@@ -1,104 +1,81 @@
-## Estratégia: preparar tudo agora, plugar a conta Asaas depois
+## Objetivo
 
-Você não precisa da conta Asaas criada para adiantarmos ~90% do trabalho. Vamos preparar banco, código, rotas e UI. Quando você criar a conta:
-
-1. Você cria a conta no Asaas (sandbox primeiro).
-2. Pega a API Key no painel.
-3. Me avisa — peço o segredo `ASAAS_API_KEY` por formulário seguro (não por chat).
-4. Você cola a URL do webhook (que já vou ter pronta) no painel Asaas + define o token.
-5. Testa um PIX de R$ 0,01 no sandbox.
-
-Enquanto isso, **tudo que não depende da chave fica pronto e testável** — inclusive a tela de PIX com QRCode usando dados mockados.
+Expandir o cadastro de campeonatos com informações institucionais (local com Google Maps, políticas, regulamento), tabela de medidas do uniforme (upload de imagens) e data limite de garantia do tamanho. As informações institucionais aparecem na página pública do campeonato; a tabela de medidas e o aviso de garantia aparecem **apenas** na página de preenchimento de dados da inscrição.
 
 ---
 
-## Diagnóstico do bug "não consigo abrir o campeonato sem ser admin"
+## 1. Banco de dados (migration)
 
-Não é bug de permissão. O campeonato `Estação Open - Brasília` está `active = true` e a policy pública permite leitura. O problema é que no admin não há link para a página pública (`/campeonatos/<slug>`), então parece bloqueado. Vou adicionar um botão "Ver página pública" + avisos quando o campeonato estiver inativo ou sem categorias ativas.
+Adicionar à tabela `championships`:
+- `location_url` (text) — link do Google Maps do local.
+- `policies` (text) — políticas gerais do evento.
+- `cancellation_policy` (text) — política de cancelamento e reembolso.
+- `regulations` (text) — regulamento do campeonato.
+- `shirt_size_guarantee_until` (timestamptz) — data limite para garantir o tamanho do uniforme.
+- `shirt_size_chart_urls` (text[]) — URLs das imagens da tabela de medidas (1 ou mais).
 
----
-
-## Sobre a chave: `ASAAS_API_KEY`, NÃO `VITE_ASAAS_API_KEY`
-
-Importante: **não usar prefixo `VITE_`**. Tudo com `VITE_*` vai parar no bundle do navegador, ou seja, qualquer pessoa veria sua chave do Asaas no DevTools e poderia criar cobranças no seu nome. A chave fica como segredo runtime, só acessível no servidor. O frontend nunca toca nela — só chama nosso endpoint.
-
----
-
-## Plano
-
-### Fase 1 — Pronto AGORA (sem depender da conta Asaas)
-
-#### 1.1 Migration de banco
-- Adicionar em `registrations`:
-  - `asaas_payment_id text` (id da cobrança no Asaas)
-  - `asaas_customer_id text` (id do cliente no Asaas)
-  - `pix_qr_code text` (copia-e-cola)
-  - `pix_qr_code_base64 text` (imagem do QRCode)
-  - `pix_expires_at timestamptz`
-  - `amount_cents int` (valor cobrado, snapshot da categoria)
-- Nova RPC `set_registration_pix(_id, _payment_id, _customer_id, _qr, _qr_b64, _expires_at)` — SECURITY DEFINER, usada pelo server.
-- A RPC `confirm_registration_by_payment` já existe — manter.
-- Habilitar Realtime na tabela `registrations` para a tela de sucesso saber na hora que o pagamento entrou.
-
-#### 1.2 Estrutura de código (com modo "fake" enquanto não há chave)
-- `src/lib/asaas.server.ts` — wrapper da API Asaas (`createCustomer`, `createPixCharge`, `getPixQrCode`).
-  - Lê `ASAAS_API_KEY` e `ASAAS_ENV` (`sandbox` | `production`).
-  - **Se a chave não estiver definida, opera em modo MOCK**: retorna QRCode de exemplo e payload PIX fake. Assim conseguimos ver a tela funcionando antes de criar a conta.
-- `src/lib/payments.functions.ts` — server function `createPixCharge({ registrationId })`:
-  - Busca inscrição + categoria + atleta1.
-  - Cria/recupera customer no Asaas.
-  - Cria cobrança PIX (`externalReference = registration_id`).
-  - Salva via `set_registration_pix`.
-  - Retorna `{ qrCodeBase64, payload, expiresAt }`.
-
-#### 1.3 Server route `/api/public/asaas-webhook` (já com URL estável)
-- `POST` recebe evento Asaas.
-- Valida header `asaas-access-token` contra `ASAAS_WEBHOOK_TOKEN` (timing-safe).
-- Valida body com Zod.
-- Idempotente: `PAYMENT_RECEIVED`/`PAYMENT_CONFIRMED` → `confirm_registration_by_payment`. `PAYMENT_REFUNDED`/`PAYMENT_DELETED` → `cancel_registration`.
-- Responde 200.
-- **URL final que você vai colar no painel Asaas**:
-  `https://project--99e9256e-6199-4540-afcf-feabc3117e21.lovable.app/api/public/asaas-webhook`
-
-#### 1.4 Frontend — tela `/sucesso/$voucher` reformulada
-- Se `status = pending` e ainda sem QRCode → botão **"Gerar PIX"** chama `createPixCharge`.
-- Mostra QRCode (`<img src="data:image/png;base64,..." />`) + Copia-e-cola com botão "Copiar".
-- Mostra valor e prazo de expiração.
-- **Realtime** na linha da inscrição: quando `status` virar `confirmed`, troca tela para "Pagamento confirmado!".
-- Botão fallback "Já paguei, atualizar".
-- Em modo MOCK, mostra um aviso amarelo: "Modo simulação — configure a chave Asaas para cobranças reais".
-
-#### 1.5 Bug do acesso público + descoberta
-- Botão "Ver página pública" no `/admin/campeonatos/$id` (abre `/campeonatos/<slug>` em nova aba).
-- Aviso quando o campeonato está inativo / sem categorias ativas.
-- `/campeonatos/$slug` mostrar mensagem clara quando não há categorias.
-
-### Fase 2 — Quando você criar a conta Asaas
-
-1. Você cria a conta (recomendo começar em **sandbox**: `https://sandbox.asaas.com`).
-2. Pega a API Key em "Integrações → Chave de API".
-3. Eu peço via formulário seguro: `ASAAS_API_KEY`, `ASAAS_ENV` (`sandbox`), `ASAAS_WEBHOOK_TOKEN` (uma string aleatória que você inventa).
-4. Você vai no painel Asaas → "Integrações → Webhooks":
-   - URL: a que vou ter pronta acima.
-   - Token: o mesmo `ASAAS_WEBHOOK_TOKEN`.
-   - Eventos: `PAYMENT_RECEIVED`, `PAYMENT_CONFIRMED`, `PAYMENT_REFUNDED`, `PAYMENT_DELETED`.
-5. Faz uma inscrição teste, paga R$ 0,01 com seu PIX → confirma que a tela atualiza sozinha.
-
-### Fase 3 — Próximos passos (depois do PIX funcionando)
-
-- Admin de inscrições (`/admin/inscricoes`) com filtros, ações (confirmar/cancelar/copiar voucher/reabrir QR), CSV export.
-- Inscrição mais robusta: bloquear quando lotado, máscara de telefone, realtime de vagas.
-- Recuperação de senha (`/esqueci-senha` + `/reset-password`).
-- E-mail de confirmação com voucher (precisa de domínio configurado — pergunto antes).
-
-### Fora do escopo
-
-- Cartão de crédito / boleto (você pediu só PIX).
-- Estorno automático.
-- Crop de imagem no cliente.
+Storage: reutilizar o bucket público `championship-covers` em subpasta `size-charts/`. Sem nova migration de bucket.
 
 ---
 
-## Posso começar pela Fase 1?
+## 2. Admin — formulário de campeonato (`admin.campeonatos.index.tsx`)
 
-Confirme e eu já começo pela migration + código com modo mock. Você consegue ver a tela de PIX funcionando hoje, mesmo sem a conta Asaas.
+No `ChampionshipDialog`, adicionar (organizado em seções dentro do mesmo dialog):
+
+**Local**
+- Campo "Local" (já existe).
+- Novo "Link Google Maps" (`location_url`).
+
+**Uniforme**
+- Upload múltiplo de imagens (`shirt_size_chart_urls`) com preview em grid e botão para remover cada uma.
+- Date picker "Data limite para garantia do tamanho" (`shirt_size_guarantee_until`).
+
+**Textos legais** (Textareas)
+- Regulamento (`regulations`)
+- Políticas do evento (`policies`)
+- Política de cancelamento e reembolso (`cancellation_policy`)
+
+Campos opcionais; admin preenche por etapas.
+
+---
+
+## 3. Página pública do campeonato (`campeonatos.$slug.tsx`)
+
+Acrescentar seções abaixo das categorias:
+- **Local**: nome + botão "Abrir no Google Maps" (se `location_url` setado).
+- **Regulamento / Políticas / Cancelamento**: accordions (`@/components/ui/accordion`).
+
+Não exibir aqui a tabela de medidas nem o aviso de garantia.
+
+---
+
+## 4. Página de inscrição (`inscricao.$categoryId.tsx`)
+
+Buscar também os campos novos do campeonato no query da categoria.
+
+- **Link "Ver tabela de medidas"** próximo aos selects de tamanho — abre Dialog com galeria das imagens de `shirt_size_chart_urls` (clicáveis para ampliar). Só renderiza se houver imagens.
+- **Aviso de garantia de tamanho** (`Alert` amarelo) no topo do bloco de uniforme:
+  - Futuro: "Garantimos a troca do tamanho para inscrições feitas até DD/MM/AAAA. Após essa data, o tamanho está sujeito à disponibilidade."
+  - Passado: "O prazo de garantia de tamanho expirou em DD/MM/AAAA. Tamanho sujeito à disponibilidade."
+  - Não renderiza se vazio.
+
+---
+
+## Detalhes técnicos
+
+- Migration única adicionando todas as colunas em `public.championships`.
+- Tipos do Supabase regenerados automaticamente.
+- Upload múltiplo: `<input type="file" multiple>` iterando `supabase.storage.from('championship-covers').upload('size-charts/{uuid}.{ext}', ...)` e acumulando URLs em `shirt_size_chart_urls`.
+- Date picker: Shadcn (Popover + Calendar com `pointer-events-auto`).
+- Datas formatadas com `Intl.DateTimeFormat('pt-BR')`.
+- Sem mudanças no fluxo Asaas.
+
+---
+
+## Arquivos afetados
+
+- `supabase/migrations/<timestamp>_championship_extras.sql` (novo)
+- `src/routes/admin.campeonatos.index.tsx`
+- `src/routes/campeonatos.$slug.tsx`
+- `src/routes/inscricao.$categoryId.tsx`
+- `src/integrations/supabase/types.ts` (auto)
