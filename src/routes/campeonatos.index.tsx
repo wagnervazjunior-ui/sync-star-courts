@@ -5,7 +5,7 @@ import { PublicHeader } from "@/components/PublicHeader";
 import { Card } from "@/components/ui/card";
 import { Calendar, MapPin } from "lucide-react";
 
-export const Route = createFileRoute("/campeonatos")({
+export const Route = createFileRoute("/campeonatos/")({
   head: () => ({ meta: [{ title: "Campeonatos — Open Sync" }, { name: "description", content: "Veja todos os campeonatos de futevôlei abertos para inscrição." }] }),
   component: ListPage,
 });
