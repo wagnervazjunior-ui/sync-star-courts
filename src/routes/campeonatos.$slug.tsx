@@ -81,6 +81,54 @@ function DetailPage() {
             })}
             {cats.length === 0 && <p className="text-muted-foreground">Nenhuma categoria disponível.</p>}
           </div>
+
+          {(ch.location || ch.location_url) && (
+            <section className="mt-12">
+              <h2 className="text-2xl font-bold">Local do evento</h2>
+              <Card className="mt-4 p-5 bg-gradient-card border-border/50 flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <MapPin className="size-5 text-primary mt-0.5" />
+                  <div>
+                    {ch.location && <p className="font-medium">{ch.location}</p>}
+                    {ch.location_url && <p className="text-xs text-muted-foreground">Veja no mapa para chegar até o local</p>}
+                  </div>
+                </div>
+                {ch.location_url && (
+                  <Button asChild variant="premium">
+                    <a href={ch.location_url} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink className="size-4" /> Abrir no Google Maps
+                    </a>
+                  </Button>
+                )}
+              </Card>
+            </section>
+          )}
+
+          {(ch.regulations || ch.policies || ch.cancellation_policy) && (
+            <section className="mt-12">
+              <h2 className="text-2xl font-bold">Informações do evento</h2>
+              <Accordion type="single" collapsible className="mt-4">
+                {ch.regulations && (
+                  <AccordionItem value="regulations">
+                    <AccordionTrigger>Regulamento</AccordionTrigger>
+                    <AccordionContent className="whitespace-pre-line text-foreground/80">{ch.regulations}</AccordionContent>
+                  </AccordionItem>
+                )}
+                {ch.policies && (
+                  <AccordionItem value="policies">
+                    <AccordionTrigger>Políticas do evento</AccordionTrigger>
+                    <AccordionContent className="whitespace-pre-line text-foreground/80">{ch.policies}</AccordionContent>
+                  </AccordionItem>
+                )}
+                {ch.cancellation_policy && (
+                  <AccordionItem value="cancellation">
+                    <AccordionTrigger>Política de cancelamento e reembolso</AccordionTrigger>
+                    <AccordionContent className="whitespace-pre-line text-foreground/80">{ch.cancellation_policy}</AccordionContent>
+                  </AccordionItem>
+                )}
+              </Accordion>
+            </section>
+          )}
         </div>
       </main>
     </div>
