@@ -61,39 +61,57 @@ export type Database = {
       championships: {
         Row: {
           active: boolean
+          cancellation_policy: string | null
           cover_image_url: string | null
           created_at: string
           description: string | null
           end_date: string | null
           id: string
           location: string | null
+          location_url: string | null
           name: string
+          policies: string | null
+          regulations: string | null
+          shirt_size_chart_urls: string[]
+          shirt_size_guarantee_until: string | null
           slug: string
           start_date: string | null
           updated_at: string
         }
         Insert: {
           active?: boolean
+          cancellation_policy?: string | null
           cover_image_url?: string | null
           created_at?: string
           description?: string | null
           end_date?: string | null
           id?: string
           location?: string | null
+          location_url?: string | null
           name: string
+          policies?: string | null
+          regulations?: string | null
+          shirt_size_chart_urls?: string[]
+          shirt_size_guarantee_until?: string | null
           slug: string
           start_date?: string | null
           updated_at?: string
         }
         Update: {
           active?: boolean
+          cancellation_policy?: string | null
           cover_image_url?: string | null
           created_at?: string
           description?: string | null
           end_date?: string | null
           id?: string
           location?: string | null
+          location_url?: string | null
           name?: string
+          policies?: string | null
+          regulations?: string | null
+          shirt_size_chart_urls?: string[]
+          shirt_size_guarantee_until?: string | null
           slug?: string
           start_date?: string | null
           updated_at?: string
