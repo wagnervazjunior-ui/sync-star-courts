@@ -6,6 +6,7 @@ export function useAuth() {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isMaster, setIsMaster] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -22,10 +23,14 @@ export function useAuth() {
   }, []);
 
   useEffect(() => {
-    if (!user) { setIsAdmin(false); return; }
-    supabase.from("user_roles").select("role").eq("user_id", user.id).eq("role", "admin").maybeSingle()
-      .then(({ data }) => setIsAdmin(!!data));
+    if (!user) { setIsAdmin(false); setIsMaster(false); return; }
+    supabase.from("user_roles").select("role").eq("user_id", user.id)
+      .then(({ data }) => {
+        const roles = (data ?? []).map((r) => r.role);
+        setIsAdmin(roles.includes("admin") || roles.includes("master" as any));
+        setIsMaster(roles.includes("master" as any));
+      });
   }, [user]);
 
-  return { session, user, isAdmin, loading };
+  return { session, user, isAdmin, isMaster, loading };
 }

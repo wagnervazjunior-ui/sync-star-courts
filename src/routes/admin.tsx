@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { LayoutDashboard, Trophy, ListChecks, LogOut, ArrowLeft } from "lucide-react";
+import { LayoutDashboard, Trophy, ListChecks, LogOut, ArrowLeft, Shield } from "lucide-react";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({ meta: [{ title: "Admin — Open Sync" }] }),
@@ -12,7 +12,7 @@ export const Route = createFileRoute("/admin")({
 });
 
 function AdminLayout() {
-  const { user, isAdmin, loading } = useAuth();
+  const { user, isAdmin, isMaster, loading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -27,7 +27,7 @@ function AdminLayout() {
         <div className="max-w-md text-center">
           <h1 className="text-2xl font-bold">Acesso restrito</h1>
           <p className="mt-2 text-muted-foreground">Sua conta não tem permissão de administrador.</p>
-          <p className="mt-2 text-xs text-muted-foreground">Peça ao responsável para promover seu usuário no banco com:<br /><code className="text-primary">INSERT INTO user_roles (user_id, role) VALUES ('{user.id}', 'admin');</code></p>
+          <p className="mt-2 text-xs text-muted-foreground">Peça ao admin master para promover sua conta.</p>
           <Button className="mt-6" variant="ghost" asChild><Link to="/"><ArrowLeft className="size-4" /> Voltar</Link></Button>
         </div>
       </div>
@@ -42,6 +42,7 @@ function AdminLayout() {
           <NavItem to="/admin" icon={LayoutDashboard} label="Dashboard" />
           <NavItem to="/admin/campeonatos" icon={Trophy} label="Campeonatos" />
           <NavItem to="/admin/inscricoes" icon={ListChecks} label="Inscrições" />
+          {isMaster && <NavItem to="/admin/administradores" icon={Shield} label="Administradores" />}
         </nav>
         <div className="mt-auto">
           <p className="text-xs text-muted-foreground truncate mb-2">{user.email}</p>
@@ -57,6 +58,7 @@ function AdminLayout() {
             <Button size="sm" variant="ghost" asChild><Link to="/admin">Dashboard</Link></Button>
             <Button size="sm" variant="ghost" asChild><Link to="/admin/campeonatos">Camp.</Link></Button>
             <Button size="sm" variant="ghost" asChild><Link to="/admin/inscricoes">Insc.</Link></Button>
+            {isMaster && <Button size="sm" variant="ghost" asChild><Link to="/admin/administradores">Admins</Link></Button>}
           </div>
         </div>
         <div className="p-6 md:p-8"><Outlet /></div>
