@@ -63,7 +63,7 @@ function LoginPage() {
           ))}
         </Tabs>
         <p className="mt-6 text-center text-xs text-muted-foreground">
-          Para virar admin, peça ao responsável para promover seu usuário no painel do banco.
+          Após criar conta, peça ao admin master para liberar seu acesso.
         </p>
       </Card>
     </div>
