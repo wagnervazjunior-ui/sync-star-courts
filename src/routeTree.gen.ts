@@ -9,38 +9,140 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as VoucherRouteImport } from './routes/voucher'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as CampeonatosRouteImport } from './routes/campeonatos'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SucessoVoucherRouteImport } from './routes/sucesso.$voucher'
+import { Route as InscricaoCategoryIdRouteImport } from './routes/inscricao.$categoryId'
+import { Route as CampeonatosSlugRouteImport } from './routes/campeonatos.$slug'
 
+const VoucherRoute = VoucherRouteImport.update({
+  id: '/voucher',
+  path: '/voucher',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CampeonatosRoute = CampeonatosRouteImport.update({
+  id: '/campeonatos',
+  path: '/campeonatos',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SucessoVoucherRoute = SucessoVoucherRouteImport.update({
+  id: '/sucesso/$voucher',
+  path: '/sucesso/$voucher',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InscricaoCategoryIdRoute = InscricaoCategoryIdRouteImport.update({
+  id: '/inscricao/$categoryId',
+  path: '/inscricao/$categoryId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CampeonatosSlugRoute = CampeonatosSlugRouteImport.update({
+  id: '/$slug',
+  path: '/$slug',
+  getParentRoute: () => CampeonatosRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/campeonatos': typeof CampeonatosRouteWithChildren
+  '/login': typeof LoginRoute
+  '/voucher': typeof VoucherRoute
+  '/campeonatos/$slug': typeof CampeonatosSlugRoute
+  '/inscricao/$categoryId': typeof InscricaoCategoryIdRoute
+  '/sucesso/$voucher': typeof SucessoVoucherRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/campeonatos': typeof CampeonatosRouteWithChildren
+  '/login': typeof LoginRoute
+  '/voucher': typeof VoucherRoute
+  '/campeonatos/$slug': typeof CampeonatosSlugRoute
+  '/inscricao/$categoryId': typeof InscricaoCategoryIdRoute
+  '/sucesso/$voucher': typeof SucessoVoucherRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/campeonatos': typeof CampeonatosRouteWithChildren
+  '/login': typeof LoginRoute
+  '/voucher': typeof VoucherRoute
+  '/campeonatos/$slug': typeof CampeonatosSlugRoute
+  '/inscricao/$categoryId': typeof InscricaoCategoryIdRoute
+  '/sucesso/$voucher': typeof SucessoVoucherRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/campeonatos'
+    | '/login'
+    | '/voucher'
+    | '/campeonatos/$slug'
+    | '/inscricao/$categoryId'
+    | '/sucesso/$voucher'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/campeonatos'
+    | '/login'
+    | '/voucher'
+    | '/campeonatos/$slug'
+    | '/inscricao/$categoryId'
+    | '/sucesso/$voucher'
+  id:
+    | '__root__'
+    | '/'
+    | '/campeonatos'
+    | '/login'
+    | '/voucher'
+    | '/campeonatos/$slug'
+    | '/inscricao/$categoryId'
+    | '/sucesso/$voucher'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CampeonatosRoute: typeof CampeonatosRouteWithChildren
+  LoginRoute: typeof LoginRoute
+  VoucherRoute: typeof VoucherRoute
+  InscricaoCategoryIdRoute: typeof InscricaoCategoryIdRoute
+  SucessoVoucherRoute: typeof SucessoVoucherRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/voucher': {
+      id: '/voucher'
+      path: '/voucher'
+      fullPath: '/voucher'
+      preLoaderRoute: typeof VoucherRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/campeonatos': {
+      id: '/campeonatos'
+      path: '/campeonatos'
+      fullPath: '/campeonatos'
+      preLoaderRoute: typeof CampeonatosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,12 +150,60 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/sucesso/$voucher': {
+      id: '/sucesso/$voucher'
+      path: '/sucesso/$voucher'
+      fullPath: '/sucesso/$voucher'
+      preLoaderRoute: typeof SucessoVoucherRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/inscricao/$categoryId': {
+      id: '/inscricao/$categoryId'
+      path: '/inscricao/$categoryId'
+      fullPath: '/inscricao/$categoryId'
+      preLoaderRoute: typeof InscricaoCategoryIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/campeonatos/$slug': {
+      id: '/campeonatos/$slug'
+      path: '/$slug'
+      fullPath: '/campeonatos/$slug'
+      preLoaderRoute: typeof CampeonatosSlugRouteImport
+      parentRoute: typeof CampeonatosRoute
+    }
   }
 }
 
+interface CampeonatosRouteChildren {
+  CampeonatosSlugRoute: typeof CampeonatosSlugRoute
+}
+
+const CampeonatosRouteChildren: CampeonatosRouteChildren = {
+  CampeonatosSlugRoute: CampeonatosSlugRoute,
+}
+
+const CampeonatosRouteWithChildren = CampeonatosRoute._addFileChildren(
+  CampeonatosRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CampeonatosRoute: CampeonatosRouteWithChildren,
+  LoginRoute: LoginRoute,
+  VoucherRoute: VoucherRoute,
+  InscricaoCategoryIdRoute: InscricaoCategoryIdRoute,
+  SucessoVoucherRoute: SucessoVoucherRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
