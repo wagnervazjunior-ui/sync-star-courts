@@ -102,6 +102,9 @@ export type Database = {
       }
       registrations: {
         Row: {
+          amount_cents: number | null
+          asaas_customer_id: string | null
+          asaas_payment_id: string | null
           athlete1_name: string
           athlete1_phone: string
           athlete1_shirt_size: Database["public"]["Enums"]["shirt_size"]
@@ -113,11 +116,17 @@ export type Database = {
           created_at: string
           id: string
           payment_id: string | null
+          pix_expires_at: string | null
+          pix_qr_code: string | null
+          pix_qr_code_base64: string | null
           status: Database["public"]["Enums"]["registration_status"]
           updated_at: string
           voucher_code: string
         }
         Insert: {
+          amount_cents?: number | null
+          asaas_customer_id?: string | null
+          asaas_payment_id?: string | null
           athlete1_name: string
           athlete1_phone: string
           athlete1_shirt_size: Database["public"]["Enums"]["shirt_size"]
@@ -129,11 +138,17 @@ export type Database = {
           created_at?: string
           id?: string
           payment_id?: string | null
+          pix_expires_at?: string | null
+          pix_qr_code?: string | null
+          pix_qr_code_base64?: string | null
           status?: Database["public"]["Enums"]["registration_status"]
           updated_at?: string
           voucher_code: string
         }
         Update: {
+          amount_cents?: number | null
+          asaas_customer_id?: string | null
+          asaas_payment_id?: string | null
           athlete1_name?: string
           athlete1_phone?: string
           athlete1_shirt_size?: Database["public"]["Enums"]["shirt_size"]
@@ -145,6 +160,9 @@ export type Database = {
           created_at?: string
           id?: string
           payment_id?: string | null
+          pix_expires_at?: string | null
+          pix_qr_code?: string | null
+          pix_qr_code_base64?: string | null
           status?: Database["public"]["Enums"]["registration_status"]
           updated_at?: string
           voucher_code?: string
@@ -216,6 +234,18 @@ export type Database = {
       }
       promote_user_to_admin: { Args: { _email: string }; Returns: Json }
       revoke_admin: { Args: { _user_id: string }; Returns: undefined }
+      set_registration_pix: {
+        Args: {
+          _amount_cents: number
+          _customer_id: string
+          _expires_at: string
+          _id: string
+          _payment_id: string
+          _qr: string
+          _qr_b64: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "admin" | "master"
