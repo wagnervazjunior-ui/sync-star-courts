@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
-import { LayoutDashboard, Trophy, ListChecks, LogOut, ArrowLeft } from "lucide-react";
+import { LayoutDashboard, Trophy, ListChecks, LogOut, ArrowLeft, Shield } from "lucide-react";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({ meta: [{ title: "Admin — Open Sync" }] }),
