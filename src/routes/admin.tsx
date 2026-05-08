@@ -27,7 +27,7 @@ function AdminLayout() {
         <div className="max-w-md text-center">
           <h1 className="text-2xl font-bold">Acesso restrito</h1>
           <p className="mt-2 text-muted-foreground">Sua conta não tem permissão de administrador.</p>
-          <p className="mt-2 text-xs text-muted-foreground">Peça ao responsável para promover seu usuário no banco com:<br /><code className="text-primary">INSERT INTO user_roles (user_id, role) VALUES ('{user.id}', 'admin');</code></p>
+          <p className="mt-2 text-xs text-muted-foreground">Peça ao admin master para promover sua conta.</p>
           <Button className="mt-6" variant="ghost" asChild><Link to="/"><ArrowLeft className="size-4" /> Voltar</Link></Button>
         </div>
       </div>
