@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, ArrowLeft } from "lucide-react";
+import { Plus, Pencil, Trash2, ArrowLeft, ExternalLink, AlertTriangle } from "lucide-react";
 
 export const Route = createFileRoute("/admin/campeonatos/$id")({
   component: ChampionshipDetail,
@@ -58,11 +58,33 @@ function ChampionshipDetail() {
           <h1 className="text-3xl font-bold">{ch?.name}</h1>
           <p className="text-muted-foreground">Categorias do campeonato</p>
         </div>
-        <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setEditing(null); }}>
-          <DialogTrigger asChild><Button variant="hero"><Plus className="size-4" /> Nova categoria</Button></DialogTrigger>
-          <CategoryDialog initial={editing} onSave={save} />
-        </Dialog>
+        <div className="flex gap-2">
+          {ch?.slug && (
+            <Button variant="outline" asChild>
+              <a href={`/campeonatos/${ch.slug}`} target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="size-4" /> Ver página pública
+              </a>
+            </Button>
+          )}
+          <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setEditing(null); }}>
+            <DialogTrigger asChild><Button variant="hero"><Plus className="size-4" /> Nova categoria</Button></DialogTrigger>
+            <CategoryDialog initial={editing} onSave={save} />
+          </Dialog>
+        </div>
       </div>
+
+      {ch && !ch.active && (
+        <div className="mt-4 flex items-start gap-2 rounded-md border border-yellow-500/30 bg-yellow-500/10 p-3 text-sm text-yellow-200">
+          <AlertTriangle className="size-4 mt-0.5" />
+          <span>Este campeonato está <strong>inativo</strong> e não aparece publicamente. Ative-o na lista de campeonatos para liberar inscrições.</span>
+        </div>
+      )}
+      {ch?.active && cats && cats.length > 0 && cats.every((c: any) => !c.active) && (
+        <div className="mt-4 flex items-start gap-2 rounded-md border border-yellow-500/30 bg-yellow-500/10 p-3 text-sm text-yellow-200">
+          <AlertTriangle className="size-4 mt-0.5" />
+          <span>Nenhuma categoria está ativa. Ative pelo menos uma para que o público consiga se inscrever.</span>
+        </div>
+      )}
 
       <div className="mt-6 grid gap-3">
         {cats?.map((c) => (
