@@ -9,38 +9,206 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as VoucherRouteImport } from './routes/voucher'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as CampeonatosRouteImport } from './routes/campeonatos'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as SucessoVoucherRouteImport } from './routes/sucesso.$voucher'
+import { Route as InscricaoCategoryIdRouteImport } from './routes/inscricao.$categoryId'
+import { Route as CampeonatosSlugRouteImport } from './routes/campeonatos.$slug'
+import { Route as AdminInscricoesRouteImport } from './routes/admin.inscricoes'
+import { Route as AdminCampeonatosRouteImport } from './routes/admin.campeonatos'
+import { Route as AdminCampeonatosIdRouteImport } from './routes/admin.campeonatos.$id'
 
+const VoucherRoute = VoucherRouteImport.update({
+  id: '/voucher',
+  path: '/voucher',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CampeonatosRoute = CampeonatosRouteImport.update({
+  id: '/campeonatos',
+  path: '/campeonatos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const SucessoVoucherRoute = SucessoVoucherRouteImport.update({
+  id: '/sucesso/$voucher',
+  path: '/sucesso/$voucher',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InscricaoCategoryIdRoute = InscricaoCategoryIdRouteImport.update({
+  id: '/inscricao/$categoryId',
+  path: '/inscricao/$categoryId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CampeonatosSlugRoute = CampeonatosSlugRouteImport.update({
+  id: '/$slug',
+  path: '/$slug',
+  getParentRoute: () => CampeonatosRoute,
+} as any)
+const AdminInscricoesRoute = AdminInscricoesRouteImport.update({
+  id: '/inscricoes',
+  path: '/inscricoes',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminCampeonatosRoute = AdminCampeonatosRouteImport.update({
+  id: '/campeonatos',
+  path: '/campeonatos',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminCampeonatosIdRoute = AdminCampeonatosIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => AdminCampeonatosRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
+  '/campeonatos': typeof CampeonatosRouteWithChildren
+  '/login': typeof LoginRoute
+  '/voucher': typeof VoucherRoute
+  '/admin/campeonatos': typeof AdminCampeonatosRouteWithChildren
+  '/admin/inscricoes': typeof AdminInscricoesRoute
+  '/campeonatos/$slug': typeof CampeonatosSlugRoute
+  '/inscricao/$categoryId': typeof InscricaoCategoryIdRoute
+  '/sucesso/$voucher': typeof SucessoVoucherRoute
+  '/admin/': typeof AdminIndexRoute
+  '/admin/campeonatos/$id': typeof AdminCampeonatosIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/campeonatos': typeof CampeonatosRouteWithChildren
+  '/login': typeof LoginRoute
+  '/voucher': typeof VoucherRoute
+  '/admin/campeonatos': typeof AdminCampeonatosRouteWithChildren
+  '/admin/inscricoes': typeof AdminInscricoesRoute
+  '/campeonatos/$slug': typeof CampeonatosSlugRoute
+  '/inscricao/$categoryId': typeof InscricaoCategoryIdRoute
+  '/sucesso/$voucher': typeof SucessoVoucherRoute
+  '/admin': typeof AdminIndexRoute
+  '/admin/campeonatos/$id': typeof AdminCampeonatosIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
+  '/campeonatos': typeof CampeonatosRouteWithChildren
+  '/login': typeof LoginRoute
+  '/voucher': typeof VoucherRoute
+  '/admin/campeonatos': typeof AdminCampeonatosRouteWithChildren
+  '/admin/inscricoes': typeof AdminInscricoesRoute
+  '/campeonatos/$slug': typeof CampeonatosSlugRoute
+  '/inscricao/$categoryId': typeof InscricaoCategoryIdRoute
+  '/sucesso/$voucher': typeof SucessoVoucherRoute
+  '/admin/': typeof AdminIndexRoute
+  '/admin/campeonatos/$id': typeof AdminCampeonatosIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/admin'
+    | '/campeonatos'
+    | '/login'
+    | '/voucher'
+    | '/admin/campeonatos'
+    | '/admin/inscricoes'
+    | '/campeonatos/$slug'
+    | '/inscricao/$categoryId'
+    | '/sucesso/$voucher'
+    | '/admin/'
+    | '/admin/campeonatos/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/campeonatos'
+    | '/login'
+    | '/voucher'
+    | '/admin/campeonatos'
+    | '/admin/inscricoes'
+    | '/campeonatos/$slug'
+    | '/inscricao/$categoryId'
+    | '/sucesso/$voucher'
+    | '/admin'
+    | '/admin/campeonatos/$id'
+  id:
+    | '__root__'
+    | '/'
+    | '/admin'
+    | '/campeonatos'
+    | '/login'
+    | '/voucher'
+    | '/admin/campeonatos'
+    | '/admin/inscricoes'
+    | '/campeonatos/$slug'
+    | '/inscricao/$categoryId'
+    | '/sucesso/$voucher'
+    | '/admin/'
+    | '/admin/campeonatos/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRouteWithChildren
+  CampeonatosRoute: typeof CampeonatosRouteWithChildren
+  LoginRoute: typeof LoginRoute
+  VoucherRoute: typeof VoucherRoute
+  InscricaoCategoryIdRoute: typeof InscricaoCategoryIdRoute
+  SucessoVoucherRoute: typeof SucessoVoucherRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/voucher': {
+      id: '/voucher'
+      path: '/voucher'
+      fullPath: '/voucher'
+      preLoaderRoute: typeof VoucherRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/campeonatos': {
+      id: '/campeonatos'
+      path: '/campeonatos'
+      fullPath: '/campeonatos'
+      preLoaderRoute: typeof CampeonatosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,22 +216,104 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/sucesso/$voucher': {
+      id: '/sucesso/$voucher'
+      path: '/sucesso/$voucher'
+      fullPath: '/sucesso/$voucher'
+      preLoaderRoute: typeof SucessoVoucherRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/inscricao/$categoryId': {
+      id: '/inscricao/$categoryId'
+      path: '/inscricao/$categoryId'
+      fullPath: '/inscricao/$categoryId'
+      preLoaderRoute: typeof InscricaoCategoryIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/campeonatos/$slug': {
+      id: '/campeonatos/$slug'
+      path: '/$slug'
+      fullPath: '/campeonatos/$slug'
+      preLoaderRoute: typeof CampeonatosSlugRouteImport
+      parentRoute: typeof CampeonatosRoute
+    }
+    '/admin/inscricoes': {
+      id: '/admin/inscricoes'
+      path: '/inscricoes'
+      fullPath: '/admin/inscricoes'
+      preLoaderRoute: typeof AdminInscricoesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/campeonatos': {
+      id: '/admin/campeonatos'
+      path: '/campeonatos'
+      fullPath: '/admin/campeonatos'
+      preLoaderRoute: typeof AdminCampeonatosRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/campeonatos/$id': {
+      id: '/admin/campeonatos/$id'
+      path: '/$id'
+      fullPath: '/admin/campeonatos/$id'
+      preLoaderRoute: typeof AdminCampeonatosIdRouteImport
+      parentRoute: typeof AdminCampeonatosRoute
+    }
   }
 }
 
+interface AdminCampeonatosRouteChildren {
+  AdminCampeonatosIdRoute: typeof AdminCampeonatosIdRoute
+}
+
+const AdminCampeonatosRouteChildren: AdminCampeonatosRouteChildren = {
+  AdminCampeonatosIdRoute: AdminCampeonatosIdRoute,
+}
+
+const AdminCampeonatosRouteWithChildren =
+  AdminCampeonatosRoute._addFileChildren(AdminCampeonatosRouteChildren)
+
+interface AdminRouteChildren {
+  AdminCampeonatosRoute: typeof AdminCampeonatosRouteWithChildren
+  AdminInscricoesRoute: typeof AdminInscricoesRoute
+  AdminIndexRoute: typeof AdminIndexRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminCampeonatosRoute: AdminCampeonatosRouteWithChildren,
+  AdminInscricoesRoute: AdminInscricoesRoute,
+  AdminIndexRoute: AdminIndexRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+
+interface CampeonatosRouteChildren {
+  CampeonatosSlugRoute: typeof CampeonatosSlugRoute
+}
+
+const CampeonatosRouteChildren: CampeonatosRouteChildren = {
+  CampeonatosSlugRoute: CampeonatosSlugRoute,
+}
+
+const CampeonatosRouteWithChildren = CampeonatosRoute._addFileChildren(
+  CampeonatosRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRouteWithChildren,
+  CampeonatosRoute: CampeonatosRouteWithChildren,
+  LoginRoute: LoginRoute,
+  VoucherRoute: VoucherRoute,
+  InscricaoCategoryIdRoute: InscricaoCategoryIdRoute,
+  SucessoVoucherRoute: SucessoVoucherRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
