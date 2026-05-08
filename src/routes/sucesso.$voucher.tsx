@@ -1,54 +1,197 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
+import { createPixCharge } from "@/lib/payments.functions";
 import { PublicHeader } from "@/components/PublicHeader";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, Copy, Loader2, AlertTriangle } from "lucide-react";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/sucesso/$voucher")({
-  head: () => ({ meta: [{ title: "Inscrição confirmada — Open Sync" }] }),
+  head: () => ({ meta: [{ title: "Inscrição — Open Sync" }] }),
   component: SuccessPage,
 });
 
+type RegInfo = {
+  id: string;
+  status: string;
+  pix_qr_code: string | null;
+  pix_qr_code_base64: string | null;
+  pix_expires_at: string | null;
+  amount_cents: number | null;
+  category?: { name?: string; price_cents?: number };
+  championship?: { name?: string };
+};
+
 function SuccessPage() {
   const { voucher } = Route.useParams();
-  const { data } = useQuery({
+  const qc = useQueryClient();
+  const callCreatePix = useServerFn(createPixCharge);
+
+  const { data, isLoading } = useQuery({
     queryKey: ["voucher", voucher],
     queryFn: async () => {
       const { data, error } = await supabase.rpc("get_registration_by_voucher", { _code: voucher });
       if (error) throw error;
-      return data as any;
+      return data as RegInfo | null;
     },
   });
+
+  // Realtime: when our registration row changes, refetch.
+  useEffect(() => {
+    if (!data?.id) return;
+    const channel = supabase
+      .channel(`reg-${data.id}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "registrations", filter: `id=eq.${data.id}` },
+        () => {
+          qc.invalidateQueries({ queryKey: ["voucher", voucher] });
+        },
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [data?.id, voucher, qc]);
+
+  const [generating, setGenerating] = useState(false);
+  const [mock, setMock] = useState(false);
+
+  const handleGenerate = async () => {
+    setGenerating(true);
+    try {
+      const res = await callCreatePix({ data: { voucher } });
+      if ("mock" in res) setMock(res.mock);
+      qc.invalidateQueries({ queryKey: ["voucher", voucher] });
+    } catch (err: any) {
+      toast.error(err?.message ?? "Erro ao gerar PIX");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  // Auto-generate on first load if pending without PIX
+  useEffect(() => {
+    if (!data) return;
+    if (data.status === "pending" && !data.pix_qr_code && !generating) {
+      handleGenerate();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data?.id]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen">
+        <PublicHeader />
+        <main className="mx-auto max-w-xl px-4 py-12 text-center">
+          <Loader2 className="mx-auto size-8 animate-spin text-muted-foreground" />
+        </main>
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="min-h-screen">
+        <PublicHeader />
+        <main className="mx-auto max-w-xl px-4 py-12">
+          <Card className="p-8 text-center">
+            <p>Voucher não encontrado.</p>
+            <Button asChild variant="ghost" className="mt-4"><Link to="/">Voltar</Link></Button>
+          </Card>
+        </main>
+      </div>
+    );
+  }
+
+  const isConfirmed = data.status === "confirmed";
+  const amount = data.amount_cents ?? data.category?.price_cents ?? 0;
+
+  const copyPayload = async () => {
+    if (!data.pix_qr_code) return;
+    await navigator.clipboard.writeText(data.pix_qr_code);
+    toast.success("Código PIX copiado");
+  };
 
   return (
     <div className="min-h-screen">
       <PublicHeader />
-      <main className="mx-auto max-w-xl px-4 py-12">
+      <main className="mx-auto max-w-xl px-4 py-10 space-y-4">
         <Card className="p-8 bg-gradient-card border-border/50 shadow-elegant text-center">
-          <div className="mx-auto inline-flex size-16 items-center justify-center rounded-full bg-success/20 text-success">
-            <CheckCircle2 className="size-10" />
+          <div className={`mx-auto inline-flex size-16 items-center justify-center rounded-full ${isConfirmed ? "bg-success/20 text-success" : "bg-primary/20 text-primary"}`}>
+            {isConfirmed ? <CheckCircle2 className="size-10" /> : <Loader2 className="size-10 animate-spin" />}
           </div>
-          <h1 className="mt-4 text-3xl font-bold">Inscrição registrada!</h1>
-          <p className="mt-2 text-muted-foreground">Guarde seu voucher abaixo.</p>
+          <h1 className="mt-4 text-3xl font-bold">
+            {isConfirmed ? "Pagamento confirmado!" : "Inscrição registrada"}
+          </h1>
+          <p className="mt-2 text-muted-foreground">
+            {isConfirmed ? "Sua inscrição está garantida." : "Pague o PIX abaixo para garantir sua vaga."}
+          </p>
           <div className="mt-6 rounded-xl border border-primary/30 bg-primary/10 p-6">
             <p className="text-xs uppercase tracking-widest text-muted-foreground">Voucher</p>
             <p className="mt-2 text-3xl font-bold tracking-widest text-gradient">{voucher}</p>
           </div>
-          {data && (
-            <div className="mt-6 text-left text-sm">
-              <p><strong>Campeonato:</strong> {data.championship?.name}</p>
-              <p><strong>Categoria:</strong> {data.category?.name}</p>
-              <p className="mt-2"><strong>Status:</strong> <Badge>{data.status}</Badge></p>
-            </div>
-          )}
-          <div className="mt-8 flex flex-col gap-2">
-            <Button variant="hero" disabled>Pagar agora (em breve)</Button>
-            <Button variant="ghost" asChild><Link to="/">Voltar</Link></Button>
+          <div className="mt-6 text-left text-sm space-y-1">
+            <p><strong>Campeonato:</strong> {data.championship?.name}</p>
+            <p><strong>Categoria:</strong> {data.category?.name}</p>
+            <p><strong>Valor:</strong> R$ {(amount / 100).toFixed(2).replace(".", ",")}</p>
+            <p className="mt-2"><strong>Status:</strong>{" "}
+              <Badge variant={isConfirmed ? "default" : "secondary"}>
+                {isConfirmed ? "Confirmado" : data.status}
+              </Badge>
+            </p>
           </div>
         </Card>
+
+        {!isConfirmed && (
+          <Card className="p-6 bg-gradient-card border-border/50">
+            {mock && (
+              <div className="mb-4 flex items-start gap-2 rounded-md border border-yellow-500/30 bg-yellow-500/10 p-3 text-sm text-yellow-200">
+                <AlertTriangle className="size-4 mt-0.5" />
+                <span>Modo simulação — configure a chave Asaas para gerar cobranças reais.</span>
+              </div>
+            )}
+            {data.pix_qr_code_base64 ? (
+              <div className="space-y-4">
+                <div className="flex justify-center">
+                  <img
+                    src={`data:image/png;base64,${data.pix_qr_code_base64}`}
+                    alt="QRCode PIX"
+                    className="size-56 rounded-lg bg-white p-2"
+                  />
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">PIX copia e cola</p>
+                  <div className="flex gap-2">
+                    <code className="flex-1 truncate rounded-md border border-border/50 bg-background px-3 py-2 text-xs">
+                      {data.pix_qr_code}
+                    </code>
+                    <Button size="sm" variant="outline" onClick={copyPayload}><Copy className="size-4" /></Button>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground text-center">
+                  Esta tela atualiza sozinha quando o pagamento for identificado.
+                </p>
+                <Button variant="ghost" className="w-full" onClick={() => qc.invalidateQueries({ queryKey: ["voucher", voucher] })}>
+                  Já paguei, atualizar
+                </Button>
+              </div>
+            ) : (
+              <Button variant="hero" className="w-full" onClick={handleGenerate} disabled={generating}>
+                {generating ? "Gerando PIX…" : "Gerar PIX"}
+              </Button>
+            )}
+          </Card>
+        )}
+
+        <div className="text-center">
+          <Button variant="ghost" asChild><Link to="/">Voltar para o início</Link></Button>
+        </div>
       </main>
     </div>
   );
