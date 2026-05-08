@@ -24,8 +24,9 @@ function LoginPage() {
   const handle = async (mode: "login" | "signup") => {
     setLoading(true);
     try {
-      const fn = mode === "login" ? supabase.auth.signInWithPassword : supabase.auth.signUp;
-      const { error } = await fn({ email, password });
+      const { error } = mode === "login"
+        ? await supabase.auth.signInWithPassword({ email, password })
+        : await supabase.auth.signUp({ email, password });
       if (error) throw error;
       toast.success(mode === "login" ? "Bem-vindo!" : "Conta criada!");
       navigate({ to: "/admin" });
