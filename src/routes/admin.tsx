@@ -42,6 +42,7 @@ function AdminLayout() {
           <NavItem to="/admin" icon={LayoutDashboard} label="Dashboard" />
           <NavItem to="/admin/campeonatos" icon={Trophy} label="Campeonatos" />
           <NavItem to="/admin/inscricoes" icon={ListChecks} label="Inscrições" />
+          {isMaster && <NavItem to="/admin/administradores" icon={Shield} label="Administradores" />}
         </nav>
         <div className="mt-auto">
           <p className="text-xs text-muted-foreground truncate mb-2">{user.email}</p>
