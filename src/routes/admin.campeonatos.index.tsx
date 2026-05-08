@@ -91,8 +91,14 @@ function ChampionshipsPage() {
 }
 
 function ChampionshipDialog({ initial, onSave }: { initial: any; onSave: (v: any) => void }) {
-  const [form, setForm] = useState(() => initial ?? { name: "", slug: "", description: "", start_date: "", end_date: "", location: "", cover_image_url: "", active: true });
+  const [form, setForm] = useState(() => initial ?? {
+    name: "", slug: "", description: "", start_date: "", end_date: "",
+    location: "", location_url: "", cover_image_url: "", active: true,
+    regulations: "", policies: "", cancellation_policy: "",
+    shirt_size_chart_urls: [] as string[], shirt_size_guarantee_until: "",
+  });
   const [uploading, setUploading] = useState(false);
+  const [uploadingChart, setUploadingChart] = useState(false);
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -114,10 +120,50 @@ function ChampionshipDialog({ initial, onSave }: { initial: any; onSave: (v: any
     }
   };
 
+  const handleChartFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    if (!files.length) return;
+    setUploadingChart(true);
+    try {
+      const urls: string[] = [];
+      for (const file of files) {
+        const ext = file.name.split(".").pop() ?? "jpg";
+        const path = `size-charts/${crypto.randomUUID()}.${ext}`;
+        const { error } = await supabase.storage.from("championship-covers").upload(path, file, { upsert: false, contentType: file.type });
+        if (error) throw error;
+        const { data } = supabase.storage.from("championship-covers").getPublicUrl(path);
+        urls.push(data.publicUrl);
+      }
+      setForm({ ...form, shirt_size_chart_urls: [...(form.shirt_size_chart_urls ?? []), ...urls] });
+      toast.success(`${urls.length} imagem(ns) enviada(s)`);
+    } catch (err: any) {
+      toast.error(err.message ?? "Falha no upload");
+    } finally {
+      setUploadingChart(false);
+      e.target.value = "";
+    }
+  };
+
+  const removeChart = (url: string) => {
+    setForm({ ...form, shirt_size_chart_urls: (form.shirt_size_chart_urls ?? []).filter((u: string) => u !== url) });
+  };
+
+  const handleSave = () => {
+    const payload = {
+      ...form,
+      shirt_size_guarantee_until: form.shirt_size_guarantee_until || null,
+      location_url: form.location_url || null,
+      regulations: form.regulations || null,
+      policies: form.policies || null,
+      cancellation_policy: form.cancellation_policy || null,
+    };
+    onSave(payload);
+  };
+
   return (
-    <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+    <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
       <DialogHeader><DialogTitle>{initial ? "Editar" : "Novo"} campeonato</DialogTitle></DialogHeader>
-      <div className="space-y-4">
+      <div className="space-y-5">
         <div className="space-y-2"><Label>Nome</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
         <div className="space-y-2"><Label>Slug (URL)</Label><Input placeholder="auto-gerado" value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} /></div>
         <div className="space-y-2"><Label>Descrição</Label><Textarea rows={4} value={form.description ?? ""} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
@@ -125,7 +171,13 @@ function ChampionshipDialog({ initial, onSave }: { initial: any; onSave: (v: any
           <div className="space-y-2"><Label>Início</Label><Input type="date" value={form.start_date ?? ""} onChange={(e) => setForm({ ...form, start_date: e.target.value })} /></div>
           <div className="space-y-2"><Label>Fim</Label><Input type="date" value={form.end_date ?? ""} onChange={(e) => setForm({ ...form, end_date: e.target.value })} /></div>
         </div>
-        <div className="space-y-2"><Label>Local</Label><Input value={form.location ?? ""} onChange={(e) => setForm({ ...form, location: e.target.value })} /></div>
+
+        <div className="rounded-lg border border-border/50 p-4 space-y-3">
+          <h4 className="font-semibold text-sm">Local</h4>
+          <div className="space-y-2"><Label>Local</Label><Input value={form.location ?? ""} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="Ex: Ginásio Nilson Nelson, Brasília — DF" /></div>
+          <div className="space-y-2"><Label>Link Google Maps</Label><Input type="url" value={form.location_url ?? ""} onChange={(e) => setForm({ ...form, location_url: e.target.value })} placeholder="https://maps.google.com/..." /></div>
+        </div>
+
         <div className="space-y-2">
           <Label>Imagem de capa</Label>
           {form.cover_image_url && (
@@ -142,9 +194,50 @@ function ChampionshipDialog({ initial, onSave }: { initial: any; onSave: (v: any
             <input type="file" accept="image/*" className="hidden" onChange={handleFile} disabled={uploading} />
           </label>
         </div>
+
+        <div className="rounded-lg border border-border/50 p-4 space-y-3">
+          <h4 className="font-semibold text-sm">Uniforme</h4>
+          <div className="space-y-2">
+            <Label>Tabela de medidas (uma ou mais imagens)</Label>
+            {(form.shirt_size_chart_urls ?? []).length > 0 && (
+              <div className="grid grid-cols-3 gap-2">
+                {form.shirt_size_chart_urls.map((url: string) => (
+                  <div key={url} className="relative rounded-md overflow-hidden border border-border/50">
+                    <img src={url} alt="Tabela de medidas" className="w-full h-24 object-cover" />
+                    <Button type="button" size="sm" variant="ghost" className="absolute top-1 right-1 h-6 w-6 p-0 bg-background/80 backdrop-blur" onClick={() => removeChart(url)}>
+                      <X className="size-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <label className="flex items-center justify-center gap-2 px-4 py-3 border border-dashed border-border rounded-lg cursor-pointer hover:bg-accent/30 transition-colors text-sm text-muted-foreground">
+              {uploadingChart ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
+              {uploadingChart ? "Enviando..." : "Adicionar imagens"}
+              <input type="file" accept="image/*" multiple className="hidden" onChange={handleChartFiles} disabled={uploadingChart} />
+            </label>
+          </div>
+          <div className="space-y-2">
+            <Label>Data limite para garantia do tamanho</Label>
+            <Input
+              type="date"
+              value={form.shirt_size_guarantee_until ? String(form.shirt_size_guarantee_until).slice(0, 10) : ""}
+              onChange={(e) => setForm({ ...form, shirt_size_guarantee_until: e.target.value })}
+            />
+            <p className="text-xs text-muted-foreground">Após essa data, o tamanho fica sujeito à disponibilidade.</p>
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-border/50 p-4 space-y-3">
+          <h4 className="font-semibold text-sm">Textos legais</h4>
+          <div className="space-y-2"><Label>Regulamento</Label><Textarea rows={4} value={form.regulations ?? ""} onChange={(e) => setForm({ ...form, regulations: e.target.value })} /></div>
+          <div className="space-y-2"><Label>Políticas do evento</Label><Textarea rows={4} value={form.policies ?? ""} onChange={(e) => setForm({ ...form, policies: e.target.value })} /></div>
+          <div className="space-y-2"><Label>Política de cancelamento e reembolso</Label><Textarea rows={4} value={form.cancellation_policy ?? ""} onChange={(e) => setForm({ ...form, cancellation_policy: e.target.value })} /></div>
+        </div>
+
         <div className="flex items-center gap-2"><Switch checked={form.active} onCheckedChange={(v) => setForm({ ...form, active: v })} /><Label>Ativo</Label></div>
       </div>
-      <DialogFooter><Button variant="hero" onClick={() => onSave(form)} disabled={uploading}>Salvar</Button></DialogFooter>
+      <DialogFooter><Button variant="hero" onClick={handleSave} disabled={uploading || uploadingChart}>Salvar</Button></DialogFooter>
     </DialogContent>
   );
 }
