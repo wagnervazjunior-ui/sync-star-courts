@@ -101,6 +101,8 @@ function RegisterPage() {
               {form.formState.errors.contact_email && <p className="text-xs text-destructive">{form.formState.errors.contact_email.message}</p>}
             </div>
 
+            {ctx && <UniformNotice championship={ctx.championship} />}
+
             {[1, 2].map((n) => (
               <div key={n} className="rounded-lg border border-border/50 p-4 space-y-4">
                 <h3 className="font-semibold text-primary">Atleta {n}</h3>
@@ -118,7 +120,10 @@ function RegisterPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Tamanho do uniforme</Label>
+                    <div className="flex items-center justify-between gap-2">
+                      <Label>Tamanho do uniforme</Label>
+                      {ctx && <SizeChartLink urls={ctx.championship.shirt_size_chart_urls ?? []} />}
+                    </div>
                     <Select
                       defaultValue="M"
                       onValueChange={(v) => form.setValue(`athlete${n}_shirt_size` as any, v as any)}
@@ -140,5 +145,46 @@ function RegisterPage() {
         </Card>
       </main>
     </div>
+  );
+}
+
+function UniformNotice({ championship }: { championship: any }) {
+  const until = championship?.shirt_size_guarantee_until;
+  if (!until) return null;
+  const date = new Date(until);
+  const formatted = date.toLocaleDateString("pt-BR");
+  const expired = date.getTime() < Date.now();
+  return (
+    <Alert className={expired ? "border-destructive/40" : "border-primary/40"}>
+      <AlertTriangle className="size-4" />
+      <AlertDescription>
+        {expired
+          ? `O prazo de garantia do tamanho do uniforme expirou em ${formatted}. O tamanho está sujeito à disponibilidade.`
+          : `Garantimos a troca do tamanho para inscrições feitas até ${formatted}. Após essa data, o tamanho fica sujeito à disponibilidade.`}
+      </AlertDescription>
+    </Alert>
+  );
+}
+
+function SizeChartLink({ urls }: { urls: string[] }) {
+  if (!urls?.length) return null;
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <button type="button" className="text-xs text-primary hover:underline inline-flex items-center gap-1">
+          <Ruler className="size-3" /> Ver tabela de medidas
+        </button>
+      </DialogTrigger>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader><DialogTitle>Tabela de medidas do uniforme</DialogTitle></DialogHeader>
+        <div className="grid gap-3">
+          {urls.map((url) => (
+            <a key={url} href={url} target="_blank" rel="noopener noreferrer">
+              <img src={url} alt="Tabela de medidas" className="w-full rounded-md border border-border/50" />
+            </a>
+          ))}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
