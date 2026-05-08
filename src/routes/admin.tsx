@@ -58,6 +58,7 @@ function AdminLayout() {
             <Button size="sm" variant="ghost" asChild><Link to="/admin">Dashboard</Link></Button>
             <Button size="sm" variant="ghost" asChild><Link to="/admin/campeonatos">Camp.</Link></Button>
             <Button size="sm" variant="ghost" asChild><Link to="/admin/inscricoes">Insc.</Link></Button>
+            {isMaster && <Button size="sm" variant="ghost" asChild><Link to="/admin/administradores">Admins</Link></Button>}
           </div>
         </div>
         <div className="p-6 md:p-8"><Outlet /></div>
