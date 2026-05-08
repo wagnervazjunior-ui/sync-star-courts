@@ -19,7 +19,6 @@ import { Route as SucessoVoucherRouteImport } from './routes/sucesso.$voucher'
 import { Route as InscricaoCategoryIdRouteImport } from './routes/inscricao.$categoryId'
 import { Route as CampeonatosSlugRouteImport } from './routes/campeonatos.$slug'
 import { Route as AdminInscricoesRouteImport } from './routes/admin.inscricoes'
-import { Route as AdminCampeonatosRouteImport } from './routes/admin.campeonatos'
 import { Route as AdminAdministradoresRouteImport } from './routes/admin.administradores'
 import { Route as AdminCampeonatosIndexRouteImport } from './routes/admin.campeonatos.index'
 import { Route as AdminCampeonatosIdRouteImport } from './routes/admin.campeonatos.$id'
@@ -74,25 +73,20 @@ const AdminInscricoesRoute = AdminInscricoesRouteImport.update({
   path: '/inscricoes',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminCampeonatosRoute = AdminCampeonatosRouteImport.update({
-  id: '/campeonatos',
-  path: '/campeonatos',
-  getParentRoute: () => AdminRoute,
-} as any)
 const AdminAdministradoresRoute = AdminAdministradoresRouteImport.update({
   id: '/administradores',
   path: '/administradores',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminCampeonatosIndexRoute = AdminCampeonatosIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => AdminCampeonatosRoute,
+  id: '/campeonatos/',
+  path: '/campeonatos/',
+  getParentRoute: () => AdminRoute,
 } as any)
 const AdminCampeonatosIdRoute = AdminCampeonatosIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => AdminCampeonatosRoute,
+  id: '/campeonatos/$id',
+  path: '/campeonatos/$id',
+  getParentRoute: () => AdminRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -102,7 +96,6 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/voucher': typeof VoucherRoute
   '/admin/administradores': typeof AdminAdministradoresRoute
-  '/admin/campeonatos': typeof AdminCampeonatosRouteWithChildren
   '/admin/inscricoes': typeof AdminInscricoesRoute
   '/campeonatos/$slug': typeof CampeonatosSlugRoute
   '/inscricao/$categoryId': typeof InscricaoCategoryIdRoute
@@ -133,7 +126,6 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/voucher': typeof VoucherRoute
   '/admin/administradores': typeof AdminAdministradoresRoute
-  '/admin/campeonatos': typeof AdminCampeonatosRouteWithChildren
   '/admin/inscricoes': typeof AdminInscricoesRoute
   '/campeonatos/$slug': typeof CampeonatosSlugRoute
   '/inscricao/$categoryId': typeof InscricaoCategoryIdRoute
@@ -151,7 +143,6 @@ export interface FileRouteTypes {
     | '/login'
     | '/voucher'
     | '/admin/administradores'
-    | '/admin/campeonatos'
     | '/admin/inscricoes'
     | '/campeonatos/$slug'
     | '/inscricao/$categoryId'
@@ -181,7 +172,6 @@ export interface FileRouteTypes {
     | '/login'
     | '/voucher'
     | '/admin/administradores'
-    | '/admin/campeonatos'
     | '/admin/inscricoes'
     | '/campeonatos/$slug'
     | '/inscricao/$categoryId'
@@ -273,13 +263,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminInscricoesRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/admin/campeonatos': {
-      id: '/admin/campeonatos'
-      path: '/campeonatos'
-      fullPath: '/admin/campeonatos'
-      preLoaderRoute: typeof AdminCampeonatosRouteImport
-      parentRoute: typeof AdminRoute
-    }
     '/admin/administradores': {
       id: '/admin/administradores'
       path: '/administradores'
@@ -289,46 +272,35 @@ declare module '@tanstack/react-router' {
     }
     '/admin/campeonatos/': {
       id: '/admin/campeonatos/'
-      path: '/'
+      path: '/campeonatos'
       fullPath: '/admin/campeonatos/'
       preLoaderRoute: typeof AdminCampeonatosIndexRouteImport
-      parentRoute: typeof AdminCampeonatosRoute
+      parentRoute: typeof AdminRoute
     }
     '/admin/campeonatos/$id': {
       id: '/admin/campeonatos/$id'
-      path: '/$id'
+      path: '/campeonatos/$id'
       fullPath: '/admin/campeonatos/$id'
       preLoaderRoute: typeof AdminCampeonatosIdRouteImport
-      parentRoute: typeof AdminCampeonatosRoute
+      parentRoute: typeof AdminRoute
     }
   }
 }
 
-interface AdminCampeonatosRouteChildren {
+interface AdminRouteChildren {
+  AdminAdministradoresRoute: typeof AdminAdministradoresRoute
+  AdminInscricoesRoute: typeof AdminInscricoesRoute
+  AdminIndexRoute: typeof AdminIndexRoute
   AdminCampeonatosIdRoute: typeof AdminCampeonatosIdRoute
   AdminCampeonatosIndexRoute: typeof AdminCampeonatosIndexRoute
 }
 
-const AdminCampeonatosRouteChildren: AdminCampeonatosRouteChildren = {
-  AdminCampeonatosIdRoute: AdminCampeonatosIdRoute,
-  AdminCampeonatosIndexRoute: AdminCampeonatosIndexRoute,
-}
-
-const AdminCampeonatosRouteWithChildren =
-  AdminCampeonatosRoute._addFileChildren(AdminCampeonatosRouteChildren)
-
-interface AdminRouteChildren {
-  AdminAdministradoresRoute: typeof AdminAdministradoresRoute
-  AdminCampeonatosRoute: typeof AdminCampeonatosRouteWithChildren
-  AdminInscricoesRoute: typeof AdminInscricoesRoute
-  AdminIndexRoute: typeof AdminIndexRoute
-}
-
 const AdminRouteChildren: AdminRouteChildren = {
   AdminAdministradoresRoute: AdminAdministradoresRoute,
-  AdminCampeonatosRoute: AdminCampeonatosRouteWithChildren,
   AdminInscricoesRoute: AdminInscricoesRoute,
   AdminIndexRoute: AdminIndexRoute,
+  AdminCampeonatosIdRoute: AdminCampeonatosIdRoute,
+  AdminCampeonatosIndexRoute: AdminCampeonatosIndexRoute,
 }
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
@@ -357,3 +329,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
