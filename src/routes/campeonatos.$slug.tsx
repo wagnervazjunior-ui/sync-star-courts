@@ -5,7 +5,8 @@ import { PublicHeader } from "@/components/PublicHeader";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, MapPin, Users } from "lucide-react";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Calendar, MapPin, Users, ExternalLink } from "lucide-react";
 
 export const Route = createFileRoute("/campeonatos/$slug")({
   head: ({ params }) => ({ meta: [{ title: `${params.slug} — Open Sync` }] }),
