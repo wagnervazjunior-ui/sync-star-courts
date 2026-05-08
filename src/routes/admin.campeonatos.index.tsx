@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Settings } from "lucide-react";
+import { Plus, Pencil, Trash2, Settings, Upload, X, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/admin/campeonatos/")({
   component: ChampionshipsPage,
