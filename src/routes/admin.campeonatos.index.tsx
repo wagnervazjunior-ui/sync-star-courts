@@ -11,9 +11,9 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Settings } from "lucide-react";
+import { Plus, Pencil, Trash2, Settings, Upload, X, Loader2 } from "lucide-react";
 
-export const Route = createFileRoute("/admin/campeonatos")({
+export const Route = createFileRoute("/admin/campeonatos/")({
   component: ChampionshipsPage,
 });
 
@@ -92,6 +92,28 @@ function ChampionshipsPage() {
 
 function ChampionshipDialog({ initial, onSave }: { initial: any; onSave: (v: any) => void }) {
   const [form, setForm] = useState(() => initial ?? { name: "", slug: "", description: "", start_date: "", end_date: "", location: "", cover_image_url: "", active: true });
+  const [uploading, setUploading] = useState(false);
+
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const ext = file.name.split(".").pop() ?? "jpg";
+      const path = `${crypto.randomUUID()}.${ext}`;
+      const { error } = await supabase.storage.from("championship-covers").upload(path, file, { upsert: false, contentType: file.type });
+      if (error) throw error;
+      const { data } = supabase.storage.from("championship-covers").getPublicUrl(path);
+      setForm({ ...form, cover_image_url: data.publicUrl });
+      toast.success("Imagem enviada!");
+    } catch (err: any) {
+      toast.error(err.message ?? "Falha no upload");
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  };
+
   return (
     <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
       <DialogHeader><DialogTitle>{initial ? "Editar" : "Novo"} campeonato</DialogTitle></DialogHeader>
@@ -104,10 +126,25 @@ function ChampionshipDialog({ initial, onSave }: { initial: any; onSave: (v: any
           <div className="space-y-2"><Label>Fim</Label><Input type="date" value={form.end_date ?? ""} onChange={(e) => setForm({ ...form, end_date: e.target.value })} /></div>
         </div>
         <div className="space-y-2"><Label>Local</Label><Input value={form.location ?? ""} onChange={(e) => setForm({ ...form, location: e.target.value })} /></div>
-        <div className="space-y-2"><Label>URL da imagem de capa</Label><Input value={form.cover_image_url ?? ""} onChange={(e) => setForm({ ...form, cover_image_url: e.target.value })} /></div>
+        <div className="space-y-2">
+          <Label>Imagem de capa</Label>
+          {form.cover_image_url && (
+            <div className="relative rounded-lg overflow-hidden border border-border/50">
+              <img src={form.cover_image_url} alt="Capa" className="w-full h-40 object-cover" />
+              <Button type="button" size="sm" variant="ghost" className="absolute top-2 right-2 bg-background/80 backdrop-blur" onClick={() => setForm({ ...form, cover_image_url: "" })}>
+                <X className="size-4" />
+              </Button>
+            </div>
+          )}
+          <label className="flex items-center justify-center gap-2 px-4 py-3 border border-dashed border-border rounded-lg cursor-pointer hover:bg-accent/30 transition-colors text-sm text-muted-foreground">
+            {uploading ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
+            {uploading ? "Enviando..." : form.cover_image_url ? "Trocar imagem" : "Selecionar imagem"}
+            <input type="file" accept="image/*" className="hidden" onChange={handleFile} disabled={uploading} />
+          </label>
+        </div>
         <div className="flex items-center gap-2"><Switch checked={form.active} onCheckedChange={(v) => setForm({ ...form, active: v })} /><Label>Ativo</Label></div>
       </div>
-      <DialogFooter><Button variant="hero" onClick={() => onSave(form)}>Salvar</Button></DialogFooter>
+      <DialogFooter><Button variant="hero" onClick={() => onSave(form)} disabled={uploading}>Salvar</Button></DialogFooter>
     </DialogContent>
   );
 }
