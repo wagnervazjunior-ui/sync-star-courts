@@ -20,10 +20,12 @@ export type Database = {
           championship_id: string
           created_at: string
           description: string | null
+          gender: Database["public"]["Enums"]["category_gender"]
           id: string
           max_slots: number
           name: string
           price_cents: number
+          uniform_model: string | null
           updated_at: string
         }
         Insert: {
@@ -31,10 +33,12 @@ export type Database = {
           championship_id: string
           created_at?: string
           description?: string | null
+          gender?: Database["public"]["Enums"]["category_gender"]
           id?: string
           max_slots: number
           name: string
           price_cents?: number
+          uniform_model?: string | null
           updated_at?: string
         }
         Update: {
@@ -42,10 +46,12 @@ export type Database = {
           championship_id?: string
           created_at?: string
           description?: string | null
+          gender?: Database["public"]["Enums"]["category_gender"]
           id?: string
           max_slots?: number
           name?: string
           price_cents?: number
+          uniform_model?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -76,6 +82,7 @@ export type Database = {
           shirt_size_guarantee_until: string | null
           slug: string
           start_date: string | null
+          uniform_models: string[]
           updated_at: string
         }
         Insert: {
@@ -95,6 +102,7 @@ export type Database = {
           shirt_size_guarantee_until?: string | null
           slug: string
           start_date?: string | null
+          uniform_models?: string[]
           updated_at?: string
         }
         Update: {
@@ -114,6 +122,7 @@ export type Database = {
           shirt_size_guarantee_until?: string | null
           slug?: string
           start_date?: string | null
+          uniform_models?: string[]
           updated_at?: string
         }
         Relationships: []
@@ -124,13 +133,14 @@ export type Database = {
           asaas_customer_id: string | null
           asaas_payment_id: string | null
           athlete1_name: string
-          athlete1_phone: string
           athlete1_shirt_size: Database["public"]["Enums"]["shirt_size"]
+          athlete1_shorts_size: Database["public"]["Enums"]["shirt_size"]
           athlete2_name: string
-          athlete2_phone: string
           athlete2_shirt_size: Database["public"]["Enums"]["shirt_size"]
+          athlete2_shorts_size: Database["public"]["Enums"]["shirt_size"]
           category_id: string
           contact_email: string
+          contact_phone: string
           created_at: string
           id: string
           payment_id: string | null
@@ -138,6 +148,7 @@ export type Database = {
           pix_qr_code: string | null
           pix_qr_code_base64: string | null
           status: Database["public"]["Enums"]["registration_status"]
+          team_name: string
           updated_at: string
           voucher_code: string
         }
@@ -146,13 +157,14 @@ export type Database = {
           asaas_customer_id?: string | null
           asaas_payment_id?: string | null
           athlete1_name: string
-          athlete1_phone: string
           athlete1_shirt_size: Database["public"]["Enums"]["shirt_size"]
+          athlete1_shorts_size: Database["public"]["Enums"]["shirt_size"]
           athlete2_name: string
-          athlete2_phone: string
           athlete2_shirt_size: Database["public"]["Enums"]["shirt_size"]
+          athlete2_shorts_size: Database["public"]["Enums"]["shirt_size"]
           category_id: string
           contact_email: string
+          contact_phone?: string
           created_at?: string
           id?: string
           payment_id?: string | null
@@ -160,6 +172,7 @@ export type Database = {
           pix_qr_code?: string | null
           pix_qr_code_base64?: string | null
           status?: Database["public"]["Enums"]["registration_status"]
+          team_name?: string
           updated_at?: string
           voucher_code: string
         }
@@ -168,13 +181,14 @@ export type Database = {
           asaas_customer_id?: string | null
           asaas_payment_id?: string | null
           athlete1_name?: string
-          athlete1_phone?: string
           athlete1_shirt_size?: Database["public"]["Enums"]["shirt_size"]
+          athlete1_shorts_size?: Database["public"]["Enums"]["shirt_size"]
           athlete2_name?: string
-          athlete2_phone?: string
           athlete2_shirt_size?: Database["public"]["Enums"]["shirt_size"]
+          athlete2_shorts_size?: Database["public"]["Enums"]["shirt_size"]
           category_id?: string
           contact_email?: string
+          contact_phone?: string
           created_at?: string
           id?: string
           payment_id?: string | null
@@ -182,6 +196,7 @@ export type Database = {
           pix_qr_code?: string | null
           pix_qr_code_base64?: string | null
           status?: Database["public"]["Enums"]["registration_status"]
+          team_name?: string
           updated_at?: string
           voucher_code?: string
         }
@@ -267,6 +282,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "master"
+      category_gender: "male" | "female" | "mixed"
       registration_status: "pending" | "confirmed" | "cancelled"
       shirt_size: "P" | "M" | "G" | "GG" | "XG"
     }
@@ -397,6 +413,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "master"],
+      category_gender: ["male", "female", "mixed"],
       registration_status: ["pending", "confirmed", "cancelled"],
       shirt_size: ["P", "M", "G", "GG", "XG"],
     },
