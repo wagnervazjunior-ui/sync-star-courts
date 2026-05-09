@@ -90,7 +90,10 @@ function CategoryAdminPage() {
             <Badge variant="secondary" className="gap-1"><Users className="size-3" /> {totalAtivas}/{cat?.max_slots ?? 0} inscritos · {restantes} vaga(s)</Badge>
           </div>
         </div>
-        <Button variant="hero" onClick={exportExcel}><Download className="size-4" /> Exportar planilha de uniformes</Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={exportGateList}><ClipboardList className="size-4" /> Lista da portaria</Button>
+          <Button variant="hero" onClick={exportExcel}><Download className="size-4" /> Planilha de uniformes</Button>
+        </div>
       </div>
 
       <Card className="mt-6 p-4 bg-gradient-card border-border/50">
