@@ -118,7 +118,7 @@ function ChampionshipDetail() {
           )}
           <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setEditing(null); }}>
             <DialogTrigger asChild><Button variant="hero"><Plus className="size-4" /> Nova categoria</Button></DialogTrigger>
-            <CategoryDialog initial={editing} onSave={save} uniformModels={ch?.uniform_models ?? []} />
+            <CategoryDialog key={editing?.id ?? "new"} initial={editing} onSave={save} uniformModels={ch?.uniform_models ?? []} />
           </Dialog>
         </div>
       </div>
