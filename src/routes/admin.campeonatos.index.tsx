@@ -96,7 +96,9 @@ function ChampionshipDialog({ initial, onSave }: { initial: any; onSave: (v: any
     location: "", location_url: "", cover_image_url: "", active: true,
     regulations: "", policies: "", cancellation_policy: "",
     shirt_size_chart_urls: [] as string[], shirt_size_guarantee_until: "",
+    uniform_models: [] as string[],
   });
+  const [newModel, setNewModel] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadingChart, setUploadingChart] = useState(false);
 
