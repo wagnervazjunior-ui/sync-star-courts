@@ -12,7 +12,7 @@ export const Route = createFileRoute("/admin")({
 });
 
 function AdminLayout() {
-  const { user, isAdmin, isMaster, loading } = useAuth();
+  const { user, isAdmin, isMaster, loading, rolesLoading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
