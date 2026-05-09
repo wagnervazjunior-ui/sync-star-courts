@@ -65,6 +65,15 @@ function CategoryAdminPage() {
     });
   };
 
+  const exportGateList = async () => {
+    if (!cat) return;
+    await generateGateListWorkbook({
+      championshipName: cat.championship?.name ?? "",
+      championshipSlug: `${cat.championship?.slug ?? "categoria"}-${cat.name}`,
+      categories: [{ name: cat.name, registrations: regs ?? [] }],
+    });
+  };
+
   return (
     <div>
       <Button variant="ghost" size="sm" asChild>
