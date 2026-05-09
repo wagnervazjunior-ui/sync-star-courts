@@ -12,7 +12,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, ArrowLeft, ExternalLink, AlertTriangle, Users } from "lucide-react";
+import { Plus, Pencil, Trash2, ArrowLeft, ExternalLink, AlertTriangle, Users, ClipboardList, Shield } from "lucide-react";
+import { generateGateListWorkbook } from "@/lib/gate-list-export";
+import { useAuth } from "@/hooks/useAuth";
 
 export const Route = createFileRoute("/admin/campeonatos/$id")({
   component: ChampionshipDetail,
