@@ -191,6 +191,97 @@ function CategoryAdminPage() {
           </TableBody>
         </Table>
       </Card>
+
+      <EditRegistrationDialog
+        key={editing?.id ?? "none"}
+        registration={editing}
+        ageRuleMode={cat?.age_rule_mode ?? "none"}
+        onClose={() => setEditing(null)}
+        onSaved={() => { setEditing(null); qc.invalidateQueries({ queryKey: ["adm-cat-regs", categoryId] }); }}
+      />
     </div>
+  );
+}
+
+function EditRegistrationDialog({ registration, ageRuleMode, onClose, onSaved }: { registration: any | null; ageRuleMode: string; onClose: () => void; onSaved: () => void }) {
+  const [form, setForm] = useState(() => registration ? {
+    contact_email: registration.contact_email ?? "",
+    contact_phone: registration.contact_phone ?? "",
+    team_name: registration.team_name ?? "",
+    athlete1_name: registration.athlete1_name ?? "",
+    athlete1_shirt_size: registration.athlete1_shirt_size ?? "M",
+    athlete1_shorts_size: registration.athlete1_shorts_size ?? "M",
+    athlete1_birthdate: registration.athlete1_birthdate ?? "",
+    athlete2_name: registration.athlete2_name ?? "",
+    athlete2_shirt_size: registration.athlete2_shirt_size ?? "M",
+    athlete2_shorts_size: registration.athlete2_shorts_size ?? "M",
+    athlete2_birthdate: registration.athlete2_birthdate ?? "",
+  } : null);
+  const [saving, setSaving] = useState(false);
+  const showAge = ageRuleMode && ageRuleMode !== "none";
+
+  if (!registration || !form) return null;
+
+  const save = async () => {
+    setSaving(true);
+    const payload: any = { ...form };
+    payload.contact_email = payload.contact_email.toLowerCase().trim();
+    payload.athlete1_birthdate = payload.athlete1_birthdate || null;
+    payload.athlete2_birthdate = payload.athlete2_birthdate || null;
+    const { error } = await supabase.from("registrations").update(payload).eq("id", registration.id);
+    setSaving(false);
+    if (error) toast.error(error.message);
+    else { toast.success("Inscrição atualizada"); onSaved(); }
+  };
+
+  return (
+    <Dialog open={!!registration} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader><DialogTitle>Editar inscrição — {registration.voucher_code}</DialogTitle></DialogHeader>
+        <div className="space-y-4">
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="space-y-2"><Label>E-mail</Label><Input type="email" value={form.contact_email} onChange={(e) => setForm({ ...form, contact_email: e.target.value })} /></div>
+            <div className="space-y-2"><Label>WhatsApp</Label><Input value={form.contact_phone} onChange={(e) => setForm({ ...form, contact_phone: maskPhone(e.target.value) })} /></div>
+          </div>
+          <div className="space-y-2"><Label>Nome da dupla</Label><Input value={form.team_name} onChange={(e) => setForm({ ...form, team_name: e.target.value })} /></div>
+
+          {[1, 2].map((n) => {
+            const nameKey = `athlete${n}_name`;
+            const shirtKey = `athlete${n}_shirt_size`;
+            const shortsKey = `athlete${n}_shorts_size`;
+            const birthKey = `athlete${n}_birthdate`;
+            return (
+              <div key={n} className="rounded-lg border border-border/50 p-3 space-y-3">
+                <h4 className="font-semibold text-primary">Atleta {n}</h4>
+                <div className="space-y-2"><Label>Nome completo</Label><Input value={(form as any)[nameKey]} onChange={(e) => setForm({ ...form, [nameKey]: e.target.value })} /></div>
+                {showAge && (
+                  <div className="space-y-2"><Label>Data de nascimento</Label><Input type="date" value={(form as any)[birthKey]} onChange={(e) => setForm({ ...form, [birthKey]: e.target.value })} /></div>
+                )}
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Camiseta</Label>
+                    <Select value={(form as any)[shirtKey]} onValueChange={(v) => setForm({ ...form, [shirtKey]: v })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>{SHIRT_SIZES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Shorts</Label>
+                    <Select value={(form as any)[shortsKey]} onValueChange={(v) => setForm({ ...form, [shortsKey]: v })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>{SHIRT_SIZES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+          <Button variant="hero" onClick={save} disabled={saving}>{saving ? "Salvando…" : "Salvar"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
