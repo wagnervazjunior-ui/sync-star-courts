@@ -157,6 +157,17 @@ function RegisterPage() {
                   <Label>Nome completo</Label>
                   <Input {...form.register(`athlete${n}_name` as any)} />
                 </div>
+                {requiresAge && (
+                  <div className="space-y-2">
+                    <Label>Data de nascimento</Label>
+                    <Input type="date" {...form.register(`athlete${n}_birthdate` as any)} />
+                    <p className="text-xs text-muted-foreground">
+                      {ctx?.age_rule_mode === "individual_min"
+                        ? `Cada atleta precisa ter pelo menos ${ctx.age_min} anos em ${championshipYear}.`
+                        : `A soma das idades da dupla em ${championshipYear} precisa ser ≥ ${ctx?.age_min}.`}
+                    </p>
+                  </div>
+                )}
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-xs text-muted-foreground">Tamanhos do uniforme</p>
                   {ctx && <SizeChartLink urls={ctx.championship.shirt_size_chart_urls ?? []} />}
