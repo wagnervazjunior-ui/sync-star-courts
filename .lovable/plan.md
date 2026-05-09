@@ -1,102 +1,104 @@
 ## Objetivo
 
-Reformar o fluxo de inscrição e o admin para refletir a realidade da operação de uniformes: dupla com nome próprio, modelos por campeonato, gênero por categoria, tamanhos separados de camiseta e shorts, e relatórios voltados ao pedido de uniformes.
+Adicionar confirmações em ações destrutivas, regra de idade para categorias Master, planilha da portaria e controle de permissões por campeonato (master vs admin).
 
 ---
 
-## 1. Banco de dados (migration única)
+## 1. Confirmações no admin
 
-**`championships`**
-- `uniform_models text[] NOT NULL DEFAULT '{}'` — modelos de uniforme do campeonato (ex.: "Amador", "Convidados", "Profissional"), gerenciados pelo admin.
-
-**`categories`**
-- `gender text NOT NULL DEFAULT 'mixed'` com check em `('male','female','mixed')`.
-- `uniform_model text` — modelo escolhido entre os do campeonato.
-
-**`registrations`**
-- `team_name text NOT NULL DEFAULT ''` (depois remover default).
-- `contact_phone text NOT NULL DEFAULT ''` — único WhatsApp da dupla.
-- `athlete1_shorts_size`, `athlete2_shorts_size` (`shirt_size`, mesma escala P/M/G/GG/XG; modelagem feminina é diferenciada via `gender` da categoria, não por nova escala).
-- Remover (drop) `athlete1_phone` e `athlete2_phone`.
-- Em mistas, `athlete1_*` = atleta masculino e `athlete2_*` = atleta feminina (convenção fixada no formulário e nos relatórios).
-
-**RPC `create_registration`** atualizada para receber `team_name`, `contact_phone`, `athleteN_shirt_size`, `athleteN_shorts_size` e gravar nos novos campos.
-
-**Política de vagas:** valor de vagas continua existindo, mas só é exibido para admin.
+Em `admin.categorias.$categoryId.tsx`, envolver os botões **Confirmar inscrição** e **Cancelar inscrição** num `AlertDialog` (já disponível em `components/ui/alert-dialog.tsx`).
+- "Cancelar inscrição": título "Cancelar inscrição?", descrição com voucher e nome da dupla, botões "Voltar" / "Cancelar inscrição" (destructive).
+- "Confirmar inscrição": título "Confirmar inscrição?", descrição idem, botões "Voltar" / "Confirmar".
 
 ---
 
-## 2. Admin — campeonato (`admin.campeonatos.index.tsx`)
+## 2. Categoria por idade (Master)
 
-No `ChampionshipDialog`, nova seção **Modelos de uniforme**: input + botão "Adicionar" que monta a lista `uniform_models` (chips removíveis). Persistir no array.
+### Banco
+Migration adiciona em `categories`:
+- `age_rule_mode text` check em `('none','individual_min','sum_min')` default `'none'`.
+- `age_min int` — idade mínima (por atleta) ou soma mínima.
 
-## 3. Admin — categorias
+Em `registrations`:
+- `athlete1_birthdate date`, `athlete2_birthdate date` (nullable; obrigatórios apenas quando a categoria tiver `age_rule_mode <> 'none'`).
 
-No formulário de categoria (no admin de campeonato):
-- Select **Gênero**: Masculina / Feminina / Mista.
-- Select **Modelo de uniforme**: opções vindas de `championships.uniform_models` do campeonato corrente.
+`create_registration` passa a aceitar `athleteN_birthdate` no payload e, quando a categoria exige idade, valida no servidor:
+- Idade calculada como **(ano do start_date do campeonato) − (ano de nascimento)** — "idade completada no ano do campeonato".
+- `individual_min`: cada atleta ≥ `age_min`.
+- `sum_min`: soma das idades ≥ `age_min`.
+- Falha com `AGE_RULE_VIOLATION`.
 
-## 4. Admin — listagem de inscrições / dashboard de categorias
+### Admin (cadastro de categoria)
+No formulário de categoria (em `admin.campeonatos.$id.tsx` e `admin.campeonatos.index.tsx`), adicionar:
+- Select **Regra de idade**: "Sem regra" / "Idade mínima por atleta" / "Soma mínima das idades".
+- Quando ≠ "Sem regra", input numérico **Idade mínima**.
 
-- `admin.campeonatos.$id.tsx`: na lista de categorias mostrar `inscritos / max_slots` e `vagas restantes`. Cada categoria vira um link para a nova rota da categoria.
-- Nova rota **`admin.categorias.$categoryId.tsx`** com:
-  - Cabeçalho com nome da categoria, gênero, modelo, total inscritos, vagas restantes.
-  - Tabela de inscrições (pendentes, confirmadas, canceladas) com colunas: Voucher, Status, Nome da dupla, WhatsApp, E-mail, Atleta 1 (camiseta/shorts), Atleta 2 (camiseta/shorts), Data.
-  - Ações: confirmar / cancelar (já existem via RPC).
-  - Botão "Exportar Excel desta categoria".
-
-## 5. Admin — `admin.inscricoes.tsx` (Excel)
-
-Manter visão geral mas reescrever a geração do Excel (planilha de uniformes):
-
-- Apenas inscrições com `status = 'confirmed'`.
-- Uma aba por categoria, no formato:
-  - Cabeçalho: Categoria, Gênero, Modelo de uniforme.
-  - Linhas com colunas exatamente nesta ordem: **Data da inscrição · Atleta 1 · Atleta 2 · Camiseta atleta 1 · Shorts atleta 1 · Camiseta atleta 2 · Shorts atleta 2 · Nome da dupla · Número do voucher**. (O pedido do usuário lista até "shorts atleta 1, nome da dupla, voucher" — assumimos que camiseta/shorts do atleta 2 entram na sequência simétrica antes do nome da dupla; confirmar se preferir esconder atleta 2.)
-  - Bloco de **contagem de uniformes** por tamanho ao final da aba: `Camiseta P/M/G/GG/XG` e `Shorts P/M/G/GG/XG`. Em mistas, contagem separada Masculino/Feminino dentro da mesma aba.
-- Aba final **"Resumo geral de uniformes"**:
-  - Agregação de todos os tamanhos em todas as categorias confirmadas, separando por **modelagem** (Masculino vs Feminino — feminino inclui mulheres das mistas + categorias femininas; masculino inclui homens das mistas + categorias masculinas) e por **modelo de uniforme**.
-
-## 6. Página pública do campeonato (`campeonatos.$slug.tsx`)
-
-- Não exibir mais o número de vagas para o público. Mostrar apenas se está aberto/encerrado (sem números).
-- Remover qualquer indicador "X vagas restantes" do card de categoria.
-
-## 7. Formulário de inscrição (`inscricao.$categoryId.tsx`)
-
-Reordenar os campos:
-1. **E-mail de contato**.
-2. **WhatsApp da dupla** (único, com máscara).
-3. **Nome da dupla** (obrigatório).
-4. Bloco **Atleta 1** / **Atleta 2** — sem telefone individual; com:
-   - Nome completo.
-   - Tamanho da **camiseta** (select).
-   - Tamanho do **shorts** (select).
-5. Para categorias **mistas**, os blocos viram **"Atleta masculino"** e **"Atleta feminina"** (rótulos fixos; ordem fixa: 1 = masculino, 2 = feminina). Para categorias masculinas/femininas usa "Atleta 1 / Atleta 2".
-6. Manter aviso de garantia de tamanho e link para tabela de medidas (já existe).
-7. Não exibir vagas restantes; manter tratamento de erro `SLOTS_FULL` no submit.
+### Inscrição (`inscricao.$categoryId.tsx`)
+- Quando categoria tem `age_rule_mode <> 'none'`, exibir campo **Data de nascimento** dentro do bloco de cada atleta.
+- Validação client-side com a mesma fórmula do servidor; mostrar mensagem clara ("A soma das idades em 2026 deve ser ≥ X").
+- Tratar erro `AGE_RULE_VIOLATION` no submit.
 
 ---
 
-## Detalhes técnicos
+## 3. Planilha da portaria
 
-- Migration em uma chamada: alter `championships`, `categories`, `registrations` + drop colunas antigas + recriar `create_registration`.
-- Tipos do Supabase regenerados automaticamente.
-- `confirm_registration_by_payment` mantém comportamento.
-- Excel: usar `ExcelJS` (já no projeto). Sheet name truncada em 31 chars. Linhas de contagem destacadas em negrito.
-- Página `admin.categorias.$categoryId.tsx` reusa componentes Card/Badge/Button.
-- Tabela `registrations`: nenhum dado existente nesse momento de operação, então o drop de telefones individuais é seguro.
+Nova função `generateGateListWorkbook` em `src/lib/uniform-export.ts` (ou novo `gate-list-export.ts`):
+- Apenas inscrições `confirmed`.
+- Uma aba por categoria (nome truncado em 31 chars).
+- Colunas: **Nome completo do atleta** · **Nome da dupla**.
+- Linhas geradas a partir de `athlete1_name` e `athlete2_name` (duas linhas por inscrição), ordenadas alfabeticamente pelo nome do atleta (A‑Z, locale pt-BR).
+- Cabeçalho em negrito.
+
+Botões de download:
+- Em `admin.campeonatos.$id.tsx`: "Baixar lista da portaria" (todas as categorias do campeonato).
+- Em `admin.categorias.$categoryId.tsx`: "Baixar lista da portaria desta categoria".
+
+---
+
+## 4. Permissões master × admin por campeonato
+
+### Banco
+- Nova coluna `championships.created_by uuid` (preenchida no insert via RPC ou trigger usando `auth.uid()`).
+- Nova tabela `championship_admins (championship_id uuid, user_id uuid, granted_by uuid, created_at)`, PK `(championship_id, user_id)`, RLS habilitado.
+- Função `can_view_championship(_user_id uuid, _championship_id uuid) returns boolean security definer`:
+  - true se master, ou criador, ou existe linha em `championship_admins`.
+
+### RLS
+- `championships`:
+  - Master: tudo (já coberto via `has_role master`).
+  - Admin (não master): SELECT/UPDATE/DELETE somente quando `can_view_championship(auth.uid(), id)`. INSERT permitido para qualquer admin (vira criador).
+- `categories` e `registrations`: políticas de admin passam a checar `can_view_championship` via join no `championship_id`.
+- `championship_admins`: somente master gerencia (ALL); admin lê apenas as próprias linhas.
+
+### Backend funcs
+- `grant_championship_admin(_championship_id, _email)` e `revoke_championship_admin(_championship_id, _user_id)` (security definer, somente master).
+- `list_championship_admins(_championship_id)` (master ou criador do campeonato).
+
+### UI
+- **Listagem de campeonatos no admin**: passa a respeitar RLS automaticamente (admin não-master só vê o que pode).
+- Nova rota **`admin.campeonatos.$id.permissoes.tsx`** (visível só para master): lista admins com acesso ao campeonato, input de e-mail + "Adicionar", botão remover.
+- Em `admin.administradores.tsx` (página do master), adicionar coluna/ação rápida "Gerenciar campeonatos" → leva para uma aba que mostra, por admin, os campeonatos que ele enxerga, com toggle.
+- Esconder ações de edição/exclusão de campeonatos para admins sem permissão.
+
+---
+
+## 5. Detalhes técnicos
+
+- Migration única cobrindo: alter `categories` (age_rule_mode, age_min), alter `registrations` (athleteN_birthdate), alter `championships` (created_by + backfill `auth.uid()` no insert via trigger), nova tabela `championship_admins`, função `can_view_championship`, RPCs `grant/revoke/list_championship_admins`, atualização de `create_registration` com validação de idade, atualização de RLS de `championships/categories/registrations`.
+- Fórmula de idade no servidor e no cliente: `extract(year from championships.start_date) - extract(year from birthdate)`. Se `start_date` for nulo, usa o ano corrente.
+- ExcelJS reaproveitado para a planilha da portaria.
+- AlertDialogs reutilizam o componente shadcn já existente.
 
 ---
 
 ## Arquivos afetados
 
-- `supabase/migrations/<timestamp>_uniform_overhaul.sql` (novo)
-- `src/routes/admin.campeonatos.index.tsx` (modelos de uniforme + gênero/modelo nas categorias + contagem inscritos)
-- `src/routes/admin.campeonatos.$id.tsx` (links pra página da categoria, contagem)
-- `src/routes/admin.categorias.$categoryId.tsx` (novo)
-- `src/routes/admin.inscricoes.tsx` (novo gerador Excel + filtros)
-- `src/routes/campeonatos.$slug.tsx` (remover vagas)
-- `src/routes/inscricao.$categoryId.tsx` (novos campos + ordem + rótulos por gênero)
+- `supabase/migrations/<timestamp>_age_rule_and_permissions.sql` (novo)
+- `src/lib/gate-list-export.ts` (novo)
+- `src/routes/admin.categorias.$categoryId.tsx` (AlertDialogs + botão portaria)
+- `src/routes/admin.campeonatos.$id.tsx` (form de categoria com regra de idade + botão portaria + esconder ações sem permissão)
+- `src/routes/admin.campeonatos.index.tsx` (form de categoria com regra de idade)
+- `src/routes/admin.campeonatos.$id.permissoes.tsx` (novo, master only)
+- `src/routes/admin.administradores.tsx` (link/ação para gerenciar permissões por campeonato)
+- `src/routes/inscricao.$categoryId.tsx` (campo data de nascimento + validação + tratamento de erro)
 - `src/integrations/supabase/types.ts` (auto)
-
