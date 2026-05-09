@@ -17,7 +17,7 @@ type Row = { user_id: string; email: string; granted_by: string | null; created_
 
 function PermissionsPage() {
   const { id } = Route.useParams();
-  const { isMaster, loading: authLoading } = useAuth();
+  const { isMaster, loading: authLoading, rolesLoading } = useAuth();
   const navigate = useNavigate();
   const [ch, setCh] = useState<any>(null);
   const [rows, setRows] = useState<Row[]>([]);
@@ -26,8 +26,8 @@ function PermissionsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!authLoading && !isMaster) navigate({ to: "/admin/campeonatos/$id", params: { id } });
-  }, [authLoading, isMaster, navigate, id]);
+    if (!authLoading && !rolesLoading && !isMaster) navigate({ to: "/admin/campeonatos/$id", params: { id } });
+  }, [authLoading, rolesLoading, isMaster, navigate, id]);
 
   const load = async () => {
     setLoading(true);
