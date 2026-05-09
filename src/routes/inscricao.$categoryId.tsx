@@ -25,9 +25,11 @@ const schema = z.object({
   athlete1_name: z.string().min(2, "Informe o nome"),
   athlete1_shirt_size: z.enum(SHIRT_SIZES),
   athlete1_shorts_size: z.enum(SHIRT_SIZES),
+  athlete1_birthdate: z.string().optional(),
   athlete2_name: z.string().min(2, "Informe o nome"),
   athlete2_shirt_size: z.enum(SHIRT_SIZES),
   athlete2_shorts_size: z.enum(SHIRT_SIZES),
+  athlete2_birthdate: z.string().optional(),
 });
 type FormValues = z.infer<typeof schema>;
 
