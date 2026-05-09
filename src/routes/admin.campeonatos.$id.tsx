@@ -85,12 +85,35 @@ function ChampionshipDetail() {
           <h1 className="text-3xl font-bold">{ch?.name}</h1>
           <p className="text-muted-foreground">Categorias do campeonato</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {ch?.slug && (
             <Button variant="outline" asChild>
               <a href={`/campeonatos/${ch.slug}`} target="_blank" rel="noopener noreferrer">
                 <ExternalLink className="size-4" /> Ver página pública
               </a>
+            </Button>
+          )}
+          <Button variant="outline" onClick={async () => {
+            const { data: regs } = await supabase
+              .from("registrations")
+              .select("team_name, athlete1_name, athlete2_name, status, category_id, category:categories!inner(name, championship_id)")
+              .eq("category.championship_id", id)
+              .eq("status", "confirmed");
+            const byCat = new Map<string, { name: string; registrations: any[] }>();
+            (regs ?? []).forEach((r: any) => {
+              const key = r.category_id;
+              if (!byCat.has(key)) byCat.set(key, { name: r.category.name, registrations: [] });
+              byCat.get(key)!.registrations.push(r);
+            });
+            await generateGateListWorkbook({
+              championshipName: ch?.name ?? "",
+              championshipSlug: ch?.slug ?? "campeonato",
+              categories: Array.from(byCat.values()),
+            });
+          }}><ClipboardList className="size-4" /> Lista da portaria</Button>
+          {isMaster && (
+            <Button variant="outline" asChild>
+              <Link to="/admin/campeonatos/$id/permissoes" params={{ id }}><Shield className="size-4" /> Permissões</Link>
             </Button>
           )}
           <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setEditing(null); }}>
