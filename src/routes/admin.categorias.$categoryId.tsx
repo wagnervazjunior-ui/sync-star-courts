@@ -7,9 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { ArrowLeft, CheckCircle2, XCircle, Users, Download } from "lucide-react";
+import { ArrowLeft, CheckCircle2, XCircle, Users, Download, ClipboardList } from "lucide-react";
 import { generateUniformWorkbook } from "@/lib/uniform-export";
+import { generateGateListWorkbook } from "@/lib/gate-list-export";
 
 export const Route = createFileRoute("/admin/categorias/$categoryId")({
   component: CategoryAdminPage,
