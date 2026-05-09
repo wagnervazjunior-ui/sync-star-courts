@@ -142,6 +142,7 @@ function CategoryAdminPage() {
                 <TableCell className="text-xs whitespace-nowrap">{new Date(r.created_at).toLocaleString("pt-BR")}</TableCell>
                 <TableCell>
                   <div className="flex gap-1">
+                    <Button size="sm" variant="ghost" title="Editar inscrição" onClick={() => setEditing(r)}><Pencil className="size-4" /></Button>
                     {r.status !== "confirmed" && (
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
