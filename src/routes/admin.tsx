@@ -19,7 +19,7 @@ function AdminLayout() {
     if (!loading && !user) navigate({ to: "/login" });
   }, [user, loading, navigate]);
 
-  if (loading) return <div className="min-h-screen p-8 text-muted-foreground">Carregando…</div>;
+  if (loading || rolesLoading) return <div className="min-h-screen p-8 text-muted-foreground">Carregando…</div>;
   if (!user) return null;
   if (!isAdmin) {
     return (
