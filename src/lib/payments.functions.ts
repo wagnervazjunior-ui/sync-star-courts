@@ -19,7 +19,7 @@ export const createPixCharge = createServerFn({ method: "POST" })
     const { data: reg, error: regErr } = await supabaseAdmin
       .from("registrations")
       .select(
-        "id, status, contact_email, athlete1_name, athlete1_phone, asaas_payment_id, pix_qr_code, pix_qr_code_base64, pix_expires_at, amount_cents, category:categories(id, name, price_cents, championship:championships(name))",
+        "id, status, contact_email, contact_phone, athlete1_name, asaas_payment_id, pix_qr_code, pix_qr_code_base64, pix_expires_at, amount_cents, category:categories(id, name, price_cents, championship:championships(name))",
       )
       .eq("voucher_code", voucher)
       .maybeSingle();
@@ -57,7 +57,7 @@ export const createPixCharge = createServerFn({ method: "POST" })
     const customer = await findOrCreateCustomer({
       name: reg.athlete1_name,
       email: reg.contact_email,
-      phone: reg.athlete1_phone,
+      phone: reg.contact_phone,
       externalReference: reg.id,
     });
 

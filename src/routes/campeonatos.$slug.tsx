@@ -4,9 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { PublicHeader } from "@/components/PublicHeader";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Calendar, MapPin, Users, ExternalLink } from "lucide-react";
+import { Calendar, MapPin, ExternalLink } from "lucide-react";
 
 export const Route = createFileRoute("/campeonatos/$slug")({
   head: ({ params }) => ({ meta: [{ title: `${params.slug} — Open Sync` }] }),
@@ -57,23 +56,17 @@ function DetailPage() {
           <h2 className="mt-12 text-2xl font-bold">Categorias</h2>
           <div className="mt-4 grid gap-4">
             {cats.map((cat) => {
-              const avail = availability[cat.id] ?? 0;
-              const full = avail === 0;
+              const full = (availability[cat.id] ?? 0) === 0;
               return (
                 <Card key={cat.id} className="p-6 bg-gradient-card border-border/50">
                   <div className="flex flex-wrap items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-3 flex-wrap">
-                        <h3 className="text-xl font-bold">{cat.name}</h3>
-                        <Badge variant={full ? "destructive" : "secondary"} className="gap-1">
-                          <Users className="size-3" /> {avail}/{cat.max_slots} vagas
-                        </Badge>
-                      </div>
+                      <h3 className="text-xl font-bold">{cat.name}</h3>
                       {cat.description && <p className="mt-2 whitespace-pre-line text-sm text-muted-foreground">{cat.description}</p>}
                       <p className="mt-3 text-lg font-semibold">R$ {(cat.price_cents / 100).toFixed(2).replace(".", ",")}</p>
                     </div>
                     <Button variant={full ? "secondary" : "hero"} disabled={full} asChild={!full}>
-                      {full ? <span>Esgotado</span> : <Link to="/inscricao/$categoryId" params={{ categoryId: cat.id }}>Inscrever dupla</Link>}
+                      {full ? <span>Inscrições encerradas</span> : <Link to="/inscricao/$categoryId" params={{ categoryId: cat.id }}>Inscrever dupla</Link>}
                     </Button>
                   </div>
                 </Card>

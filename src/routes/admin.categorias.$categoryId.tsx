@@ -1,0 +1,133 @@
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { toast } from "sonner";
+import { ArrowLeft, CheckCircle2, XCircle, Users, Download } from "lucide-react";
+import { generateUniformWorkbook } from "@/lib/uniform-export";
+
+export const Route = createFileRoute("/admin/categorias/$categoryId")({
+  component: CategoryAdminPage,
+});
+
+const STATUS_LABEL: Record<string, string> = { pending: "Pendente", confirmed: "Confirmada", cancelled: "Cancelada" };
+const GENDER_LABEL: Record<string, string> = { male: "Masculina", female: "Feminina", mixed: "Mista" };
+
+function CategoryAdminPage() {
+  const { categoryId } = Route.useParams();
+  const qc = useQueryClient();
+  const [search, setSearch] = useState("");
+
+  const { data: cat } = useQuery({
+    queryKey: ["adm-cat", categoryId],
+    queryFn: async () => (await supabase.from("categories").select("*, championship:championships(*)").eq("id", categoryId).maybeSingle()).data,
+  });
+
+  const { data: regs } = useQuery({
+    queryKey: ["adm-cat-regs", categoryId],
+    queryFn: async () => (await supabase.from("registrations").select("*").eq("category_id", categoryId).order("created_at", { ascending: false })).data ?? [],
+  });
+
+  const filtered = useMemo(() => {
+    if (!regs) return [];
+    if (!search) return regs;
+    const s = search.toLowerCase();
+    return regs.filter((r: any) =>
+      [r.voucher_code, r.team_name, r.contact_email, r.contact_phone, r.athlete1_name, r.athlete2_name].some((v) => v?.toLowerCase().includes(s))
+    );
+  }, [regs, search]);
+
+  const totalAtivas = (regs ?? []).filter((r: any) => r.status !== "cancelled").length;
+  const restantes = cat ? Math.max(0, cat.max_slots - totalAtivas) : 0;
+
+  const updateStatus = async (id: string, action: "confirm" | "cancel") => {
+    const fn = action === "confirm" ? "confirm_registration" : "cancel_registration";
+    const { error } = await supabase.rpc(fn, { _id: id });
+    if (error) toast.error(error.message);
+    else { toast.success("Atualizado"); qc.invalidateQueries({ queryKey: ["adm-cat-regs", categoryId] }); }
+  };
+
+  const exportExcel = async () => {
+    if (!cat) return;
+    const confirmed = (regs ?? []).filter((r: any) => r.status === "confirmed");
+    if (!confirmed.length) { toast.info("Nenhuma inscrição confirmada para exportar"); return; }
+    await generateUniformWorkbook({
+      championshipName: cat.championship?.name ?? "",
+      championshipSlug: cat.championship?.slug ?? "categoria",
+      categories: [{ ...cat, registrations: confirmed }],
+    });
+  };
+
+  return (
+    <div>
+      <Button variant="ghost" size="sm" asChild>
+        <Link to="/admin/campeonatos/$id" params={{ id: cat?.championship_id ?? "" }}><ArrowLeft className="size-4" /> Voltar</Link>
+      </Button>
+
+      <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-sm text-muted-foreground">{cat?.championship?.name}</p>
+          <h1 className="text-3xl font-bold">{cat?.name}</h1>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            {cat?.gender && <Badge variant="outline">{GENDER_LABEL[cat.gender] ?? cat.gender}</Badge>}
+            {cat?.uniform_model && <Badge variant="outline">{cat.uniform_model}</Badge>}
+            <Badge variant="secondary" className="gap-1"><Users className="size-3" /> {totalAtivas}/{cat?.max_slots ?? 0} inscritos · {restantes} vaga(s)</Badge>
+          </div>
+        </div>
+        <Button variant="hero" onClick={exportExcel}><Download className="size-4" /> Exportar planilha de uniformes</Button>
+      </div>
+
+      <Card className="mt-6 p-4 bg-gradient-card border-border/50">
+        <Input placeholder="Buscar voucher / dupla / atleta / e-mail" value={search} onChange={(e) => setSearch(e.target.value)} />
+      </Card>
+
+      <Card className="mt-4 bg-gradient-card border-border/50 overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Voucher</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Dupla</TableHead>
+              <TableHead>WhatsApp</TableHead>
+              <TableHead>E-mail</TableHead>
+              <TableHead>Atleta 1 (cam/short)</TableHead>
+              <TableHead>Atleta 2 (cam/short)</TableHead>
+              <TableHead>Data</TableHead>
+              <TableHead></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filtered.map((r: any) => (
+              <TableRow key={r.id}>
+                <TableCell><code className="font-bold text-primary">{r.voucher_code}</code></TableCell>
+                <TableCell>
+                  <Badge variant={r.status === "confirmed" ? "default" : r.status === "cancelled" ? "destructive" : "secondary"}>{STATUS_LABEL[r.status]}</Badge>
+                </TableCell>
+                <TableCell className="font-medium">{r.team_name}</TableCell>
+                <TableCell>{r.contact_phone}</TableCell>
+                <TableCell className="text-xs">{r.contact_email}</TableCell>
+                <TableCell className="text-sm">{r.athlete1_name}<br /><span className="text-xs text-muted-foreground">{r.athlete1_shirt_size} / {r.athlete1_shorts_size}</span></TableCell>
+                <TableCell className="text-sm">{r.athlete2_name}<br /><span className="text-xs text-muted-foreground">{r.athlete2_shirt_size} / {r.athlete2_shorts_size}</span></TableCell>
+                <TableCell className="text-xs whitespace-nowrap">{new Date(r.created_at).toLocaleString("pt-BR")}</TableCell>
+                <TableCell>
+                  <div className="flex gap-1">
+                    {r.status !== "confirmed" && <Button size="sm" variant="premium" onClick={() => updateStatus(r.id, "confirm")}><CheckCircle2 className="size-4" /></Button>}
+                    {r.status !== "cancelled" && <Button size="sm" variant="ghost" onClick={() => updateStatus(r.id, "cancel")}><XCircle className="size-4 text-destructive" /></Button>}
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+            {filtered.length === 0 && (
+              <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">Nenhuma inscrição.</TableCell></TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </Card>
+    </div>
+  );
+}

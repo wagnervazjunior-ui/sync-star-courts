@@ -20,12 +20,14 @@ const SHIRT_SIZES = ["P", "M", "G", "GG", "XG"] as const;
 
 const schema = z.object({
   contact_email: z.string().email("E-mail inválido"),
+  contact_phone: z.string().min(10, "WhatsApp inválido"),
+  team_name: z.string().trim().min(2, "Informe o nome da dupla").max(80),
   athlete1_name: z.string().min(2, "Informe o nome"),
-  athlete1_phone: z.string().min(10, "Telefone inválido"),
   athlete1_shirt_size: z.enum(SHIRT_SIZES),
+  athlete1_shorts_size: z.enum(SHIRT_SIZES),
   athlete2_name: z.string().min(2, "Informe o nome"),
-  athlete2_phone: z.string().min(10, "Telefone inválido"),
   athlete2_shirt_size: z.enum(SHIRT_SIZES),
+  athlete2_shorts_size: z.enum(SHIRT_SIZES),
 });
 type FormValues = z.infer<typeof schema>;
 
@@ -58,7 +60,7 @@ function RegisterPage() {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { athlete1_shirt_size: "M", athlete2_shirt_size: "M" } as any,
+    defaultValues: { athlete1_shirt_size: "M", athlete1_shorts_size: "M", athlete2_shirt_size: "M", athlete2_shorts_size: "M" } as any,
   });
 
   const onSubmit = async (values: FormValues) => {
@@ -81,6 +83,9 @@ function RegisterPage() {
     }
   };
 
+  const isMixed = ctx?.gender === "mixed";
+  const athleteLabels = isMixed ? ["Atleta masculino", "Atleta feminina"] : ["Atleta 1", "Atleta 2"];
+
   return (
     <div className="min-h-screen">
       <PublicHeader />
@@ -101,32 +106,53 @@ function RegisterPage() {
               {form.formState.errors.contact_email && <p className="text-xs text-destructive">{form.formState.errors.contact_email.message}</p>}
             </div>
 
+            <div className="space-y-2">
+              <Label>WhatsApp da dupla</Label>
+              <Input
+                placeholder="(11) 99999-9999"
+                {...form.register("contact_phone")}
+                onChange={(e) => form.setValue("contact_phone", maskPhone(e.target.value))}
+              />
+              {form.formState.errors.contact_phone && <p className="text-xs text-destructive">{form.formState.errors.contact_phone.message}</p>}
+            </div>
+
+            <div className="space-y-2">
+              <Label>Nome da dupla</Label>
+              <Input {...form.register("team_name")} placeholder="Ex: Os Invencíveis" />
+              {form.formState.errors.team_name && <p className="text-xs text-destructive">{form.formState.errors.team_name.message}</p>}
+            </div>
+
             {ctx && <UniformNotice championship={ctx.championship} />}
 
             {[1, 2].map((n) => (
               <div key={n} className="rounded-lg border border-border/50 p-4 space-y-4">
-                <h3 className="font-semibold text-primary">Atleta {n}</h3>
+                <h3 className="font-semibold text-primary">{athleteLabels[n - 1]}</h3>
                 <div className="space-y-2">
                   <Label>Nome completo</Label>
                   <Input {...form.register(`athlete${n}_name` as any)} />
                 </div>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs text-muted-foreground">Tamanhos do uniforme</p>
+                  {ctx && <SizeChartLink urls={ctx.championship.shirt_size_chart_urls ?? []} />}
+                </div>
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label>WhatsApp</Label>
-                    <Input
-                      placeholder="(11) 99999-9999"
-                      {...form.register(`athlete${n}_phone` as any)}
-                      onChange={(e) => form.setValue(`athlete${n}_phone` as any, maskPhone(e.target.value))}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <Label>Tamanho do uniforme</Label>
-                      {ctx && <SizeChartLink urls={ctx.championship.shirt_size_chart_urls ?? []} />}
-                    </div>
+                    <Label>Camiseta</Label>
                     <Select
                       defaultValue="M"
                       onValueChange={(v) => form.setValue(`athlete${n}_shirt_size` as any, v as any)}
+                    >
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {SHIRT_SIZES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Shorts</Label>
+                    <Select
+                      defaultValue="M"
+                      onValueChange={(v) => form.setValue(`athlete${n}_shorts_size` as any, v as any)}
                     >
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>

@@ -96,7 +96,9 @@ function ChampionshipDialog({ initial, onSave }: { initial: any; onSave: (v: any
     location: "", location_url: "", cover_image_url: "", active: true,
     regulations: "", policies: "", cancellation_policy: "",
     shirt_size_chart_urls: [] as string[], shirt_size_guarantee_until: "",
+    uniform_models: [] as string[],
   });
+  const [newModel, setNewModel] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadingChart, setUploadingChart] = useState(false);
 
@@ -225,6 +227,47 @@ function ChampionshipDialog({ initial, onSave }: { initial: any; onSave: (v: any
               onChange={(e) => setForm({ ...form, shirt_size_guarantee_until: e.target.value })}
             />
             <p className="text-xs text-muted-foreground">Após essa data, o tamanho fica sujeito à disponibilidade.</p>
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-border/50 p-4 space-y-3">
+          <h4 className="font-semibold text-sm">Modelos de uniforme</h4>
+          <p className="text-xs text-muted-foreground">Ex.: Amador, Convidados, Profissional. Cada categoria seleciona um modelo dessa lista.</p>
+          {(form.uniform_models ?? []).length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {form.uniform_models.map((m: string) => (
+                <Badge key={m} variant="secondary" className="gap-1">
+                  {m}
+                  <button type="button" onClick={() => setForm({ ...form, uniform_models: form.uniform_models.filter((x: string) => x !== m) })}>
+                    <X className="size-3" />
+                  </button>
+                </Badge>
+              ))}
+            </div>
+          )}
+          <div className="flex gap-2">
+            <Input
+              placeholder="Nome do modelo"
+              value={newModel}
+              onChange={(e) => setNewModel(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  const v = newModel.trim();
+                  if (v && !(form.uniform_models ?? []).includes(v)) {
+                    setForm({ ...form, uniform_models: [...(form.uniform_models ?? []), v] });
+                  }
+                  setNewModel("");
+                }
+              }}
+            />
+            <Button type="button" variant="outline" onClick={() => {
+              const v = newModel.trim();
+              if (v && !(form.uniform_models ?? []).includes(v)) {
+                setForm({ ...form, uniform_models: [...(form.uniform_models ?? []), v] });
+              }
+              setNewModel("");
+            }}>Adicionar</Button>
           </div>
         </div>
 
