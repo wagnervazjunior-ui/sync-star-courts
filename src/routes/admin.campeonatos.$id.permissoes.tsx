@@ -68,7 +68,8 @@ function PermissionsPage() {
     load();
   };
 
-  if (authLoading || !isMaster) return null;
+  if (authLoading || rolesLoading) return <div className="text-muted-foreground text-sm">Carregando…</div>;
+  if (!isMaster) return null;
 
   return (
     <div className="space-y-6 max-w-3xl">
