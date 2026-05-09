@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Download, CheckCircle2, XCircle } from "lucide-react";
-import ExcelJS from "exceljs";
+import { generateUniformWorkbook } from "@/lib/uniform-export";
 
 export const Route = createFileRoute("/admin/inscricoes")({
   component: InscricoesPage,
@@ -51,7 +51,7 @@ function InscricoesPage() {
       if (status !== "all" && r.status !== status) return false;
       if (search) {
         const s = search.toLowerCase();
-        if (![r.voucher_code, r.contact_email, r.athlete1_name, r.athlete2_name].some(v => v?.toLowerCase().includes(s))) return false;
+        if (![r.voucher_code, r.contact_email, r.team_name, r.athlete1_name, r.athlete2_name].some((v: any) => v?.toLowerCase().includes(s))) return false;
       }
       return true;
     });
@@ -67,63 +67,18 @@ function InscricoesPage() {
   };
 
   const exportExcel = async () => {
-    const wb = new ExcelJS.Workbook();
-    wb.creator = "Open Sync";
     const targetCh = championshipId === "all" ? null : championships?.find((c: any) => c.id === championshipId);
     const cats = (categories ?? []).filter((c: any) => !targetCh || c.championship_id === targetCh.id);
-
-    const summary = wb.addWorksheet("Resumo");
-    summary.columns = [
-      { header: "Categoria", key: "cat", width: 30 },
-      { header: "Pendentes", key: "p", width: 12 },
-      { header: "Confirmadas", key: "c", width: 14 },
-      { header: "Canceladas", key: "x", width: 14 },
-      { header: "Total ativas", key: "t", width: 14 },
-    ];
-
-    for (const cat of cats) {
-      const list = (regs ?? []).filter((r: any) => r.category_id === cat.id);
-      const active = list.filter((r: any) => r.status !== "cancelled");
-      const cancelled = list.filter((r: any) => r.status === "cancelled");
-      const pending = list.filter((r: any) => r.status === "pending").length;
-      const confirmed = list.filter((r: any) => r.status === "confirmed").length;
-      summary.addRow({ cat: cat.name, p: pending, c: confirmed, x: cancelled.length, t: active.length });
-
-      const makeSheet = (suffix: string, rows: any[]) => {
-        const ws = wb.addWorksheet(`${cat.name} - ${suffix}`.slice(0, 31));
-        ws.columns = [
-          { header: "Voucher", key: "v", width: 12 },
-          { header: "Status", key: "s", width: 12 },
-          { header: "E-mail", key: "e", width: 28 },
-          { header: "Atleta 1", key: "n1", width: 24 },
-          { header: "Tel 1", key: "p1", width: 16 },
-          { header: "Uniforme 1", key: "u1", width: 12 },
-          { header: "Atleta 2", key: "n2", width: 24 },
-          { header: "Tel 2", key: "p2", width: 16 },
-          { header: "Uniforme 2", key: "u2", width: 12 },
-          { header: "Data", key: "d", width: 18 },
-        ];
-        rows.forEach((r) => ws.addRow({
-          v: r.voucher_code, s: STATUS_LABEL[r.status], e: r.contact_email,
-          n1: r.athlete1_name, p1: r.athlete1_phone, u1: r.athlete1_shirt_size,
-          n2: r.athlete2_name, p2: r.athlete2_phone, u2: r.athlete2_shirt_size,
-          d: new Date(r.created_at).toLocaleString("pt-BR"),
-        }));
-        ws.getRow(1).font = { bold: true };
-      };
-      if (active.length) makeSheet("Ativas", active);
-      if (cancelled.length) makeSheet("Canceladas", cancelled);
-    }
-    summary.getRow(1).font = { bold: true };
-
-    const buf = await wb.xlsx.writeBuffer();
-    const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `inscricoes-${targetCh?.slug ?? "todos"}-${new Date().toISOString().slice(0, 10)}.xlsx`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const confirmed = (regs ?? []).filter((r: any) => r.status === "confirmed");
+    if (!confirmed.length) { toast.info("Nenhuma inscrição confirmada para exportar"); return; }
+    await generateUniformWorkbook({
+      championshipName: targetCh?.name ?? "Todos os campeonatos",
+      championshipSlug: targetCh?.slug ?? "todos",
+      categories: cats.map((c: any) => ({
+        ...c,
+        registrations: confirmed.filter((r: any) => r.category_id === c.id),
+      })).filter((c: any) => c.registrations.length > 0),
+    });
   };
 
   return (
@@ -133,7 +88,7 @@ function InscricoesPage() {
           <h1 className="text-3xl font-bold">Inscrições</h1>
           <p className="text-muted-foreground">{filtered.length} resultado(s)</p>
         </div>
-        <Button variant="hero" onClick={exportExcel}><Download className="size-4" /> Exportar Excel</Button>
+        <Button variant="hero" onClick={exportExcel}><Download className="size-4" /> Exportar planilha de uniformes</Button>
       </div>
 
       <Card className="mt-4 p-4 bg-gradient-card border-border/50 grid gap-3 md:grid-cols-4">
@@ -160,7 +115,7 @@ function InscricoesPage() {
             <SelectItem value="cancelled">Canceladas</SelectItem>
           </SelectContent>
         </Select>
-        <Input placeholder="Buscar voucher / nome / e-mail" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <Input placeholder="Buscar voucher / dupla / e-mail" value={search} onChange={(e) => setSearch(e.target.value)} />
       </Card>
 
       <div className="mt-4 grid gap-3">
@@ -174,13 +129,15 @@ function InscricoesPage() {
                   <Badge variant={r.status === "confirmed" ? "default" : r.status === "cancelled" ? "destructive" : "secondary"}>{STATUS_LABEL[r.status]}</Badge>
                   <span className="text-xs text-muted-foreground">{r.category?.championship?.name} · {r.category?.name}</span>
                 </div>
-                <div className="mt-2 grid gap-1 text-sm md:grid-cols-2">
-                  <div><strong>{r.athlete1_name}</strong> · {r.athlete1_phone} · uniforme {r.athlete1_shirt_size}</div>
-                  <div><strong>{r.athlete2_name}</strong> · {r.athlete2_phone} · uniforme {r.athlete2_shirt_size}</div>
+                <p className="mt-1 text-sm font-medium">{r.team_name} · {r.contact_phone}</p>
+                <div className="mt-1 grid gap-1 text-sm md:grid-cols-2">
+                  <div><strong>{r.athlete1_name}</strong> · cam {r.athlete1_shirt_size} / short {r.athlete1_shorts_size}</div>
+                  <div><strong>{r.athlete2_name}</strong> · cam {r.athlete2_shirt_size} / short {r.athlete2_shorts_size}</div>
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">{r.contact_email} · {new Date(r.created_at).toLocaleString("pt-BR")}</p>
               </div>
               <div className="flex gap-1">
+                <Button size="sm" variant="outline" asChild><Link to="/admin/categorias/$categoryId" params={{ categoryId: r.category_id }}>Abrir categoria</Link></Button>
                 {r.status !== "confirmed" && <Button size="sm" variant="premium" onClick={() => updateStatus(r.id, "confirm")}><CheckCircle2 className="size-4" /></Button>}
                 {r.status !== "cancelled" && <Button size="sm" variant="ghost" onClick={() => updateStatus(r.id, "cancel")}><XCircle className="size-4 text-destructive" /></Button>}
               </div>
