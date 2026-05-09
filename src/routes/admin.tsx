@@ -12,14 +12,14 @@ export const Route = createFileRoute("/admin")({
 });
 
 function AdminLayout() {
-  const { user, isAdmin, isMaster, loading } = useAuth();
+  const { user, isAdmin, isMaster, loading, rolesLoading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
     if (!loading && !user) navigate({ to: "/login" });
   }, [user, loading, navigate]);
 
-  if (loading) return <div className="min-h-screen p-8 text-muted-foreground">Carregando…</div>;
+  if (loading || rolesLoading) return <div className="min-h-screen p-8 text-muted-foreground">Carregando…</div>;
   if (!user) return null;
   if (!isAdmin) {
     return (

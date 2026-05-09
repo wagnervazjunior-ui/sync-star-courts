@@ -18,7 +18,7 @@ export const Route = createFileRoute("/admin/administradores")({
 type AdminRow = { user_id: string; email: string; role: "admin" | "master"; created_at: string };
 
 function AdministradoresPage() {
-  const { user, isMaster, loading: authLoading } = useAuth();
+  const { user, isMaster, loading: authLoading, rolesLoading } = useAuth();
   const navigate = useNavigate();
   const [list, setList] = useState<AdminRow[]>([]);
   const [email, setEmail] = useState("");
@@ -26,8 +26,8 @@ function AdministradoresPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!authLoading && !isMaster) navigate({ to: "/admin" });
-  }, [authLoading, isMaster, navigate]);
+    if (!authLoading && !rolesLoading && !isMaster) navigate({ to: "/admin" });
+  }, [authLoading, rolesLoading, isMaster, navigate]);
 
   const load = async () => {
     setLoading(true);
@@ -64,7 +64,8 @@ function AdministradoresPage() {
     load();
   };
 
-  if (authLoading || !isMaster) return null;
+  if (authLoading || rolesLoading) return <div className="text-muted-foreground text-sm">Carregando…</div>;
+  if (!isMaster) return null;
 
   return (
     <div className="space-y-6 max-w-3xl">
