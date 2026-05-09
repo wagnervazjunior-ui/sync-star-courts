@@ -1,44 +1,38 @@
-## 1. Editar categoria não preenche os campos
-**Causa:** `CategoryDialog` usa `useState(() => initial ?? {...})` — só inicializa uma vez. Ao reabrir o diálogo com outra categoria, o form mantém o estado anterior.
+## Causa raiz
 
-**Correção em `src/routes/admin.campeonatos.$id.tsx`:**
-- Forçar remontagem do diálogo passando `key={editing?.id ?? "new"}` no `<CategoryDialog />`, **ou** usar `useEffect` no componente para resetar o form quando `initial` mudar.
-- Garantir que campos opcionais (`uniform_model`, `age_rule_mode`, `age_min`, `description`) caiam corretamente nos defaults quando vierem `null` do banco.
+A página `/admin/administradores` (e `/admin/campeonatos/$id/permissoes`) redireciona para `/admin` antes do papel `master` ser carregado, então o usuário sempre cai no Dashboard.
 
-## 2. Data de nascimento aparecendo sem regra de idade
-**Status:** o formulário em `src/routes/inscricao.$categoryId.tsx` já condiciona `{requiresAge && ...}`. Vou:
-- Confirmar que o schema Zod não exige a data quando não há regra (já é `optional`, ok).
-- Adicionar um pequeno guard: se `ctx.age_rule_mode` vier `null` (categorias antigas), tratar como `"none"`.
-- Validar na prática abrindo a inscrição de uma categoria sem regra para confirmar a remoção total da seção.
+Em `src/hooks/useAuth.ts`:
+- `loading` vira `false` assim que `getSession()` resolve.
+- A consulta a `user_roles` (que define `isMaster`) acontece em um `useEffect` separado, depois disso.
+- Existe uma janela em que `loading=false` e `isMaster=false`.
 
-## 3. Admin precisa editar a inscrição do atleta
-Adicionar **edição completa** da inscrição na página `src/routes/admin.categorias.$categoryId.tsx`:
-- Botão "Editar" (ícone lápis) na linha da tabela ao lado de Confirmar/Cancelar.
-- Abrir um `<Dialog>` com formulário pré-preenchido: e-mail, WhatsApp, nome da dupla, nome / camiseta / shorts / data de nascimento de cada atleta.
-- Salvar via `supabase.from("registrations").update(...)` (a policy `registrations_admin_update` já permite update do admin com `can_view_championship`).
-- Reaproveitar máscara de WhatsApp e o seletor de tamanhos do formulário público.
-- Invalidar a query `["adm-cat-regs", categoryId]` após salvar.
-
-## 4. Contagem de uniformes incorreta na exportação
-**Causa em `src/routes/admin.inscricoes.tsx` (`exportExcel`):**
+Em `src/routes/admin.administradores.tsx`:
 ```ts
-const confirmed = (regs ?? []).filter(r => r.status === "confirmed");
+useEffect(() => {
+  if (!authLoading && !isMaster) navigate({ to: "/admin" });
+}, [authLoading, isMaster, navigate]);
 ```
-Ignora os filtros aplicados (`championshipId`, `categoryId`, `status`, `search`). Resultado: a aba "Resumo geral" soma duplas de **outros campeonatos / categorias** que compartilham o mesmo `uniform_model` (ex.: "Amador"), inflando a contagem.
+Esse efeito dispara nessa janela e manda o master de volta ao Dashboard. O mesmo padrão existe em `admin.campeonatos.$id.permissoes.tsx`.
 
-**Correção:**
-- Trocar por `filtered` (já respeita todos os filtros) e considerar apenas `status === "confirmed"`.
-- Quando `categoryId !== "all"`, exportar somente aquela categoria.
-- Verificar também a página por-categoria (`admin.categorias.$categoryId.tsx`) — ela já passa só `[cat]` então a contagem nela está correta; vou apenas auditar o `renderBucket` para confirmar que cada atleta entra **uma única vez** no bucket de modelagem.
+Confirmei no banco que `junior@pexcelsp.com.br` tem o papel `master` (e `admin`), então o problema é puramente o race no front.
+
+## Correção
+
+1. **`src/hooks/useAuth.ts`** — adicionar um estado `rolesLoading` (inicia `true`, vira `false` no `.then` da consulta de `user_roles`, e também `false` quando não há `user`). Expor no retorno.
+2. **`src/routes/admin.administradores.tsx`** — trocar o guard para esperar `rolesLoading`:
+   - `if (!authLoading && !rolesLoading && !isMaster) navigate({ to: "/admin" })`
+   - `if (authLoading || rolesLoading) return <loader/>`; só depois checar `isMaster`.
+3. **`src/routes/admin.campeonatos.$id.permissoes.tsx`** — mesma mudança.
+4. **`src/routes/admin.tsx`** — opcional mas recomendado: usar `rolesLoading` para não esconder o item "Administradores" da sidebar antes do papel chegar (atualmente ele só aparece quando `isMaster` é true, o que pode "piscar"). Mostrar o item só após `rolesLoading=false`.
 
 ## Validação
-- Editar uma categoria existente: confirmar que nome / vagas / preço / regra de idade aparecem preenchidos.
-- Inscrever em categoria sem regra de idade: campo "Data de nascimento" não aparece.
-- Editar uma inscrição como admin e ver as alterações persistirem.
-- Exportar planilha com 1 dupla confirmada em "Amador": o Resumo geral mostra exatamente 2 (1 camiseta + 1 shorts por atleta).
+- Logar como master, clicar em "Administradores" → deve abrir a tela de gerenciamento (promover/revogar admins), sem redirecionar.
+- Clicar em "Permissões" dentro de um campeonato → deve abrir a lista de admins do campeonato.
+- Logar como admin não-master → ainda deve ser redirecionado para `/admin`.
 
 ## Arquivos alterados
-- `src/routes/admin.campeonatos.$id.tsx` (reset do diálogo de categoria)
-- `src/routes/admin.categorias.$categoryId.tsx` (edição de inscrição)
-- `src/routes/admin.inscricoes.tsx` (exportação respeita filtros)
-- `src/routes/inscricao.$categoryId.tsx` (guard `age_rule_mode` null)
+- `src/hooks/useAuth.ts`
+- `src/routes/admin.administradores.tsx`
+- `src/routes/admin.campeonatos.$id.permissoes.tsx`
+- `src/routes/admin.tsx`
