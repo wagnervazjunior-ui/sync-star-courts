@@ -205,6 +205,24 @@ function CategoryDialog({ initial, onSave, uniformModels }: { initial: any; onSa
           <div className="space-y-2"><Label>Vagas</Label><Input type="number" min={1} value={form.max_slots} onChange={(e) => setForm({ ...form, max_slots: e.target.value })} /></div>
           <div className="space-y-2"><Label>Preço (R$)</Label><Input type="number" step="0.01" value={form.price_reais} onChange={(e) => setForm({ ...form, price_reais: e.target.value })} /></div>
         </div>
+        <div className="rounded-lg border border-border/50 p-3 space-y-3">
+          <Label className="text-sm font-semibold">Regra de idade (categorias Master)</Label>
+          <Select value={form.age_rule_mode ?? "none"} onValueChange={(v) => setForm({ ...form, age_rule_mode: v })}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Sem regra de idade</SelectItem>
+              <SelectItem value="individual_min">Idade mínima por atleta</SelectItem>
+              <SelectItem value="sum_min">Soma mínima das idades da dupla</SelectItem>
+            </SelectContent>
+          </Select>
+          {form.age_rule_mode && form.age_rule_mode !== "none" && (
+            <div className="space-y-2">
+              <Label>{form.age_rule_mode === "individual_min" ? "Idade mínima de cada atleta" : "Soma mínima das idades"}</Label>
+              <Input type="number" min={1} value={form.age_min ?? ""} onChange={(e) => setForm({ ...form, age_min: e.target.value })} />
+              <p className="text-xs text-muted-foreground">A idade considerada é a completada no ano de início do campeonato.</p>
+            </div>
+          )}
+        </div>
         <div className="flex items-center gap-2"><Switch checked={form.active} onCheckedChange={(v) => setForm({ ...form, active: v })} /><Label>Ativa</Label></div>
       </div>
       <DialogFooter><Button variant="hero" onClick={() => onSave(form)}>Salvar</Button></DialogFooter>
