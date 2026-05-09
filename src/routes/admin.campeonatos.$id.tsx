@@ -172,7 +172,14 @@ function ChampionshipDetail() {
 }
 
 function CategoryDialog({ initial, onSave, uniformModels }: { initial: any; onSave: (v: any) => void; uniformModels: string[] }) {
-  const [form, setForm] = useState(() => initial ?? { name: "", description: "", max_slots: 16, price_reais: "0", active: true, gender: "mixed", uniform_model: "", age_rule_mode: "none", age_min: "" });
+  const [form, setForm] = useState(() => ({
+    name: "", description: "", max_slots: 16, price_reais: "0", active: true, gender: "mixed", uniform_model: "", age_rule_mode: "none", age_min: "",
+    ...(initial ?? {}),
+    description: initial?.description ?? "",
+    uniform_model: initial?.uniform_model ?? "",
+    age_rule_mode: initial?.age_rule_mode ?? "none",
+    age_min: initial?.age_min ?? "",
+  }));
   return (
     <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
       <DialogHeader><DialogTitle>{initial ? "Editar" : "Nova"} categoria</DialogTitle></DialogHeader>
