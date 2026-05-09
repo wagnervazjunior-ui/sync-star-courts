@@ -17,6 +17,8 @@ export type Database = {
       categories: {
         Row: {
           active: boolean
+          age_min: number | null
+          age_rule_mode: string
           championship_id: string
           created_at: string
           description: string | null
@@ -30,6 +32,8 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          age_min?: number | null
+          age_rule_mode?: string
           championship_id: string
           created_at?: string
           description?: string | null
@@ -43,6 +47,8 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          age_min?: number | null
+          age_rule_mode?: string
           championship_id?: string
           created_at?: string
           description?: string | null
@@ -64,12 +70,42 @@ export type Database = {
           },
         ]
       }
+      championship_admins: {
+        Row: {
+          championship_id: string
+          created_at: string
+          granted_by: string | null
+          user_id: string
+        }
+        Insert: {
+          championship_id: string
+          created_at?: string
+          granted_by?: string | null
+          user_id: string
+        }
+        Update: {
+          championship_id?: string
+          created_at?: string
+          granted_by?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "championship_admins_championship_id_fkey"
+            columns: ["championship_id"]
+            isOneToOne: false
+            referencedRelation: "championships"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       championships: {
         Row: {
           active: boolean
           cancellation_policy: string | null
           cover_image_url: string | null
           created_at: string
+          created_by: string | null
           description: string | null
           end_date: string | null
           id: string
@@ -90,6 +126,7 @@ export type Database = {
           cancellation_policy?: string | null
           cover_image_url?: string | null
           created_at?: string
+          created_by?: string | null
           description?: string | null
           end_date?: string | null
           id?: string
@@ -110,6 +147,7 @@ export type Database = {
           cancellation_policy?: string | null
           cover_image_url?: string | null
           created_at?: string
+          created_by?: string | null
           description?: string | null
           end_date?: string | null
           id?: string
@@ -132,9 +170,11 @@ export type Database = {
           amount_cents: number | null
           asaas_customer_id: string | null
           asaas_payment_id: string | null
+          athlete1_birthdate: string | null
           athlete1_name: string
           athlete1_shirt_size: Database["public"]["Enums"]["shirt_size"]
           athlete1_shorts_size: Database["public"]["Enums"]["shirt_size"]
+          athlete2_birthdate: string | null
           athlete2_name: string
           athlete2_shirt_size: Database["public"]["Enums"]["shirt_size"]
           athlete2_shorts_size: Database["public"]["Enums"]["shirt_size"]
@@ -156,9 +196,11 @@ export type Database = {
           amount_cents?: number | null
           asaas_customer_id?: string | null
           asaas_payment_id?: string | null
+          athlete1_birthdate?: string | null
           athlete1_name: string
           athlete1_shirt_size: Database["public"]["Enums"]["shirt_size"]
           athlete1_shorts_size: Database["public"]["Enums"]["shirt_size"]
+          athlete2_birthdate?: string | null
           athlete2_name: string
           athlete2_shirt_size: Database["public"]["Enums"]["shirt_size"]
           athlete2_shorts_size: Database["public"]["Enums"]["shirt_size"]
@@ -180,9 +222,11 @@ export type Database = {
           amount_cents?: number | null
           asaas_customer_id?: string | null
           asaas_payment_id?: string | null
+          athlete1_birthdate?: string | null
           athlete1_name?: string
           athlete1_shirt_size?: Database["public"]["Enums"]["shirt_size"]
           athlete1_shorts_size?: Database["public"]["Enums"]["shirt_size"]
+          athlete2_birthdate?: string | null
           athlete2_name?: string
           athlete2_shirt_size?: Database["public"]["Enums"]["shirt_size"]
           athlete2_shorts_size?: Database["public"]["Enums"]["shirt_size"]
@@ -236,6 +280,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_view_championship: {
+        Args: { _championship_id: string; _user_id: string }
+        Returns: boolean
+      }
       cancel_registration: { Args: { _id: string }; Returns: undefined }
       confirm_registration: { Args: { _id: string }; Returns: undefined }
       confirm_registration_by_payment: {
@@ -249,6 +297,10 @@ export type Database = {
         Returns: number
       }
       get_registration_by_voucher: { Args: { _code: string }; Returns: Json }
+      grant_championship_admin: {
+        Args: { _championship_id: string; _email: string }
+        Returns: Json
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -265,8 +317,21 @@ export type Database = {
           user_id: string
         }[]
       }
+      list_championship_admins: {
+        Args: { _championship_id: string }
+        Returns: {
+          created_at: string
+          email: string
+          granted_by: string
+          user_id: string
+        }[]
+      }
       promote_user_to_admin: { Args: { _email: string }; Returns: Json }
       revoke_admin: { Args: { _user_id: string }; Returns: undefined }
+      revoke_championship_admin: {
+        Args: { _championship_id: string; _user_id: string }
+        Returns: undefined
+      }
       set_registration_pix: {
         Args: {
           _amount_cents: number
