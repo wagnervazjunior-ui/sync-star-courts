@@ -8,14 +8,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, ArrowLeft, ExternalLink, AlertTriangle } from "lucide-react";
+import { Plus, Pencil, Trash2, ArrowLeft, ExternalLink, AlertTriangle, Users } from "lucide-react";
 
 export const Route = createFileRoute("/admin/campeonatos/$id")({
   component: ChampionshipDetail,
 });
+
+const GENDER_LABEL: Record<string, string> = { male: "Masculina", female: "Feminina", mixed: "Mista" };
 
 function ChampionshipDetail() {
   const { id } = Route.useParams();
@@ -31,9 +34,28 @@ function ChampionshipDetail() {
     queryKey: ["categories", id],
     queryFn: async () => (await supabase.from("categories").select("*").eq("championship_id", id).order("name")).data ?? [],
   });
+  const { data: counts } = useQuery({
+    queryKey: ["category-counts", id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("registrations")
+        .select("category_id, status, category:categories!inner(championship_id)")
+        .eq("category.championship_id", id)
+        .neq("status", "cancelled");
+      const map: Record<string, number> = {};
+      (data ?? []).forEach((r: any) => { map[r.category_id] = (map[r.category_id] ?? 0) + 1; });
+      return map;
+    },
+  });
 
   const save = async (form: any) => {
-    const payload = { ...form, championship_id: id, max_slots: Number(form.max_slots), price_cents: Math.round(Number(form.price_reais) * 100) };
+    const payload = {
+      ...form,
+      championship_id: id,
+      max_slots: Number(form.max_slots),
+      price_cents: Math.round(Number(form.price_reais) * 100),
+      uniform_model: form.uniform_model || null,
+    };
     delete payload.price_reais;
     const op = editing?.id
       ? supabase.from("categories").update(payload).eq("id", editing.id)
@@ -68,7 +90,7 @@ function ChampionshipDetail() {
           )}
           <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setEditing(null); }}>
             <DialogTrigger asChild><Button variant="hero"><Plus className="size-4" /> Nova categoria</Button></DialogTrigger>
-            <CategoryDialog initial={editing} onSave={save} />
+            <CategoryDialog initial={editing} onSave={save} uniformModels={ch?.uniform_models ?? []} />
           </Dialog>
         </div>
       </div>
@@ -87,38 +109,70 @@ function ChampionshipDetail() {
       )}
 
       <div className="mt-6 grid gap-3">
-        {cats?.map((c) => (
-          <Card key={c.id} className="p-5 bg-gradient-card border-border/50">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="font-bold">{c.name}</h3>
-                  <Badge variant={c.active ? "default" : "secondary"}>{c.active ? "Ativa" : "Inativa"}</Badge>
+        {cats?.map((c) => {
+          const inscritos = counts?.[c.id] ?? 0;
+          const restantes = Math.max(0, c.max_slots - inscritos);
+          return (
+            <Card key={c.id} className="p-5 bg-gradient-card border-border/50">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Link to="/admin/categorias/$categoryId" params={{ categoryId: c.id }} className="font-bold hover:text-primary hover:underline">{c.name}</Link>
+                    <Badge variant={c.active ? "default" : "secondary"}>{c.active ? "Ativa" : "Inativa"}</Badge>
+                    <Badge variant="outline">{GENDER_LABEL[c.gender] ?? c.gender}</Badge>
+                    {c.uniform_model && <Badge variant="outline">{c.uniform_model}</Badge>}
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1 flex items-center gap-3 flex-wrap">
+                    <span className="inline-flex items-center gap-1"><Users className="size-3" /> {inscritos}/{c.max_slots} inscritos · {restantes} vaga(s)</span>
+                    <span>R$ {(c.price_cents / 100).toFixed(2).replace(".", ",")}</span>
+                  </p>
+                  {c.description && <p className="text-sm text-muted-foreground mt-1 whitespace-pre-line line-clamp-2">{c.description}</p>}
                 </div>
-                <p className="text-sm text-muted-foreground mt-1">{c.max_slots} vagas · R$ {(c.price_cents / 100).toFixed(2).replace(".", ",")}</p>
-                {c.description && <p className="text-sm text-muted-foreground mt-1 whitespace-pre-line line-clamp-2">{c.description}</p>}
+                <div className="flex gap-1">
+                  <Button size="sm" variant="premium" asChild><Link to="/admin/categorias/$categoryId" params={{ categoryId: c.id }}>Inscrições</Link></Button>
+                  <Button size="sm" variant="ghost" onClick={() => { setEditing({ ...c, price_reais: (c.price_cents / 100).toFixed(2) }); setOpen(true); }}><Pencil className="size-4" /></Button>
+                  <Button size="sm" variant="ghost" onClick={() => remove(c.id)}><Trash2 className="size-4 text-destructive" /></Button>
+                </div>
               </div>
-              <div className="flex gap-1">
-                <Button size="sm" variant="ghost" onClick={() => { setEditing({ ...c, price_reais: (c.price_cents / 100).toFixed(2) }); setOpen(true); }}><Pencil className="size-4" /></Button>
-                <Button size="sm" variant="ghost" onClick={() => remove(c.id)}><Trash2 className="size-4 text-destructive" /></Button>
-              </div>
-            </div>
-          </Card>
-        ))}
+            </Card>
+          );
+        })}
         {cats?.length === 0 && <Card className="p-8 text-center text-muted-foreground bg-gradient-card border-border/50">Nenhuma categoria criada.</Card>}
       </div>
     </div>
   );
 }
 
-function CategoryDialog({ initial, onSave }: { initial: any; onSave: (v: any) => void }) {
-  const [form, setForm] = useState(() => initial ?? { name: "", description: "", max_slots: 16, price_reais: "0", active: true });
+function CategoryDialog({ initial, onSave, uniformModels }: { initial: any; onSave: (v: any) => void; uniformModels: string[] }) {
+  const [form, setForm] = useState(() => initial ?? { name: "", description: "", max_slots: 16, price_reais: "0", active: true, gender: "mixed", uniform_model: "" });
   return (
     <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
       <DialogHeader><DialogTitle>{initial ? "Editar" : "Nova"} categoria</DialogTitle></DialogHeader>
       <div className="space-y-4">
         <div className="space-y-2"><Label>Nome</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex: Iniciante Masculino" /></div>
         <div className="space-y-2"><Label>Descrição (premiação, regras, horário)</Label><Textarea rows={5} value={form.description ?? ""} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-2">
+            <Label>Gênero</Label>
+            <Select value={form.gender ?? "mixed"} onValueChange={(v) => setForm({ ...form, gender: v })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="male">Masculina</SelectItem>
+                <SelectItem value="female">Feminina</SelectItem>
+                <SelectItem value="mixed">Mista</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Modelo de uniforme</Label>
+            <Select value={form.uniform_model ?? ""} onValueChange={(v) => setForm({ ...form, uniform_model: v })} disabled={uniformModels.length === 0}>
+              <SelectTrigger><SelectValue placeholder={uniformModels.length === 0 ? "Cadastre modelos no campeonato" : "Selecione"} /></SelectTrigger>
+              <SelectContent>
+                {uniformModels.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-2"><Label>Vagas</Label><Input type="number" min={1} value={form.max_slots} onChange={(e) => setForm({ ...form, max_slots: e.target.value })} /></div>
           <div className="space-y-2"><Label>Preço (R$)</Label><Input type="number" step="0.01" value={form.price_reais} onChange={(e) => setForm({ ...form, price_reais: e.target.value })} /></div>
