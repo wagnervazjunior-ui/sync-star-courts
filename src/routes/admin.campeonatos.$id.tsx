@@ -58,6 +58,8 @@ function ChampionshipDetail() {
       max_slots: Number(form.max_slots),
       price_cents: Math.round(Number(form.price_reais) * 100),
       uniform_model: form.uniform_model || null,
+      age_rule_mode: form.age_rule_mode || "none",
+      age_min: form.age_rule_mode && form.age_rule_mode !== "none" ? Number(form.age_min) : null,
     };
     delete payload.price_reais;
     const op = editing?.id
