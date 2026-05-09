@@ -35,6 +35,7 @@ function CategoryAdminPage() {
   const { categoryId } = Route.useParams();
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
+  const [editing, setEditing] = useState<any | null>(null);
 
   const { data: cat } = useQuery({
     queryKey: ["adm-cat", categoryId],
