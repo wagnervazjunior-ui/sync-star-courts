@@ -6,12 +6,23 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { ArrowLeft, CheckCircle2, XCircle, Users, Download, ClipboardList } from "lucide-react";
+import { ArrowLeft, CheckCircle2, XCircle, Users, Download, ClipboardList, Pencil } from "lucide-react";
 import { generateUniformWorkbook } from "@/lib/uniform-export";
 import { generateGateListWorkbook } from "@/lib/gate-list-export";
+
+const SHIRT_SIZES = ["P", "M", "G", "GG", "XG"] as const;
+const maskPhone = (v: string) => {
+  const d = v.replace(/\D/g, "").slice(0, 11);
+  if (d.length <= 2) return d;
+  if (d.length <= 7) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+};
 
 export const Route = createFileRoute("/admin/categorias/$categoryId")({
   component: CategoryAdminPage,
