@@ -118,7 +118,7 @@ function ChampionshipDetail() {
           )}
           <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setEditing(null); }}>
             <DialogTrigger asChild><Button variant="hero"><Plus className="size-4" /> Nova categoria</Button></DialogTrigger>
-            <CategoryDialog initial={editing} onSave={save} uniformModels={ch?.uniform_models ?? []} />
+            <CategoryDialog key={editing?.id ?? "new"} initial={editing} onSave={save} uniformModels={ch?.uniform_models ?? []} />
           </Dialog>
         </div>
       </div>
@@ -172,7 +172,17 @@ function ChampionshipDetail() {
 }
 
 function CategoryDialog({ initial, onSave, uniformModels }: { initial: any; onSave: (v: any) => void; uniformModels: string[] }) {
-  const [form, setForm] = useState(() => initial ?? { name: "", description: "", max_slots: 16, price_reais: "0", active: true, gender: "mixed", uniform_model: "", age_rule_mode: "none", age_min: "" });
+  const [form, setForm] = useState(() => ({
+    name: initial?.name ?? "",
+    description: initial?.description ?? "",
+    max_slots: initial?.max_slots ?? 16,
+    price_reais: initial?.price_reais ?? "0",
+    active: initial?.active ?? true,
+    gender: initial?.gender ?? "mixed",
+    uniform_model: initial?.uniform_model ?? "",
+    age_rule_mode: initial?.age_rule_mode ?? "none",
+    age_min: initial?.age_min ?? "",
+  }));
   return (
     <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
       <DialogHeader><DialogTitle>{initial ? "Editar" : "Nova"} categoria</DialogTitle></DialogHeader>

@@ -65,7 +65,8 @@ function RegisterPage() {
     defaultValues: { athlete1_shirt_size: "M", athlete1_shorts_size: "M", athlete2_shirt_size: "M", athlete2_shorts_size: "M" } as any,
   });
 
-  const requiresAge = ctx?.age_rule_mode && ctx.age_rule_mode !== "none";
+  const ageMode = ctx?.age_rule_mode ?? "none";
+  const requiresAge = ageMode !== "none";
   const championshipYear = ctx?.championship?.start_date
     ? new Date(ctx.championship.start_date).getUTCFullYear()
     : new Date().getUTCFullYear();
@@ -78,12 +79,12 @@ function RegisterPage() {
       }
       const a1 = championshipYear - new Date(values.athlete1_birthdate).getUTCFullYear();
       const a2 = championshipYear - new Date(values.athlete2_birthdate).getUTCFullYear();
-      const min = Number(ctx.age_min ?? 0);
-      if (ctx.age_rule_mode === "individual_min" && (a1 < min || a2 < min)) {
+      const min = Number(ctx?.age_min ?? 0);
+      if (ageMode === "individual_min" && (a1 < min || a2 < min)) {
         toast.error(`Cada atleta precisa ter pelo menos ${min} anos em ${championshipYear}`);
         return;
       }
-      if (ctx.age_rule_mode === "sum_min" && (a1 + a2) < min) {
+      if (ageMode === "sum_min" && (a1 + a2) < min) {
         toast.error(`A soma das idades em ${championshipYear} precisa ser ≥ ${min}`);
         return;
       }

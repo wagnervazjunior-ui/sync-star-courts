@@ -68,8 +68,12 @@ function InscricoesPage() {
 
   const exportExcel = async () => {
     const targetCh = championshipId === "all" ? null : championships?.find((c: any) => c.id === championshipId);
-    const cats = (categories ?? []).filter((c: any) => !targetCh || c.championship_id === targetCh.id);
-    const confirmed = (regs ?? []).filter((r: any) => r.status === "confirmed");
+    const cats = (categories ?? []).filter((c: any) => {
+      if (targetCh && c.championship_id !== targetCh.id) return false;
+      if (categoryId !== "all" && c.id !== categoryId) return false;
+      return true;
+    });
+    const confirmed = filtered.filter((r: any) => r.status === "confirmed");
     if (!confirmed.length) { toast.info("Nenhuma inscrição confirmada para exportar"); return; }
     await generateUniformWorkbook({
       championshipName: targetCh?.name ?? "Todos os campeonatos",
