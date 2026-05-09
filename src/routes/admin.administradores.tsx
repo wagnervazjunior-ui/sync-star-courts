@@ -71,6 +71,7 @@ function AdministradoresPage() {
       <div>
         <h1 className="text-3xl font-bold flex items-center gap-2"><Shield className="size-7 text-primary" /> Administradores</h1>
         <p className="text-muted-foreground mt-1">Apenas o admin master pode promover ou revogar acessos.</p>
+        <p className="text-xs text-muted-foreground mt-1">Para definir quais campeonatos cada admin enxerga, abra o campeonato e use a aba <strong>Permissões</strong>.</p>
       </div>
 
       <Card className="p-6 bg-gradient-card border-border/50">

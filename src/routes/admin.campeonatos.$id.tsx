@@ -12,7 +12,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, ArrowLeft, ExternalLink, AlertTriangle, Users } from "lucide-react";
+import { Plus, Pencil, Trash2, ArrowLeft, ExternalLink, AlertTriangle, Users, ClipboardList, Shield } from "lucide-react";
+import { generateGateListWorkbook } from "@/lib/gate-list-export";
+import { useAuth } from "@/hooks/useAuth";
 
 export const Route = createFileRoute("/admin/campeonatos/$id")({
   component: ChampionshipDetail,
@@ -23,6 +25,7 @@ const GENDER_LABEL: Record<string, string> = { male: "Masculina", female: "Femin
 function ChampionshipDetail() {
   const { id } = Route.useParams();
   const qc = useQueryClient();
+  const { isMaster } = useAuth();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
 
@@ -55,6 +58,8 @@ function ChampionshipDetail() {
       max_slots: Number(form.max_slots),
       price_cents: Math.round(Number(form.price_reais) * 100),
       uniform_model: form.uniform_model || null,
+      age_rule_mode: form.age_rule_mode || "none",
+      age_min: form.age_rule_mode && form.age_rule_mode !== "none" ? Number(form.age_min) : null,
     };
     delete payload.price_reais;
     const op = editing?.id
@@ -80,12 +85,35 @@ function ChampionshipDetail() {
           <h1 className="text-3xl font-bold">{ch?.name}</h1>
           <p className="text-muted-foreground">Categorias do campeonato</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {ch?.slug && (
             <Button variant="outline" asChild>
               <a href={`/campeonatos/${ch.slug}`} target="_blank" rel="noopener noreferrer">
                 <ExternalLink className="size-4" /> Ver página pública
               </a>
+            </Button>
+          )}
+          <Button variant="outline" onClick={async () => {
+            const { data: regs } = await supabase
+              .from("registrations")
+              .select("team_name, athlete1_name, athlete2_name, status, category_id, category:categories!inner(name, championship_id)")
+              .eq("category.championship_id", id)
+              .eq("status", "confirmed");
+            const byCat = new Map<string, { name: string; registrations: any[] }>();
+            (regs ?? []).forEach((r: any) => {
+              const key = r.category_id;
+              if (!byCat.has(key)) byCat.set(key, { name: r.category.name, registrations: [] });
+              byCat.get(key)!.registrations.push(r);
+            });
+            await generateGateListWorkbook({
+              championshipName: ch?.name ?? "",
+              championshipSlug: ch?.slug ?? "campeonato",
+              categories: Array.from(byCat.values()),
+            });
+          }}><ClipboardList className="size-4" /> Lista da portaria</Button>
+          {isMaster && (
+            <Button variant="outline" asChild>
+              <Link to="/admin/campeonatos/$id/permissoes" params={{ id }}><Shield className="size-4" /> Permissões</Link>
             </Button>
           )}
           <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setEditing(null); }}>
@@ -144,7 +172,7 @@ function ChampionshipDetail() {
 }
 
 function CategoryDialog({ initial, onSave, uniformModels }: { initial: any; onSave: (v: any) => void; uniformModels: string[] }) {
-  const [form, setForm] = useState(() => initial ?? { name: "", description: "", max_slots: 16, price_reais: "0", active: true, gender: "mixed", uniform_model: "" });
+  const [form, setForm] = useState(() => initial ?? { name: "", description: "", max_slots: 16, price_reais: "0", active: true, gender: "mixed", uniform_model: "", age_rule_mode: "none", age_min: "" });
   return (
     <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
       <DialogHeader><DialogTitle>{initial ? "Editar" : "Nova"} categoria</DialogTitle></DialogHeader>
@@ -176,6 +204,24 @@ function CategoryDialog({ initial, onSave, uniformModels }: { initial: any; onSa
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-2"><Label>Vagas</Label><Input type="number" min={1} value={form.max_slots} onChange={(e) => setForm({ ...form, max_slots: e.target.value })} /></div>
           <div className="space-y-2"><Label>Preço (R$)</Label><Input type="number" step="0.01" value={form.price_reais} onChange={(e) => setForm({ ...form, price_reais: e.target.value })} /></div>
+        </div>
+        <div className="rounded-lg border border-border/50 p-3 space-y-3">
+          <Label className="text-sm font-semibold">Regra de idade (categorias Master)</Label>
+          <Select value={form.age_rule_mode ?? "none"} onValueChange={(v) => setForm({ ...form, age_rule_mode: v })}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Sem regra de idade</SelectItem>
+              <SelectItem value="individual_min">Idade mínima por atleta</SelectItem>
+              <SelectItem value="sum_min">Soma mínima das idades da dupla</SelectItem>
+            </SelectContent>
+          </Select>
+          {form.age_rule_mode && form.age_rule_mode !== "none" && (
+            <div className="space-y-2">
+              <Label>{form.age_rule_mode === "individual_min" ? "Idade mínima de cada atleta" : "Soma mínima das idades"}</Label>
+              <Input type="number" min={1} value={form.age_min ?? ""} onChange={(e) => setForm({ ...form, age_min: e.target.value })} />
+              <p className="text-xs text-muted-foreground">A idade considerada é a completada no ano de início do campeonato.</p>
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-2"><Switch checked={form.active} onCheckedChange={(v) => setForm({ ...form, active: v })} /><Label>Ativa</Label></div>
       </div>

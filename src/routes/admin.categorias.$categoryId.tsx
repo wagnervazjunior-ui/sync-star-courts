@@ -7,9 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import { ArrowLeft, CheckCircle2, XCircle, Users, Download } from "lucide-react";
+import { ArrowLeft, CheckCircle2, XCircle, Users, Download, ClipboardList } from "lucide-react";
 import { generateUniformWorkbook } from "@/lib/uniform-export";
+import { generateGateListWorkbook } from "@/lib/gate-list-export";
 
 export const Route = createFileRoute("/admin/categorias/$categoryId")({
   component: CategoryAdminPage,
@@ -63,6 +65,15 @@ function CategoryAdminPage() {
     });
   };
 
+  const exportGateList = async () => {
+    if (!cat) return;
+    await generateGateListWorkbook({
+      championshipName: cat.championship?.name ?? "",
+      championshipSlug: `${cat.championship?.slug ?? "categoria"}-${cat.name}`,
+      categories: [{ name: cat.name, registrations: regs ?? [] }],
+    });
+  };
+
   return (
     <div>
       <Button variant="ghost" size="sm" asChild>
@@ -79,7 +90,10 @@ function CategoryAdminPage() {
             <Badge variant="secondary" className="gap-1"><Users className="size-3" /> {totalAtivas}/{cat?.max_slots ?? 0} inscritos · {restantes} vaga(s)</Badge>
           </div>
         </div>
-        <Button variant="hero" onClick={exportExcel}><Download className="size-4" /> Exportar planilha de uniformes</Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={exportGateList}><ClipboardList className="size-4" /> Lista da portaria</Button>
+          <Button variant="hero" onClick={exportExcel}><Download className="size-4" /> Planilha de uniformes</Button>
+        </div>
       </div>
 
       <Card className="mt-6 p-4 bg-gradient-card border-border/50">
@@ -116,8 +130,44 @@ function CategoryAdminPage() {
                 <TableCell className="text-xs whitespace-nowrap">{new Date(r.created_at).toLocaleString("pt-BR")}</TableCell>
                 <TableCell>
                   <div className="flex gap-1">
-                    {r.status !== "confirmed" && <Button size="sm" variant="premium" onClick={() => updateStatus(r.id, "confirm")}><CheckCircle2 className="size-4" /></Button>}
-                    {r.status !== "cancelled" && <Button size="sm" variant="ghost" onClick={() => updateStatus(r.id, "cancel")}><XCircle className="size-4 text-destructive" /></Button>}
+                    {r.status !== "confirmed" && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button size="sm" variant="premium" title="Confirmar inscrição"><CheckCircle2 className="size-4" /></Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Confirmar inscrição?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Voucher <strong>{r.voucher_code}</strong> — dupla "{r.team_name || "—"}". A inscrição passará para confirmada.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Voltar</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => updateStatus(r.id, "confirm")}>Confirmar</AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
+                    {r.status !== "cancelled" && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button size="sm" variant="ghost" title="Cancelar inscrição"><XCircle className="size-4 text-destructive" /></Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Cancelar inscrição?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Voucher <strong>{r.voucher_code}</strong> — dupla "{r.team_name || "—"}". A inscrição será cancelada e a vaga liberada.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Voltar</AlertDialogCancel>
+                            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => updateStatus(r.id, "cancel")}>Cancelar inscrição</AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
                   </div>
                 </TableCell>
               </TableRow>

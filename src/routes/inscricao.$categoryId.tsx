@@ -25,9 +25,11 @@ const schema = z.object({
   athlete1_name: z.string().min(2, "Informe o nome"),
   athlete1_shirt_size: z.enum(SHIRT_SIZES),
   athlete1_shorts_size: z.enum(SHIRT_SIZES),
+  athlete1_birthdate: z.string().optional(),
   athlete2_name: z.string().min(2, "Informe o nome"),
   athlete2_shirt_size: z.enum(SHIRT_SIZES),
   athlete2_shorts_size: z.enum(SHIRT_SIZES),
+  athlete2_birthdate: z.string().optional(),
 });
 type FormValues = z.infer<typeof schema>;
 
@@ -63,7 +65,29 @@ function RegisterPage() {
     defaultValues: { athlete1_shirt_size: "M", athlete1_shorts_size: "M", athlete2_shirt_size: "M", athlete2_shorts_size: "M" } as any,
   });
 
+  const requiresAge = ctx?.age_rule_mode && ctx.age_rule_mode !== "none";
+  const championshipYear = ctx?.championship?.start_date
+    ? new Date(ctx.championship.start_date).getUTCFullYear()
+    : new Date().getUTCFullYear();
+
   const onSubmit = async (values: FormValues) => {
+    if (requiresAge) {
+      if (!values.athlete1_birthdate || !values.athlete2_birthdate) {
+        toast.error("Informe a data de nascimento de cada atleta");
+        return;
+      }
+      const a1 = championshipYear - new Date(values.athlete1_birthdate).getUTCFullYear();
+      const a2 = championshipYear - new Date(values.athlete2_birthdate).getUTCFullYear();
+      const min = Number(ctx.age_min ?? 0);
+      if (ctx.age_rule_mode === "individual_min" && (a1 < min || a2 < min)) {
+        toast.error(`Cada atleta precisa ter pelo menos ${min} anos em ${championshipYear}`);
+        return;
+      }
+      if (ctx.age_rule_mode === "sum_min" && (a1 + a2) < min) {
+        toast.error(`A soma das idades em ${championshipYear} precisa ser ≥ ${min}`);
+        return;
+      }
+    }
     setSubmitting(true);
     try {
       const { data, error } = await supabase.rpc("create_registration", {
@@ -71,6 +95,8 @@ function RegisterPage() {
       });
       if (error) {
         if (error.message.includes("SLOTS_FULL")) toast.error("Vagas esgotadas para esta categoria");
+        else if (error.message.includes("AGE_RULE_VIOLATION")) toast.error("As idades não atendem à regra desta categoria");
+        else if (error.message.includes("BIRTHDATE_REQUIRED")) toast.error("Informe a data de nascimento de cada atleta");
         else if (error.message.includes("duplicate")) toast.error("Já existe inscrição com este e-mail");
         else toast.error(error.message);
         return;
@@ -131,6 +157,17 @@ function RegisterPage() {
                   <Label>Nome completo</Label>
                   <Input {...form.register(`athlete${n}_name` as any)} />
                 </div>
+                {requiresAge && (
+                  <div className="space-y-2">
+                    <Label>Data de nascimento</Label>
+                    <Input type="date" {...form.register(`athlete${n}_birthdate` as any)} />
+                    <p className="text-xs text-muted-foreground">
+                      {ctx?.age_rule_mode === "individual_min"
+                        ? `Cada atleta precisa ter pelo menos ${ctx.age_min} anos em ${championshipYear}.`
+                        : `A soma das idades da dupla em ${championshipYear} precisa ser ≥ ${ctx?.age_min}.`}
+                    </p>
+                  </div>
+                )}
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-xs text-muted-foreground">Tamanhos do uniforme</p>
                   {ctx && <SizeChartLink urls={ctx.championship.shirt_size_chart_urls ?? []} />}
