@@ -65,7 +65,28 @@ function RegisterPage() {
     defaultValues: { athlete1_shirt_size: "M", athlete1_shorts_size: "M", athlete2_shirt_size: "M", athlete2_shorts_size: "M" } as any,
   });
 
+  const requiresAge = ctx?.age_rule_mode && ctx.age_rule_mode !== "none";
+  const championshipYear = ctx?.championship?.start_date
+    ? new Date(ctx.championship.start_date).getUTCFullYear()
+    : new Date().getUTCFullYear();
+
   const onSubmit = async (values: FormValues) => {
+    if (requiresAge) {
+      if (!values.athlete1_birthdate || !values.athlete2_birthdate) {
+        toast.error("Informe a data de nascimento de cada atleta");
+        return;
+      }
+      const a1 = championshipYear - new Date(values.athlete1_birthdate).getUTCFullYear();
+      const a2 = championshipYear - new Date(values.athlete2_birthdate).getUTCFullYear();
+      if (ctx.age_rule_mode === "individual_min" && (a1 < ctx.age_min || a2 < ctx.age_min)) {
+        toast.error(`Cada atleta precisa ter pelo menos ${ctx.age_min} anos em ${championshipYear}`);
+        return;
+      }
+      if (ctx.age_rule_mode === "sum_min" && (a1 + a2) < ctx.age_min) {
+        toast.error(`A soma das idades em ${championshipYear} precisa ser ≥ ${ctx.age_min}`);
+        return;
+      }
+    }
     setSubmitting(true);
     try {
       const { data, error } = await supabase.rpc("create_registration", {
@@ -73,6 +94,8 @@ function RegisterPage() {
       });
       if (error) {
         if (error.message.includes("SLOTS_FULL")) toast.error("Vagas esgotadas para esta categoria");
+        else if (error.message.includes("AGE_RULE_VIOLATION")) toast.error("As idades não atendem à regra desta categoria");
+        else if (error.message.includes("BIRTHDATE_REQUIRED")) toast.error("Informe a data de nascimento de cada atleta");
         else if (error.message.includes("duplicate")) toast.error("Já existe inscrição com este e-mail");
         else toast.error(error.message);
         return;
