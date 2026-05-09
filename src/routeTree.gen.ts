@@ -24,6 +24,7 @@ import { Route as AdminCampeonatosIndexRouteImport } from './routes/admin.campeo
 import { Route as ApiPublicAsaasWebhookRouteImport } from './routes/api/public/asaas-webhook'
 import { Route as AdminCategoriasCategoryIdRouteImport } from './routes/admin.categorias.$categoryId'
 import { Route as AdminCampeonatosIdRouteImport } from './routes/admin.campeonatos.$id'
+import { Route as AdminCampeonatosIdPermissoesRouteImport } from './routes/admin.campeonatos.$id.permissoes'
 
 const VoucherRoute = VoucherRouteImport.update({
   id: '/voucher',
@@ -101,6 +102,12 @@ const AdminCampeonatosIdRoute = AdminCampeonatosIdRouteImport.update({
   path: '/campeonatos/$id',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminCampeonatosIdPermissoesRoute =
+  AdminCampeonatosIdPermissoesRouteImport.update({
+    id: '/permissoes',
+    path: '/permissoes',
+    getParentRoute: () => AdminCampeonatosIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -114,10 +121,11 @@ export interface FileRoutesByFullPath {
   '/sucesso/$voucher': typeof SucessoVoucherRoute
   '/admin/': typeof AdminIndexRoute
   '/campeonatos/': typeof CampeonatosIndexRoute
-  '/admin/campeonatos/$id': typeof AdminCampeonatosIdRoute
+  '/admin/campeonatos/$id': typeof AdminCampeonatosIdRouteWithChildren
   '/admin/categorias/$categoryId': typeof AdminCategoriasCategoryIdRoute
   '/api/public/asaas-webhook': typeof ApiPublicAsaasWebhookRoute
   '/admin/campeonatos/': typeof AdminCampeonatosIndexRoute
+  '/admin/campeonatos/$id/permissoes': typeof AdminCampeonatosIdPermissoesRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -130,10 +138,11 @@ export interface FileRoutesByTo {
   '/sucesso/$voucher': typeof SucessoVoucherRoute
   '/admin': typeof AdminIndexRoute
   '/campeonatos': typeof CampeonatosIndexRoute
-  '/admin/campeonatos/$id': typeof AdminCampeonatosIdRoute
+  '/admin/campeonatos/$id': typeof AdminCampeonatosIdRouteWithChildren
   '/admin/categorias/$categoryId': typeof AdminCategoriasCategoryIdRoute
   '/api/public/asaas-webhook': typeof ApiPublicAsaasWebhookRoute
   '/admin/campeonatos': typeof AdminCampeonatosIndexRoute
+  '/admin/campeonatos/$id/permissoes': typeof AdminCampeonatosIdPermissoesRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -148,10 +157,11 @@ export interface FileRoutesById {
   '/sucesso/$voucher': typeof SucessoVoucherRoute
   '/admin/': typeof AdminIndexRoute
   '/campeonatos/': typeof CampeonatosIndexRoute
-  '/admin/campeonatos/$id': typeof AdminCampeonatosIdRoute
+  '/admin/campeonatos/$id': typeof AdminCampeonatosIdRouteWithChildren
   '/admin/categorias/$categoryId': typeof AdminCategoriasCategoryIdRoute
   '/api/public/asaas-webhook': typeof ApiPublicAsaasWebhookRoute
   '/admin/campeonatos/': typeof AdminCampeonatosIndexRoute
+  '/admin/campeonatos/$id/permissoes': typeof AdminCampeonatosIdPermissoesRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -171,6 +181,7 @@ export interface FileRouteTypes {
     | '/admin/categorias/$categoryId'
     | '/api/public/asaas-webhook'
     | '/admin/campeonatos/'
+    | '/admin/campeonatos/$id/permissoes'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -187,6 +198,7 @@ export interface FileRouteTypes {
     | '/admin/categorias/$categoryId'
     | '/api/public/asaas-webhook'
     | '/admin/campeonatos'
+    | '/admin/campeonatos/$id/permissoes'
   id:
     | '__root__'
     | '/'
@@ -204,6 +216,7 @@ export interface FileRouteTypes {
     | '/admin/categorias/$categoryId'
     | '/api/public/asaas-webhook'
     | '/admin/campeonatos/'
+    | '/admin/campeonatos/$id/permissoes'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -325,14 +338,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminCampeonatosIdRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/campeonatos/$id/permissoes': {
+      id: '/admin/campeonatos/$id/permissoes'
+      path: '/permissoes'
+      fullPath: '/admin/campeonatos/$id/permissoes'
+      preLoaderRoute: typeof AdminCampeonatosIdPermissoesRouteImport
+      parentRoute: typeof AdminCampeonatosIdRoute
+    }
   }
 }
+
+interface AdminCampeonatosIdRouteChildren {
+  AdminCampeonatosIdPermissoesRoute: typeof AdminCampeonatosIdPermissoesRoute
+}
+
+const AdminCampeonatosIdRouteChildren: AdminCampeonatosIdRouteChildren = {
+  AdminCampeonatosIdPermissoesRoute: AdminCampeonatosIdPermissoesRoute,
+}
+
+const AdminCampeonatosIdRouteWithChildren =
+  AdminCampeonatosIdRoute._addFileChildren(AdminCampeonatosIdRouteChildren)
 
 interface AdminRouteChildren {
   AdminAdministradoresRoute: typeof AdminAdministradoresRoute
   AdminInscricoesRoute: typeof AdminInscricoesRoute
   AdminIndexRoute: typeof AdminIndexRoute
-  AdminCampeonatosIdRoute: typeof AdminCampeonatosIdRoute
+  AdminCampeonatosIdRoute: typeof AdminCampeonatosIdRouteWithChildren
   AdminCategoriasCategoryIdRoute: typeof AdminCategoriasCategoryIdRoute
   AdminCampeonatosIndexRoute: typeof AdminCampeonatosIndexRoute
 }
@@ -341,7 +372,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminAdministradoresRoute: AdminAdministradoresRoute,
   AdminInscricoesRoute: AdminInscricoesRoute,
   AdminIndexRoute: AdminIndexRoute,
-  AdminCampeonatosIdRoute: AdminCampeonatosIdRoute,
+  AdminCampeonatosIdRoute: AdminCampeonatosIdRouteWithChildren,
   AdminCategoriasCategoryIdRoute: AdminCategoriasCategoryIdRoute,
   AdminCampeonatosIndexRoute: AdminCampeonatosIndexRoute,
 }
@@ -362,3 +393,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
