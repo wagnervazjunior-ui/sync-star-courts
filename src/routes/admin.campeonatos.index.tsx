@@ -231,6 +231,47 @@ function ChampionshipDialog({ initial, onSave }: { initial: any; onSave: (v: any
         </div>
 
         <div className="rounded-lg border border-border/50 p-4 space-y-3">
+          <h4 className="font-semibold text-sm">Modelos de uniforme</h4>
+          <p className="text-xs text-muted-foreground">Ex.: Amador, Convidados, Profissional. Cada categoria seleciona um modelo dessa lista.</p>
+          {(form.uniform_models ?? []).length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {form.uniform_models.map((m: string) => (
+                <Badge key={m} variant="secondary" className="gap-1">
+                  {m}
+                  <button type="button" onClick={() => setForm({ ...form, uniform_models: form.uniform_models.filter((x: string) => x !== m) })}>
+                    <X className="size-3" />
+                  </button>
+                </Badge>
+              ))}
+            </div>
+          )}
+          <div className="flex gap-2">
+            <Input
+              placeholder="Nome do modelo"
+              value={newModel}
+              onChange={(e) => setNewModel(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  const v = newModel.trim();
+                  if (v && !(form.uniform_models ?? []).includes(v)) {
+                    setForm({ ...form, uniform_models: [...(form.uniform_models ?? []), v] });
+                  }
+                  setNewModel("");
+                }
+              }}
+            />
+            <Button type="button" variant="outline" onClick={() => {
+              const v = newModel.trim();
+              if (v && !(form.uniform_models ?? []).includes(v)) {
+                setForm({ ...form, uniform_models: [...(form.uniform_models ?? []), v] });
+              }
+              setNewModel("");
+            }}>Adicionar</Button>
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-border/50 p-4 space-y-3">
           <h4 className="font-semibold text-sm">Textos legais</h4>
           <div className="space-y-2"><Label>Regulamento</Label><Textarea rows={4} value={form.regulations ?? ""} onChange={(e) => setForm({ ...form, regulations: e.target.value })} /></div>
           <div className="space-y-2"><Label>Políticas do evento</Label><Textarea rows={4} value={form.policies ?? ""} onChange={(e) => setForm({ ...form, policies: e.target.value })} /></div>
