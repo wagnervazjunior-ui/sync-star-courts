@@ -25,6 +25,7 @@ const GENDER_LABEL: Record<string, string> = { male: "Masculina", female: "Femin
 function ChampionshipDetail() {
   const { id } = Route.useParams();
   const qc = useQueryClient();
+  const { isMaster } = useAuth();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<any | null>(null);
 
