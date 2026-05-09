@@ -173,9 +173,12 @@ function ChampionshipDetail() {
 
 function CategoryDialog({ initial, onSave, uniformModels }: { initial: any; onSave: (v: any) => void; uniformModels: string[] }) {
   const [form, setForm] = useState(() => ({
-    name: "", description: "", max_slots: 16, price_reais: "0", active: true, gender: "mixed", uniform_model: "", age_rule_mode: "none", age_min: "",
-    ...(initial ?? {}),
+    name: initial?.name ?? "",
     description: initial?.description ?? "",
+    max_slots: initial?.max_slots ?? 16,
+    price_reais: initial?.price_reais ?? "0",
+    active: initial?.active ?? true,
+    gender: initial?.gender ?? "mixed",
     uniform_model: initial?.uniform_model ?? "",
     age_rule_mode: initial?.age_rule_mode ?? "none",
     age_min: initial?.age_min ?? "",
