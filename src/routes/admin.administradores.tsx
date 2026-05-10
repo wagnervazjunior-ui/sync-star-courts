@@ -9,13 +9,14 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Shield, Trash2, UserPlus } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 
 export const Route = createFileRoute("/admin/administradores")({
   head: () => ({ meta: [{ title: "Administradores — Open Sync" }] }),
   component: AdministradoresPage,
 });
 
-type AdminRow = { user_id: string; email: string; role: "admin" | "master"; created_at: string };
+type AdminRow = { user_id: string; email: string; role: "admin" | "master"; created_at: string; can_create: boolean };
 
 function AdministradoresPage() {
   const { user, isMaster, loading: authLoading, rolesLoading } = useAuth();

@@ -7,6 +7,7 @@ export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isMaster, setIsMaster] = useState(false);
+  const [canCreateChampionships, setCanCreateChampionships] = useState(false);
   const [loading, setLoading] = useState(true);
   const [rolesLoading, setRolesLoading] = useState(true);
 
@@ -24,16 +25,23 @@ export function useAuth() {
   }, []);
 
   useEffect(() => {
-    if (!user) { setIsAdmin(false); setIsMaster(false); setRolesLoading(false); return; }
+    if (!user) { setIsAdmin(false); setIsMaster(false); setCanCreateChampionships(false); setRolesLoading(false); return; }
     setRolesLoading(true);
-    supabase.from("user_roles").select("role").eq("user_id", user.id)
-      .then(({ data }) => {
-        const roles = (data ?? []).map((r) => r.role);
-        setIsAdmin(roles.includes("admin") || roles.includes("master" as any));
-        setIsMaster(roles.includes("master" as any));
-        setRolesLoading(false);
-      });
+    (async () => {
+      const { data: rolesData } = await supabase.from("user_roles").select("role").eq("user_id", user.id);
+      const roles = (rolesData ?? []).map((r) => r.role);
+      const master = roles.includes("master" as any);
+      setIsAdmin(roles.includes("admin") || master);
+      setIsMaster(master);
+      if (master) {
+        setCanCreateChampionships(true);
+      } else {
+        const { data: perm } = await supabase.from("admin_permissions" as any).select("can_create_championships").eq("user_id", user.id).maybeSingle();
+        setCanCreateChampionships(!!(perm as any)?.can_create_championships);
+      }
+      setRolesLoading(false);
+    })();
   }, [user]);
 
-  return { session, user, isAdmin, isMaster, loading, rolesLoading };
+  return { session, user, isAdmin, isMaster, canCreateChampionships, loading, rolesLoading };
 }
