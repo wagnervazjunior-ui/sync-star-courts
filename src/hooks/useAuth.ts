@@ -9,7 +9,7 @@ export function useAuth() {
   const [isMaster, setIsMaster] = useState(false);
   const [canCreateChampionships, setCanCreateChampionships] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [rolesLoading, setRolesLoading] = useState(true);
+  const [rolesUserId, setRolesUserId] = useState<string | null>(null);
 
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {
@@ -24,9 +24,15 @@ export function useAuth() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
+  // rolesLoading is derived: while auth is loading, or while we haven't
+  // evaluated roles for the current user yet, treat it as loading. This
+  // avoids a render frame where authLoading=false but the roles effect
+  // hasn't run yet, which was redirecting master users away from
+  // master-only pages.
+  const rolesLoading = loading || (!!user && rolesUserId !== user.id);
+
   useEffect(() => {
-    if (!user) { setIsAdmin(false); setIsMaster(false); setCanCreateChampionships(false); setRolesLoading(false); return; }
-    setRolesLoading(true);
+    if (!user) { setIsAdmin(false); setIsMaster(false); setCanCreateChampionships(false); setRolesUserId(null); return; }
     (async () => {
       const { data: rolesData } = await supabase.from("user_roles").select("role").eq("user_id", user.id);
       const roles = (rolesData ?? []).map((r) => r.role);
