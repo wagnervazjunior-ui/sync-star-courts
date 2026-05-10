@@ -65,6 +65,13 @@ function AdministradoresPage() {
     load();
   };
 
+  const handleToggleCreate = async (row: AdminRow, value: boolean) => {
+    const { error } = await supabase.rpc("set_admin_can_create" as any, { _user_id: row.user_id, _value: value } as any);
+    if (error) { toast.error(error.message); return; }
+    toast.success(value ? "Permissão concedida." : "Permissão removida.");
+    load();
+  };
+
   if (authLoading || rolesLoading) return <div className="text-muted-foreground text-sm">Carregando…</div>;
   if (!isMaster) return null;
 
@@ -109,12 +116,20 @@ function AdministradoresPage() {
             {list.map((row) => {
               const isSelf = row.user_id === user?.id;
               return (
-                <li key={`${row.user_id}-${row.role}`} className="flex items-center justify-between py-3 gap-3">
-                  <div className="min-w-0">
+                <li key={`${row.user_id}-${row.role}`} className="flex flex-wrap items-center justify-between py-3 gap-3">
+                  <div className="min-w-0 flex-1">
                     <p className="font-medium truncate">{row.email}{isSelf && <span className="text-xs text-muted-foreground ml-2">(você)</span>}</p>
                     <p className="text-xs text-muted-foreground">desde {new Date(row.created_at).toLocaleDateString("pt-BR")}</p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-3">
+                    <label className="flex items-center gap-2 text-xs text-muted-foreground" title="Permite criar campeonatos">
+                      <Switch
+                        checked={row.can_create}
+                        disabled={row.role === "master"}
+                        onCheckedChange={(v) => handleToggleCreate(row, v)}
+                      />
+                      Pode criar campeonatos
+                    </label>
                     {row.role === "master" ? (
                       <Badge className="bg-gradient-primary text-primary-foreground">Master</Badge>
                     ) : (
