@@ -8,8 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Download, CheckCircle2, XCircle } from "lucide-react";
-import { generateUniformWorkbook } from "@/lib/uniform-export";
+import { CheckCircle2, XCircle } from "lucide-react";
 
 export const Route = createFileRoute("/admin/inscricoes")({
   component: InscricoesPage,
@@ -66,25 +65,6 @@ function InscricoesPage() {
     else { toast.success("Atualizado"); qc.invalidateQueries({ queryKey: ["adm-regs"] }); }
   };
 
-  const exportExcel = async () => {
-    const targetCh = championshipId === "all" ? null : championships?.find((c: any) => c.id === championshipId);
-    const cats = (categories ?? []).filter((c: any) => {
-      if (targetCh && c.championship_id !== targetCh.id) return false;
-      if (categoryId !== "all" && c.id !== categoryId) return false;
-      return true;
-    });
-    const confirmed = filtered.filter((r: any) => r.status === "confirmed");
-    if (!confirmed.length) { toast.info("Nenhuma inscrição confirmada para exportar"); return; }
-    await generateUniformWorkbook({
-      championshipName: targetCh?.name ?? "Todos os campeonatos",
-      championshipSlug: targetCh?.slug ?? "todos",
-      categories: cats.map((c: any) => ({
-        ...c,
-        registrations: confirmed.filter((r: any) => r.category_id === c.id),
-      })).filter((c: any) => c.registrations.length > 0),
-    });
-  };
-
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -92,7 +72,6 @@ function InscricoesPage() {
           <h1 className="text-3xl font-bold">Inscrições</h1>
           <p className="text-muted-foreground">{filtered.length} resultado(s)</p>
         </div>
-        <Button variant="hero" onClick={exportExcel}><Download className="size-4" /> Exportar planilha de uniformes</Button>
       </div>
 
       <Card className="mt-4 p-4 bg-gradient-card border-border/50 grid gap-3 md:grid-cols-4">

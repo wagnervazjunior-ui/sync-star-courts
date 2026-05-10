@@ -349,7 +349,38 @@ export type Database = {
           user_id: string
         }[]
       }
+      list_manageable_championships: {
+        Args: never
+        Returns: {
+          active: boolean
+          cancellation_policy: string | null
+          cover_image_url: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          end_date: string | null
+          id: string
+          location: string | null
+          location_url: string | null
+          name: string
+          policies: string | null
+          regulations: string | null
+          shirt_size_chart_urls: string[]
+          shirt_size_guarantee_until: string | null
+          slug: string
+          start_date: string | null
+          uniform_models: string[]
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "championships"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       promote_user_to_admin: { Args: { _email: string }; Returns: Json }
+      release_expired_registrations: { Args: never; Returns: number }
       revoke_admin: { Args: { _user_id: string }; Returns: undefined }
       revoke_championship_admin: {
         Args: { _championship_id: string; _user_id: string }

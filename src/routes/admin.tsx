@@ -3,6 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useEffect } from "react";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
 import { LayoutDashboard, Trophy, ListChecks, LogOut, ArrowLeft, Shield } from "lucide-react";
 
@@ -36,29 +37,32 @@ function AdminLayout() {
 
   return (
     <div className="min-h-screen flex">
-      <aside className="hidden md:flex w-64 flex-col border-r border-border/40 bg-card/50 backdrop-blur p-4">
-        <Link to="/"><Logo /></Link>
-        <nav className="mt-8 flex flex-col gap-1">
+      <aside className="hidden md:flex w-64 flex-col border-r border-border bg-gradient-to-b from-card to-card/80 p-4 shadow-sm">
+        <Link to="/" className="block"><Logo /></Link>
+        <p className="mt-4 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Administração</p>
+        <Separator className="mt-2 mb-3" />
+        <nav className="flex flex-col gap-1">
           <NavItem to="/admin" icon={LayoutDashboard} label="Dashboard" />
           <NavItem to="/admin/campeonatos" icon={Trophy} label="Campeonatos" />
           <NavItem to="/admin/inscricoes" icon={ListChecks} label="Inscrições" />
           {isMaster && <NavItem to="/admin/administradores" icon={Shield} label="Administradores" />}
         </nav>
         <div className="mt-auto">
-          <p className="text-xs text-muted-foreground truncate mb-2">{user.email}</p>
-          <Button variant="ghost" size="sm" className="w-full justify-start" onClick={async () => { await supabase.auth.signOut(); navigate({ to: "/" }); }}>
+          <Separator className="mb-3" />
+          <p className="text-xs text-muted-foreground truncate mb-2 px-1">{user.email}</p>
+          <Button variant="ghost" size="sm" className="w-full justify-start text-foreground/80" onClick={async () => { await supabase.auth.signOut(); navigate({ to: "/" }); }}>
             <LogOut className="size-4" /> Sair
           </Button>
         </div>
       </aside>
       <main className="flex-1 min-w-0">
-        <div className="md:hidden flex items-center justify-between border-b border-border/40 p-4">
+        <div className="md:hidden flex items-center justify-between border-b border-border bg-card p-3 shadow-sm">
           <Logo />
-          <div className="flex gap-1">
-            <Button size="sm" variant="ghost" asChild><Link to="/admin">Dashboard</Link></Button>
-            <Button size="sm" variant="ghost" asChild><Link to="/admin/campeonatos">Camp.</Link></Button>
-            <Button size="sm" variant="ghost" asChild><Link to="/admin/inscricoes">Insc.</Link></Button>
-            {isMaster && <Button size="sm" variant="ghost" asChild><Link to="/admin/administradores">Admins</Link></Button>}
+          <div className="flex gap-1 overflow-x-auto">
+            <MobileNav to="/admin" icon={LayoutDashboard} label="Dashboard" />
+            <MobileNav to="/admin/campeonatos" icon={Trophy} label="Camp." />
+            <MobileNav to="/admin/inscricoes" icon={ListChecks} label="Insc." />
+            {isMaster && <MobileNav to="/admin/administradores" icon={Shield} label="Admins" />}
           </div>
         </div>
         <div className="p-6 md:p-8"><Outlet /></div>
@@ -72,10 +76,23 @@ function NavItem({ to, icon: Icon, label }: { to: string; icon: any; label: stri
     <Link
       to={to}
       activeOptions={{ exact: to === "/admin" }}
-      className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent/30 hover:text-foreground [&.active]:bg-gradient-primary [&.active]:text-primary-foreground [&.active]:shadow-elegant"
+      className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-foreground/80 transition-colors hover:bg-accent/60 hover:text-foreground [&.active]:bg-gradient-primary [&.active]:text-primary-foreground [&.active]:shadow-elegant"
       activeProps={{ className: "active" }}
     >
       <Icon className="size-4" /> {label}
+    </Link>
+  );
+}
+
+function MobileNav({ to, icon: Icon, label }: { to: string; icon: any; label: string }) {
+  return (
+    <Link
+      to={to}
+      activeOptions={{ exact: to === "/admin" }}
+      className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-foreground/80 transition-colors hover:bg-accent/60 hover:text-foreground [&.active]:bg-gradient-primary [&.active]:text-primary-foreground [&.active]:shadow-elegant whitespace-nowrap"
+      activeProps={{ className: "active" }}
+    >
+      <Icon className="size-3.5" /> {label}
     </Link>
   );
 }

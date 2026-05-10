@@ -4,9 +4,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { PublicHeader } from "@/components/PublicHeader";
 import { Card } from "@/components/ui/card";
 import { Calendar, MapPin } from "lucide-react";
+import { setPublicCacheHeaders } from "@/lib/public-cache.functions";
 
 export const Route = createFileRoute("/campeonatos/")({
   head: () => ({ meta: [{ title: "Campeonatos — Open Sync" }, { name: "description", content: "Veja todos os campeonatos de futevôlei abertos para inscrição." }] }),
+  loader: () => setPublicCacheHeaders(),
   component: ListPage,
 });
 

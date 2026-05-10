@@ -14,7 +14,7 @@ function Dashboard() {
   const [championshipId, setChampionshipId] = useState<string>("all");
   const { data: championships } = useQuery({
     queryKey: ["admin-championships"],
-    queryFn: async () => (await supabase.from("championships").select("*").order("created_at", { ascending: false })).data ?? [],
+    queryFn: async () => (await supabase.rpc("list_manageable_championships")).data ?? [],
   });
   const { data: stats } = useQuery({
     queryKey: ["admin-stats", championshipId],

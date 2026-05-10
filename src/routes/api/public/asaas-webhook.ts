@@ -59,10 +59,13 @@ export const Route = createFileRoute("/api/public/asaas-webhook")({
             event === "PAYMENT_DELETED" ||
             event === "PAYMENT_CHARGEBACK_REQUESTED"
           ) {
+            // Idempotent: only cancel if not already confirmed (avoid out-of-order events
+            // reverting a confirmed payment). For real refunds after confirmation, use admin UI.
             await supabaseAdmin
               .from("registrations")
               .update({ status: "cancelled" })
-              .eq("id", registrationId);
+              .eq("id", registrationId)
+              .neq("status", "confirmed");
           }
         } catch (err) {
           console.error("[asaas-webhook] handler error", err);

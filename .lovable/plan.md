@@ -1,60 +1,45 @@
-## Objetivo
+## Plano consolidado
 
-Reestruturar a tela do campeonato em sub-abas. Ao clicar no nome de um campeonato em **Campeonatos**, abrir `/admin/campeonatos/$id` com a aba **Configurações** já selecionada. Resolve também o "botão de Permissões não funciona" porque Permissões vira uma sub-aba interna em vez de uma rota separada.
+### 1. Migração SQL (uma única)
+- Corrigir policy `championships_select_public`: remover `OR has_role(admin)`, deixando apenas `active = true` (público) e mantendo `championships_admin_select_admin` para admins.
+- Criar RPC `list_manageable_championships()` (SECURITY DEFINER) retornando campeonatos visíveis ao admin (master → todos; admin comum → criados por ele OU em `championship_admins`).
+- Criar RPC `release_expired_registrations()` (SECURITY DEFINER): cancela `pending` com `pix_expires_at < now() - 15min`.
+- Ajustar `create_registration`: contagem exclui `pending` claramente expirado (`pix_expires_at < now() - 15min`).
+- Índices:
+  - `registrations_category_status_idx (category_id, status)`
+  - `registrations_pix_expires_idx (pix_expires_at) WHERE status='pending'`
+  - `registrations_asaas_payment_id_uniq (asaas_payment_id) WHERE asaas_payment_id IS NOT NULL`
+- Habilitar `pg_cron` + `pg_net` e agendar `release_expired_registrations()` a cada 5 min.
 
-## Sub-abas previstas
+### 2. Webhook idempotente
+- `src/routes/api/public/asaas-webhook.ts`: nas transições para `cancelled`/`refunded`, só atualizar se status atual não for `confirmed` (evita reverter por evento fora de ordem). Confirmação continua idempotente.
 
-```
-/admin/campeonatos/$id
-  ├─ Configurações (default)  ← todos os campos do dialog "Editar campeonato"
-  ├─ Dashboard                 ← métricas
-  ├─ Categorias                ← criar/editar/excluir categorias (igual hoje)
-  ├─ Inscrições                ← lista filtrada por este campeonato
-  ├─ Planilhas                 ← Uniformes + Lista da portaria (downloads .xlsx)
-  └─ Permissões (só master)    ← gerenciar admins do campeonato
-```
+### 3. Cache de páginas públicas
+- `src/routes/campeonatos.index.tsx` e `campeonatos.$slug.tsx`: mover fetch para `createServerFn` com `Cache-Control: public, s-maxage=60, stale-while-revalidate=300`.
 
-Estado da aba ativa via search param `?tab=configuracoes|dashboard|categorias|inscricoes|planilhas|permissoes` (default `configuracoes`), para suportar deep-link e refresh.
+### 4. Visibilidade do admin
+- `admin.index.tsx`, `admin.campeonatos.index.tsx`: trocar `from("championships").select(...)` por RPC `list_manageable_championships()`.
+- Confirmar que `admin.campeonatos.$id.tsx` usa `can_view_championship` (já protegido por RLS).
 
-## Arquivos
+### 5. UX admin
+- `admin.campeonatos.index.tsx`: remover botão "Categorias" do card (subaba já cobre).
+- `admin.inscricoes.tsx` e `admin.categorias.$categoryId.tsx`: remover downloads de planilha (ficam só na subaba `planilhas` do campeonato).
 
-### `src/routes/admin.campeonatos.$id.tsx` (refatorado)
-- Header: voltar, nome do campeonato, badge ativo/inativo, link "Ver página pública".
-- `<Tabs value={tab} onValueChange={...}>` com os triggers acima (Permissões só renderiza se `isMaster`).
-- Cada aba renderiza um componente local definido no mesmo arquivo (ou em `src/components/admin/championship/`):
-  - **`ConfigTab`**: extrai todo o conteúdo do `ChampionshipDialog` de `admin.campeonatos.index.tsx` (uploads de capa e tabela de medidas, modelos de uniforme, datas, textos legais, switch ativo). Salva via `update` na tabela `championships`. Botão "Salvar alterações" no topo direito da aba.
-  - **`DashboardTab`**: cards com totais — categorias ativas/total, inscrições por status (pendente/confirmada/cancelada), receita confirmada (soma `amount_cents` de confirmadas), % ocupação (soma confirmed/pending dividido pelo total de `max_slots`), próximas datas (limite de garantia de tamanho, início/fim).
-  - **`CategoriesTab`**: o conteúdo atual da página (lista de categorias + dialog "Nova categoria").
-  - **`InscricoesTab`**: reusa a tabela/filtros de `admin.inscricoes.tsx`, mas pré-filtrada por `championshipId = id` (sem o seletor de campeonato).
-  - **`PlanilhasTab`**: dois cards — "Planilha de uniformes" (gera `.xlsx` com `generateUniformWorkbook`) e "Lista da portaria" (atual botão).
-  - **`PermissoesTab`**: copia o conteúdo de `admin.campeonatos.$id.permissoes.tsx` (formulário de e-mail + lista de admins concedidos via `list_championship_admins` / `grant_championship_admin` / `revoke_championship_admin`).
+### 6. Visual do menu lateral (`admin.tsx`)
+- Sidebar: `bg-card` com gradient sutil `from-card to-card/80`, `border-border`.
+- NavItem default `text-foreground/80`, hover `bg-accent/60`, ativo mantém `bg-gradient-primary text-primary-foreground shadow-elegant`.
+- Adicionar label "Administração" + `Separator` abaixo do logo, e separator antes do bloco e-mail/sair.
+- Mobile top-bar: `bg-card`, `border-border`, botões em pills com ícones (`LayoutDashboard`, `Trophy`, `ListChecks`, `Shield`) com mesmo estilo ativo.
+- Apenas tokens semânticos de `src/styles.css`.
 
-### `src/routes/admin.campeonatos.index.tsx`
-- Card de cada campeonato: o nome vira um `<Link to="/admin/campeonatos/$id">` (abre na aba Configurações). Remover o ícone do lápis (a edição agora é feita dentro da aba Configurações).
-- Botão "Categorias" continua, mas agora aponta para `?tab=categorias`. Manter o botão "Excluir".
-- O dialog "Novo campeonato" continua aqui (criação rápida). A edição inline some.
+### Arquivos
+- Nova migration SQL
+- `supabase--insert` para agendar `pg_cron` (dado de ambiente)
+- `src/routes/api/public/asaas-webhook.ts`
+- `src/routes/campeonatos.index.tsx`, `src/routes/campeonatos.$slug.tsx`
+- `src/routes/admin.tsx`, `admin.index.tsx`, `admin.campeonatos.index.tsx`, `admin.inscricoes.tsx`, `admin.categorias.$categoryId.tsx`
 
-### `src/routes/admin.campeonatos.$id.permissoes.tsx`
-- Excluir o arquivo. Permissões agora vive na sub-aba.
-
-### `src/lib/uniform-export.ts` e `src/lib/gate-list-export.ts`
-- Já existem. Apenas reutilizados pelo `PlanilhasTab`.
-
-## Detalhes técnicos
-- `useSearch` da rota para ler `tab`; navegar com `navigate({ search: (s) => ({ ...s, tab }) })` ao trocar de aba.
-- `validateSearch` no `createFileRoute` para tipar `tab`.
-- Permissões: bloqueada com `if (!isMaster) return null;` dentro do componente da aba; o trigger só aparece se `isMaster`.
-- Reaproveitar `useQuery` para campeonato + categorias (compartilhado entre Dashboard, Inscrições, Planilhas e Categorias) usando `queryKey` por id.
-- Estética: shadcn `Tabs` com `TabsList` no topo, sticky horizontal, scroll-x em mobile.
-
-## Verificação
-1. Em `/admin/campeonatos`, clicar no nome de um campeonato → abre `/admin/campeonatos/$id` com aba **Configurações** preenchida.
-2. Trocar abas atualiza o `?tab=...` na URL; refresh mantém a aba.
-3. Salvar em **Configurações** atualiza o campeonato e mostra toast.
-4. **Permissões** aparece para master e abre o formulário/lista (substitui o botão antigo que não respondia).
-5. **Planilhas** baixa os dois arquivos `.xlsx` corretamente.
-
-## Arquivos editados
-- `src/routes/admin.campeonatos.$id.tsx` (reescrito com tabs)
-- `src/routes/admin.campeonatos.index.tsx` (nome vira link, remove edição inline)
-- `src/routes/admin.campeonatos.$id.permissoes.tsx` (excluído — vira aba interna)
+### Garantias
+- **Overbooking**: `FOR UPDATE` na categoria + contagem dentro da transação + índice único em `asaas_payment_id` → zero risco mesmo com pagamentos simultâneos.
+- **Escala de leitura**: cache edge de 60s nas páginas públicas reduz drasticamente carga no banco.
+- **Slots fantasmas**: cron de 5 min libera `pending` expirado.
