@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Plus, Pencil, Trash2, Settings, Upload, X, Loader2 } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 
 export const Route = createFileRoute("/admin/campeonatos/")({
   component: ChampionshipsPage,
@@ -21,6 +22,7 @@ const slugify = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300
 
 function ChampionshipsPage() {
   const qc = useQueryClient();
+  const { canCreateChampionships } = useAuth();
   const [editing, setEditing] = useState<any | null>(null);
   const [open, setOpen] = useState(false);
   const { data } = useQuery({
@@ -57,10 +59,14 @@ function ChampionshipsPage() {
           <p className="text-muted-foreground">Gerencie campeonatos. Crie um campeonato antes de adicionar categorias.</p>
         </div>
         <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setEditing(null); }}>
-          <DialogTrigger asChild>
-            <Button variant="hero"><Plus className="size-4" /> Novo campeonato</Button>
-          </DialogTrigger>
-          <ChampionshipDialog initial={editing} onSave={save} />
+          {canCreateChampionships ? (
+            <DialogTrigger asChild>
+              <Button variant="hero"><Plus className="size-4" /> Novo campeonato</Button>
+            </DialogTrigger>
+          ) : (
+            <p className="text-xs text-muted-foreground max-w-xs text-right">Você não tem permissão para criar campeonatos. Peça ao admin master.</p>
+          )}
+          <ChampionshipDialog key={editing?.id ?? "new"} initial={editing} onSave={save} />
         </Dialog>
       </div>
 
