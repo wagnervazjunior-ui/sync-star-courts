@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_permissions: {
+        Row: {
+          can_create_championships: boolean
+          updated_at: string
+          updated_by: string | null
+          user_id: string
+        }
+        Insert: {
+          can_create_championships?: boolean
+          updated_at?: string
+          updated_by?: string | null
+          user_id: string
+        }
+        Update: {
+          can_create_championships?: boolean
+          updated_at?: string
+          updated_by?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       categories: {
         Row: {
           active: boolean
@@ -280,6 +301,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_create_championship: { Args: { _user_id: string }; Returns: boolean }
       can_view_championship: {
         Args: { _championship_id: string; _user_id: string }
         Returns: boolean
@@ -311,6 +333,7 @@ export type Database = {
       list_admins: {
         Args: never
         Returns: {
+          can_create: boolean
           created_at: string
           email: string
           role: Database["public"]["Enums"]["app_role"]
@@ -330,6 +353,10 @@ export type Database = {
       revoke_admin: { Args: { _user_id: string }; Returns: undefined }
       revoke_championship_admin: {
         Args: { _championship_id: string; _user_id: string }
+        Returns: undefined
+      }
+      set_admin_can_create: {
+        Args: { _user_id: string; _value: boolean }
         Returns: undefined
       }
       set_registration_pix: {
