@@ -27,7 +27,7 @@ function ChampionshipsPage() {
   const [open, setOpen] = useState(false);
   const { data } = useQuery({
     queryKey: ["championships"],
-    queryFn: async () => (await supabase.from("championships").select("*").order("created_at", { ascending: false })).data ?? [],
+    queryFn: async () => (await supabase.rpc("list_manageable_championships")).data ?? [],
   });
 
   const save = async (form: any) => {
