@@ -8,8 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Download, CheckCircle2, XCircle } from "lucide-react";
-import { generateUniformWorkbook } from "@/lib/uniform-export";
+import { CheckCircle2, XCircle } from "lucide-react";
 
 export const Route = createFileRoute("/admin/inscricoes")({
   component: InscricoesPage,
