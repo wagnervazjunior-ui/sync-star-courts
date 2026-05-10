@@ -85,7 +85,6 @@ function ChampionshipsPage() {
                 {c.location && <p className="text-sm text-muted-foreground mt-1">{c.location}</p>}
               </div>
               <div className="flex gap-1">
-                <Button size="sm" variant="premium" asChild><Link to="/admin/campeonatos/$id" params={{ id: c.id }} search={{ tab: "categorias" }}><Settings className="size-4" /> Categorias</Link></Button>
                 <Button size="sm" variant="ghost" onClick={() => remove(c.id)}><Trash2 className="size-4 text-destructive" /></Button>
               </div>
             </div>
