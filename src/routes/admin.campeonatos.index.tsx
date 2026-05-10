@@ -58,16 +58,16 @@ function ChampionshipsPage() {
           <h1 className="text-3xl font-bold">Campeonatos</h1>
           <p className="text-muted-foreground">Gerencie campeonatos. Crie um campeonato antes de adicionar categorias.</p>
         </div>
-        {canCreateChampionships ? (
-          <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setEditing(null); }}>
+        <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setEditing(null); }}>
+          {canCreateChampionships ? (
             <DialogTrigger asChild>
               <Button variant="hero"><Plus className="size-4" /> Novo campeonato</Button>
             </DialogTrigger>
-            <ChampionshipDialog initial={editing} onSave={save} />
-          </Dialog>
-        ) : (
-          <p className="text-xs text-muted-foreground max-w-xs text-right">Você não tem permissão para criar campeonatos. Peça ao admin master.</p>
-        )}
+          ) : (
+            <p className="text-xs text-muted-foreground max-w-xs text-right">Você não tem permissão para criar campeonatos. Peça ao admin master.</p>
+          )}
+          <ChampionshipDialog key={editing?.id ?? "new"} initial={editing} onSave={save} />
+        </Dialog>
       </div>
 
       <div className="mt-6 grid gap-4">
