@@ -6,9 +6,11 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Calendar, MapPin, ExternalLink } from "lucide-react";
+import { setPublicCacheHeaders } from "@/lib/public-cache.functions";
 
 export const Route = createFileRoute("/campeonatos/$slug")({
   head: ({ params }) => ({ meta: [{ title: `${params.slug} — Open Sync` }] }),
+  loader: () => setPublicCacheHeaders(),
   component: DetailPage,
 });
 
