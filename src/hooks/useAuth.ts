@@ -45,7 +45,7 @@ export function useAuth() {
         const { data: perm } = await supabase.from("admin_permissions" as any).select("can_create_championships").eq("user_id", user.id).maybeSingle();
         setCanCreateChampionships(!!(perm as any)?.can_create_championships);
       }
-      setRolesLoading(false);
+      setRolesUserId(user.id);
     })();
   }, [user]);
 
