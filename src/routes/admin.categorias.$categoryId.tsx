@@ -64,26 +64,6 @@ function CategoryAdminPage() {
     else { toast.success("Atualizado"); qc.invalidateQueries({ queryKey: ["adm-cat-regs", categoryId] }); }
   };
 
-  const exportExcel = async () => {
-    if (!cat) return;
-    const confirmed = (regs ?? []).filter((r: any) => r.status === "confirmed");
-    if (!confirmed.length) { toast.info("Nenhuma inscrição confirmada para exportar"); return; }
-    await generateUniformWorkbook({
-      championshipName: cat.championship?.name ?? "",
-      championshipSlug: cat.championship?.slug ?? "categoria",
-      categories: [{ ...cat, registrations: confirmed }],
-    });
-  };
-
-  const exportGateList = async () => {
-    if (!cat) return;
-    await generateGateListWorkbook({
-      championshipName: cat.championship?.name ?? "",
-      championshipSlug: `${cat.championship?.slug ?? "categoria"}-${cat.name}`,
-      categories: [{ name: cat.name, registrations: regs ?? [] }],
-    });
-  };
-
   return (
     <div>
       <Button variant="ghost" size="sm" asChild>
@@ -99,10 +79,6 @@ function CategoryAdminPage() {
             {cat?.uniform_model && <Badge variant="outline">{cat.uniform_model}</Badge>}
             <Badge variant="secondary" className="gap-1"><Users className="size-3" /> {totalAtivas}/{cat?.max_slots ?? 0} inscritos · {restantes} vaga(s)</Badge>
           </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={exportGateList}><ClipboardList className="size-4" /> Lista da portaria</Button>
-          <Button variant="hero" onClick={exportExcel}><Download className="size-4" /> Planilha de uniformes</Button>
         </div>
       </div>
 
