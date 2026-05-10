@@ -76,15 +76,16 @@ function ChampionshipsPage() {
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="text-lg font-bold">{c.name}</h3>
+                  <Link to="/admin/campeonatos/$id" params={{ id: c.id }} search={{ tab: "configuracoes" }} className="text-lg font-bold hover:text-primary hover:underline">
+                    {c.name}
+                  </Link>
                   <Badge variant={c.active ? "default" : "secondary"}>{c.active ? "Ativo" : "Inativo"}</Badge>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">/{c.slug}</p>
                 {c.location && <p className="text-sm text-muted-foreground mt-1">{c.location}</p>}
               </div>
               <div className="flex gap-1">
-                <Button size="sm" variant="premium" asChild><Link to="/admin/campeonatos/$id" params={{ id: c.id }}><Settings className="size-4" /> Categorias</Link></Button>
-                <Button size="sm" variant="ghost" onClick={() => { setEditing(c); setOpen(true); }}><Pencil className="size-4" /></Button>
+                <Button size="sm" variant="premium" asChild><Link to="/admin/campeonatos/$id" params={{ id: c.id }} search={{ tab: "categorias" }}><Settings className="size-4" /> Categorias</Link></Button>
                 <Button size="sm" variant="ghost" onClick={() => remove(c.id)}><Trash2 className="size-4 text-destructive" /></Button>
               </div>
             </div>
