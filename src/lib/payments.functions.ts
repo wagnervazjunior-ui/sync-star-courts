@@ -248,3 +248,32 @@ export const createCardCharge = createServerFn({ method: "POST" })
       .eq("id", reg.id);
     return { status: "processing" as const, mock: isAsaasMock() };
   });
+
+// Sandbox-only helper: marks a pending PIX as confirmed without real payment.
+// Refuses to run when ASAAS_ENV=production.
+export const simulatePayment = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => z.object({ voucher: z.string().min(4).max(32) }).parse(input))
+  .handler(async ({ data }) => {
+    const env = (process.env.ASAAS_ENV ?? "sandbox").toLowerCase();
+    if (env === "production") {
+      throw new Error("Simulação desabilitada em produção");
+    }
+
+    const voucher = data.voucher.toUpperCase();
+    const { data: reg, error } = await supabaseAdmin
+      .from("registrations")
+      .select("id, status, asaas_payment_id")
+      .eq("voucher_code", voucher)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!reg) throw new Error("Inscrição não encontrada");
+    if (reg.status === "confirmed") return { status: "confirmed" as const };
+
+    const paymentId = reg.asaas_payment_id ?? `SIMULATED_${reg.id}`;
+    const { error: rpcErr } = await supabaseAdmin.rpc("confirm_registration_by_payment", {
+      _payment_id: paymentId,
+      _registration_id: reg.id,
+    });
+    if (rpcErr) throw new Error(rpcErr.message);
+    return { status: "confirmed" as const };
+  });
