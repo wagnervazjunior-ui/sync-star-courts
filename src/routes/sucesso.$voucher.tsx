@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
-import { createPixCharge } from "@/lib/payments.functions";
+import { createPixCharge, simulatePayment } from "@/lib/payments.functions";
 import { PublicHeader } from "@/components/PublicHeader";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
