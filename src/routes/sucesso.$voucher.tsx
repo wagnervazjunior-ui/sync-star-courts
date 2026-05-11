@@ -42,6 +42,7 @@ function SuccessPage() {
   const { voucher } = Route.useParams();
   const qc = useQueryClient();
   const callCreatePix = useServerFn(createPixCharge);
+  const callSimulate = useServerFn(simulatePayment);
 
   const { data, isLoading } = useQuery({
     queryKey: ["voucher", voucher],
