@@ -49,11 +49,26 @@ export const Route = createFileRoute("/api/public/asaas-webhook")({
         if (!registrationId) return new Response("ok"); // not ours
 
         try {
-          if (event === "PAYMENT_RECEIVED" || event === "PAYMENT_CONFIRMED") {
+          if (
+            event === "PAYMENT_RECEIVED" ||
+            event === "PAYMENT_CONFIRMED" ||
+            event === "PAYMENT_APPROVED_BY_RISK_ANALYSIS"
+          ) {
             await supabaseAdmin.rpc("confirm_registration_by_payment", {
               _payment_id: payment.id,
               _registration_id: registrationId,
             });
+          } else if (event === "PAYMENT_AWAITING_RISK_ANALYSIS") {
+            await supabaseAdmin.rpc("set_registration_processing", {
+              _payment_id: payment.id,
+              _registration_id: registrationId,
+            });
+          } else if (event === "PAYMENT_REPROVED_BY_RISK_ANALYSIS") {
+            await supabaseAdmin
+              .from("registrations")
+              .update({ status: "cancelled" })
+              .eq("id", registrationId)
+              .neq("status", "confirmed");
           } else if (
             event === "PAYMENT_REFUNDED" ||
             event === "PAYMENT_DELETED" ||

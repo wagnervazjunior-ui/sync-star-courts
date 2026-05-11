@@ -95,6 +95,62 @@ export async function createPixCharge(input: {
   });
 }
 
+export type AsaasCardCharge = {
+  id: string;
+  status: string; // PENDING | CONFIRMED | RECEIVED | AWAITING_RISK_ANALYSIS | etc.
+  invoiceUrl?: string;
+};
+
+export async function createCreditCardCharge(input: {
+  customerId: string;
+  valueCents: number;
+  description: string;
+  externalReference: string;
+  dueDate: string; // YYYY-MM-DD
+  installmentCount: number;
+  remoteIp: string;
+  creditCard: {
+    holderName: string;
+    number: string;
+    expiryMonth: string; // MM
+    expiryYear: string; // YYYY
+    ccv: string;
+  };
+  creditCardHolderInfo: {
+    name: string;
+    email: string;
+    cpfCnpj: string;
+    postalCode: string;
+    addressNumber: string;
+    phone?: string;
+  };
+}): Promise<AsaasCardCharge> {
+  if (isAsaasMock()) {
+    return {
+      id: `mock_card_${input.externalReference.slice(0, 8)}_${Date.now()}`,
+      status: "CONFIRMED",
+    };
+  }
+  const value = Number((input.valueCents / 100).toFixed(2));
+  const body: Record<string, unknown> = {
+    customer: input.customerId,
+    billingType: "CREDIT_CARD",
+    dueDate: input.dueDate,
+    description: input.description,
+    externalReference: input.externalReference,
+    remoteIp: input.remoteIp,
+    creditCard: input.creditCard,
+    creditCardHolderInfo: input.creditCardHolderInfo,
+  };
+  if (input.installmentCount > 1) {
+    body.installmentCount = input.installmentCount;
+    body.totalValue = value;
+  } else {
+    body.value = value;
+  }
+  return asaasFetch<AsaasCardCharge>("/payments", { method: "POST", json: body });
+}
+
 export async function getPixQrCode(paymentId: string): Promise<PixQrCode> {
   if (isAsaasMock()) {
     // 1x1 transparent PNG, plus a fake BR Code payload so the UI can render.
