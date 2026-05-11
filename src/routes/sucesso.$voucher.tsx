@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
-import { createPixCharge } from "@/lib/payments.functions";
+import { createPixCharge, simulatePayment } from "@/lib/payments.functions";
 import { PublicHeader } from "@/components/PublicHeader";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -42,6 +42,7 @@ function SuccessPage() {
   const { voucher } = Route.useParams();
   const qc = useQueryClient();
   const callCreatePix = useServerFn(createPixCharge);
+  const callSimulate = useServerFn(simulatePayment);
 
   const { data, isLoading } = useQuery({
     queryKey: ["voucher", voucher],
@@ -215,6 +216,21 @@ function SuccessPage() {
                     </p>
                     <Button variant="ghost" className="w-full" onClick={() => qc.invalidateQueries({ queryKey: ["voucher", voucher] })}>
                       Já paguei, atualizar
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full border-yellow-500/40 text-yellow-200 hover:bg-yellow-500/10"
+                      onClick={async () => {
+                        try {
+                          await callSimulate({ data: { voucher } });
+                          toast.success("Pagamento simulado (sandbox)");
+                          qc.invalidateQueries({ queryKey: ["voucher", voucher] });
+                        } catch (err: any) {
+                          toast.error(err?.message ?? "Falha ao simular");
+                        }
+                      }}
+                    >
+                      Simular pagamento (sandbox)
                     </Button>
                   </div>
                 ) : (
