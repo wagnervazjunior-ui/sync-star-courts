@@ -25,9 +25,18 @@ type RegInfo = {
   pix_qr_code_base64: string | null;
   pix_expires_at: string | null;
   amount_cents: number | null;
+  payer_cpf: string | null;
   category?: { name?: string; price_cents?: number };
   championship?: { name?: string };
 };
+
+function maskCpf(v: string) {
+  const d = v.replace(/\D/g, "").slice(0, 11);
+  return d
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+}
 
 function SuccessPage() {
   const { voucher } = Route.useParams();
@@ -64,29 +73,36 @@ function SuccessPage() {
   const [generating, setGenerating] = useState(false);
   const [mock, setMock] = useState(false);
   const [tab, setTab] = useState<"pix" | "card">("pix");
+  const [cpfInput, setCpfInput] = useState("");
 
-  const handleGenerate = async () => {
+  const handleGenerate = async (cpfArg?: string) => {
     setGenerating(true);
     try {
-      const res = await callCreatePix({ data: { voucher } });
+      const cpf = (cpfArg ?? cpfInput).replace(/\D/g, "") || undefined;
+      const res = await callCreatePix({ data: { voucher, cpf } });
       if ("mock" in res) setMock(res.mock);
       qc.invalidateQueries({ queryKey: ["voucher", voucher] });
     } catch (err: any) {
-      toast.error(err?.message ?? "Erro ao gerar PIX");
+      const msg = err?.message ?? "Erro ao gerar PIX";
+      if (msg.includes("CPF_REQUIRED")) {
+        toast.error("Informe o CPF para gerar o PIX");
+      } else {
+        toast.error(msg);
+      }
     } finally {
       setGenerating(false);
     }
   };
 
-  // Auto-generate PIX on first load if pending without PIX (only when PIX tab is active)
+  // Auto-generate PIX if we already have CPF saved
   useEffect(() => {
     if (!data) return;
     if (tab !== "pix") return;
-    if (data.status === "pending" && !data.pix_qr_code && !generating) {
-      handleGenerate();
+    if (data.status === "pending" && !data.pix_qr_code && !generating && data.payer_cpf) {
+      handleGenerate(data.payer_cpf);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data?.id, tab]);
+  }, [data?.id, tab, data?.payer_cpf]);
 
   if (isLoading) {
     return (
@@ -202,9 +218,38 @@ function SuccessPage() {
                     </Button>
                   </div>
                 ) : (
-                  <Button variant="hero" className="w-full" onClick={handleGenerate} disabled={generating}>
-                    {generating ? "Gerando PIX…" : "Gerar PIX"}
-                  </Button>
+                  <form
+                    className="space-y-3"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const clean = cpfInput.replace(/\D/g, "");
+                      if (clean.length < 11) {
+                        toast.error("Informe um CPF válido");
+                        return;
+                      }
+                      handleGenerate(clean);
+                    }}
+                  >
+                    <div>
+                      <label className="text-xs uppercase tracking-widest text-muted-foreground">
+                        CPF do pagador
+                      </label>
+                      <input
+                        inputMode="numeric"
+                        autoComplete="off"
+                        value={cpfInput}
+                        onChange={(e) => setCpfInput(maskCpf(e.target.value))}
+                        placeholder="000.000.000-00"
+                        className="mt-1 w-full rounded-md border border-border/50 bg-background px-3 py-2 text-sm"
+                      />
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Necessário para gerar a cobrança PIX.
+                      </p>
+                    </div>
+                    <Button type="submit" variant="hero" className="w-full" disabled={generating}>
+                      {generating ? "Gerando PIX…" : "Gerar PIX"}
+                    </Button>
+                  </form>
                 )}
               </TabsContent>
 

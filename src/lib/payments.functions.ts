@@ -10,7 +10,10 @@ import {
   isAsaasMock,
 } from "./asaas.server";
 
-const Input = z.object({ voucher: z.string().min(4).max(32) });
+const Input = z.object({
+  voucher: z.string().min(4).max(32),
+  cpf: z.string().min(11).max(14).optional(),
+});
 
 export const createPixCharge = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => Input.parse(input))
@@ -21,7 +24,7 @@ export const createPixCharge = createServerFn({ method: "POST" })
     const { data: reg, error: regErr } = await supabaseAdmin
       .from("registrations")
       .select(
-        "id, status, contact_email, contact_phone, athlete1_name, asaas_payment_id, pix_qr_code, pix_qr_code_base64, pix_expires_at, amount_cents, category:categories(id, name, price_cents, championship:championships(name))",
+        "id, status, contact_email, contact_phone, athlete1_name, asaas_payment_id, pix_qr_code, pix_qr_code_base64, pix_expires_at, amount_cents, payer_cpf, category:categories(id, name, price_cents, championship:championships(name))",
       )
       .eq("voucher_code", voucher)
       .maybeSingle();
@@ -56,10 +59,25 @@ export const createPixCharge = createServerFn({ method: "POST" })
     const valueCents = cat?.price_cents ?? 0;
     if (valueCents <= 0) throw new Error("Categoria sem preço configurado");
 
+    const cleanCpf = (data.cpf ?? reg.payer_cpf ?? "").replace(/\D/g, "");
+    if (!cleanCpf || cleanCpf.length < 11) {
+      throw new Error("CPF_REQUIRED");
+    }
+    if (data.cpf && data.cpf !== reg.payer_cpf) {
+      await supabaseAdmin.rpc("set_registration_payer", {
+        _id: reg.id,
+        _cpf: cleanCpf,
+        _postal_code: null as unknown as string,
+        _payment_method: "pix",
+        _installments: 1,
+      });
+    }
+
     const customer = await findOrCreateCustomer({
       name: reg.athlete1_name,
       email: reg.contact_email,
       phone: reg.contact_phone,
+      cpfCnpj: cleanCpf,
       externalReference: reg.id,
     });
 
