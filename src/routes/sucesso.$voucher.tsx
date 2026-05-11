@@ -8,7 +8,9 @@ import { PublicHeader } from "@/components/PublicHeader";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, Copy, Loader2, AlertTriangle } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { CardPaymentForm } from "@/components/CardPaymentForm";
+import { CheckCircle2, Copy, Loader2, AlertTriangle, QrCode, CreditCard, Clock } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/sucesso/$voucher")({
