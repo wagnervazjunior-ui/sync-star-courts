@@ -20,7 +20,7 @@ function Dashboard() {
     queryKey: ["admin-stats", championshipId],
     queryFn: async () => {
       const { data, error } = await supabase.rpc("dashboard_stats", {
-        _championship_id: championshipId === "all" ? null : championshipId,
+        _championship_id: championshipId === "all" ? (undefined as any) : championshipId,
       });
       if (error) throw error;
       const row: any = Array.isArray(data) ? data[0] : data;
