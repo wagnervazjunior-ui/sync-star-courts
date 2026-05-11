@@ -123,6 +123,11 @@ export async function createCreditCardCharge(input: {
     cpfCnpj: string;
     postalCode: string;
     addressNumber: string;
+    address?: string;
+    complement?: string;
+    province?: string;
+    city?: string;
+    state?: string;
     phone?: string;
   };
 }): Promise<AsaasCardCharge> {
