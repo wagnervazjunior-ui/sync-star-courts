@@ -1,9 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
+import { getRequestIP } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
   findOrCreateCustomer,
   createPixCharge as asaasCreatePixCharge,
+  createCreditCardCharge as asaasCreateCardCharge,
   getPixQrCode,
   isAsaasMock,
 } from "./asaas.server";
