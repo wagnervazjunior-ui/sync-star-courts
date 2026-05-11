@@ -63,6 +63,7 @@ function SuccessPage() {
 
   const [generating, setGenerating] = useState(false);
   const [mock, setMock] = useState(false);
+  const [tab, setTab] = useState<"pix" | "card">("pix");
 
   const handleGenerate = async () => {
     setGenerating(true);
@@ -77,14 +78,15 @@ function SuccessPage() {
     }
   };
 
-  // Auto-generate on first load if pending without PIX
+  // Auto-generate PIX on first load if pending without PIX (only when PIX tab is active)
   useEffect(() => {
     if (!data) return;
+    if (tab !== "pix") return;
     if (data.status === "pending" && !data.pix_qr_code && !generating) {
       handleGenerate();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data?.id]);
+  }, [data?.id, tab]);
 
   if (isLoading) {
     return (
@@ -112,6 +114,7 @@ function SuccessPage() {
   }
 
   const isConfirmed = data.status === "confirmed";
+  const isProcessing = data.status === "processing";
   const amount = data.amount_cents ?? data.category?.price_cents ?? 0;
 
   const copyPayload = async () => {
@@ -120,19 +123,29 @@ function SuccessPage() {
     toast.success("Código PIX copiado");
   };
 
+  const statusLabel = isConfirmed
+    ? "Confirmado"
+    : isProcessing
+    ? "Em análise"
+    : data.status;
+
   return (
     <div className="min-h-screen">
       <PublicHeader />
       <main className="mx-auto max-w-xl px-4 py-10 space-y-4">
         <Card className="p-8 bg-gradient-card border-border/50 shadow-elegant text-center">
-          <div className={`mx-auto inline-flex size-16 items-center justify-center rounded-full ${isConfirmed ? "bg-success/20 text-success" : "bg-primary/20 text-primary"}`}>
-            {isConfirmed ? <CheckCircle2 className="size-10" /> : <Loader2 className="size-10 animate-spin" />}
+          <div className={`mx-auto inline-flex size-16 items-center justify-center rounded-full ${isConfirmed ? "bg-success/20 text-success" : isProcessing ? "bg-primary/20 text-primary" : "bg-primary/20 text-primary"}`}>
+            {isConfirmed ? <CheckCircle2 className="size-10" /> : isProcessing ? <Clock className="size-10" /> : <Loader2 className="size-10 animate-spin" />}
           </div>
           <h1 className="mt-4 text-3xl font-bold">
-            {isConfirmed ? "Pagamento confirmado!" : "Inscrição registrada"}
+            {isConfirmed ? "Pagamento confirmado!" : isProcessing ? "Pagamento em análise" : "Inscrição registrada"}
           </h1>
           <p className="mt-2 text-muted-foreground">
-            {isConfirmed ? "Sua inscrição está garantida." : "Pague o PIX abaixo para garantir sua vaga."}
+            {isConfirmed
+              ? "Sua inscrição está garantida."
+              : isProcessing
+              ? "Estamos aguardando a confirmação da operadora do cartão."
+              : "Escolha a forma de pagamento abaixo para garantir sua vaga."}
           </p>
           <div className="mt-6 rounded-xl border border-primary/30 bg-primary/10 p-6">
             <p className="text-xs uppercase tracking-widest text-muted-foreground">Voucher</p>
@@ -143,14 +156,12 @@ function SuccessPage() {
             <p><strong>Categoria:</strong> {data.category?.name}</p>
             <p><strong>Valor:</strong> R$ {(amount / 100).toFixed(2).replace(".", ",")}</p>
             <p className="mt-2"><strong>Status:</strong>{" "}
-              <Badge variant={isConfirmed ? "default" : "secondary"}>
-                {isConfirmed ? "Confirmado" : data.status}
-              </Badge>
+              <Badge variant={isConfirmed ? "default" : "secondary"}>{statusLabel}</Badge>
             </p>
           </div>
         </Card>
 
-        {!isConfirmed && (
+        {!isConfirmed && !isProcessing && (
           <Card className="p-6 bg-gradient-card border-border/50">
             {mock && (
               <div className="mb-4 flex items-start gap-2 rounded-md border border-yellow-500/30 bg-yellow-500/10 p-3 text-sm text-yellow-200">
@@ -158,36 +169,53 @@ function SuccessPage() {
                 <span>Modo simulação — configure a chave Asaas para gerar cobranças reais.</span>
               </div>
             )}
-            {data.pix_qr_code_base64 ? (
-              <div className="space-y-4">
-                <div className="flex justify-center">
-                  <img
-                    src={`data:image/png;base64,${data.pix_qr_code_base64}`}
-                    alt="QRCode PIX"
-                    className="size-56 rounded-lg bg-white p-2"
-                  />
-                </div>
-                <div>
-                  <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">PIX copia e cola</p>
-                  <div className="flex gap-2">
-                    <code className="flex-1 truncate rounded-md border border-border/50 bg-background px-3 py-2 text-xs">
-                      {data.pix_qr_code}
-                    </code>
-                    <Button size="sm" variant="outline" onClick={copyPayload}><Copy className="size-4" /></Button>
+            <Tabs value={tab} onValueChange={(v) => setTab(v as "pix" | "card")} className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="pix"><QrCode className="size-4 mr-2" />PIX</TabsTrigger>
+                <TabsTrigger value="card"><CreditCard className="size-4 mr-2" />Cartão de crédito</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="pix" className="mt-4">
+                {data.pix_qr_code_base64 ? (
+                  <div className="space-y-4">
+                    <div className="flex justify-center">
+                      <img
+                        src={`data:image/png;base64,${data.pix_qr_code_base64}`}
+                        alt="QRCode PIX"
+                        className="size-56 rounded-lg bg-white p-2"
+                      />
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">PIX copia e cola</p>
+                      <div className="flex gap-2">
+                        <code className="flex-1 truncate rounded-md border border-border/50 bg-background px-3 py-2 text-xs">
+                          {data.pix_qr_code}
+                        </code>
+                        <Button size="sm" variant="outline" onClick={copyPayload}><Copy className="size-4" /></Button>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground text-center">
+                      Esta tela atualiza sozinha quando o pagamento for identificado.
+                    </p>
+                    <Button variant="ghost" className="w-full" onClick={() => qc.invalidateQueries({ queryKey: ["voucher", voucher] })}>
+                      Já paguei, atualizar
+                    </Button>
                   </div>
-                </div>
-                <p className="text-xs text-muted-foreground text-center">
-                  Esta tela atualiza sozinha quando o pagamento for identificado.
-                </p>
-                <Button variant="ghost" className="w-full" onClick={() => qc.invalidateQueries({ queryKey: ["voucher", voucher] })}>
-                  Já paguei, atualizar
-                </Button>
-              </div>
-            ) : (
-              <Button variant="hero" className="w-full" onClick={handleGenerate} disabled={generating}>
-                {generating ? "Gerando PIX…" : "Gerar PIX"}
-              </Button>
-            )}
+                ) : (
+                  <Button variant="hero" className="w-full" onClick={handleGenerate} disabled={generating}>
+                    {generating ? "Gerando PIX…" : "Gerar PIX"}
+                  </Button>
+                )}
+              </TabsContent>
+
+              <TabsContent value="card" className="mt-4">
+                <CardPaymentForm
+                  voucher={voucher}
+                  amountCents={amount}
+                  onConfirmed={() => qc.invalidateQueries({ queryKey: ["voucher", voucher] })}
+                />
+              </TabsContent>
+            </Tabs>
           </Card>
         )}
 
