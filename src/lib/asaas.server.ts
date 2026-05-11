@@ -34,6 +34,7 @@ async function asaasFetch<T>(path: string, init: RequestInit & { json?: unknown 
     access_token: apiKey,
     "Content-Type": "application/json",
     accept: "application/json",
+    "User-Agent": "OpenSyncPay/1.0 (+https://sync-star-courts.lovable.app)",
     ...(init.headers as Record<string, string> | undefined),
   };
   const body = init.json !== undefined ? JSON.stringify(init.json) : init.body;
