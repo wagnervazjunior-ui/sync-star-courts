@@ -104,7 +104,12 @@ const CardInput = z.object({
   ccv: z.string().regex(/^\d{3,4}$/),
   holderCpf: z.string().min(11).max(14),
   holderPostalCode: z.string().min(8).max(9),
-  holderAddressNumber: z.string().min(1).max(10),
+  holderAddressNumber: z.string().min(1).max(20),
+  holderAddress: z.string().min(2).max(120),
+  holderNeighborhood: z.string().min(2).max(80),
+  holderCity: z.string().min(2).max(80),
+  holderState: z.string().min(2).max(2),
+  holderComplement: z.string().max(60).optional().or(z.literal("")),
   installments: z.number().int().min(1).max(12),
 });
 
