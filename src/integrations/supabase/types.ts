@@ -313,6 +313,16 @@ export type Database = {
         Returns: undefined
       }
       create_registration: { Args: { payload: Json }; Returns: Json }
+      dashboard_stats: {
+        Args: { _championship_id?: string }
+        Returns: {
+          cancelled: number
+          confirmed: number
+          pending: number
+          revenue_cents: number
+          total: number
+        }[]
+      }
       generate_voucher_code: { Args: never; Returns: string }
       get_category_availability: {
         Args: { _category_id: string }
