@@ -67,7 +67,7 @@ export const createPixCharge = createServerFn({ method: "POST" })
       await supabaseAdmin.rpc("set_registration_payer", {
         _id: reg.id,
         _cpf: cleanCpf,
-        _postal_code: null,
+        _postal_code: null as unknown as string,
         _payment_method: "pix",
         _installments: 1,
       });
