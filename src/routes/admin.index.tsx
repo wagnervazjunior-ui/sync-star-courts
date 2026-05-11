@@ -19,14 +19,18 @@ function Dashboard() {
   const { data: stats } = useQuery({
     queryKey: ["admin-stats", championshipId],
     queryFn: async () => {
-      let q = supabase.from("registrations").select("status, category:categories!inner(price_cents, championship_id)");
-      const { data } = await q;
-      const filtered = championshipId === "all" ? data ?? [] : (data ?? []).filter((r: any) => r.category.championship_id === championshipId);
-      const pending = filtered.filter((r: any) => r.status === "pending").length;
-      const confirmed = filtered.filter((r: any) => r.status === "confirmed").length;
-      const cancelled = filtered.filter((r: any) => r.status === "cancelled").length;
-      const revenue = filtered.filter((r: any) => r.status === "confirmed").reduce((sum: number, r: any) => sum + (r.category?.price_cents ?? 0), 0);
-      return { total: filtered.length, pending, confirmed, cancelled, revenue };
+      const { data, error } = await supabase.rpc("dashboard_stats", {
+        _championship_id: championshipId === "all" ? null : championshipId,
+      });
+      if (error) throw error;
+      const row: any = Array.isArray(data) ? data[0] : data;
+      return {
+        total: Number(row?.total ?? 0),
+        pending: Number(row?.pending ?? 0),
+        confirmed: Number(row?.confirmed ?? 0),
+        cancelled: Number(row?.cancelled ?? 0),
+        revenue: Number(row?.revenue_cents ?? 0),
+      };
     },
   });
 
