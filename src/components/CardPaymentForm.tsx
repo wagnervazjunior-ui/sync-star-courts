@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -17,7 +17,12 @@ const schema = z.object({
   ccv: z.string().regex(/^\d{3,4}$/, "CCV inválido"),
   holderCpf: z.string().trim().min(11, "CPF inválido").max(14),
   holderPostalCode: z.string().trim().min(8, "CEP inválido").max(9),
-  holderAddressNumber: z.string().trim().min(1, "Número do endereço"),
+  holderAddress: z.string().trim().min(2, "Logradouro obrigatório").max(120),
+  holderAddressNumber: z.string().trim().min(1, "Número").max(20),
+  holderComplement: z.string().trim().max(60).optional().or(z.literal("")),
+  holderNeighborhood: z.string().trim().min(2, "Bairro obrigatório").max(80),
+  holderCity: z.string().trim().min(2, "Cidade obrigatória").max(80),
+  holderState: z.string().trim().length(2, "UF (2 letras)"),
   installments: z.coerce.number().int().min(1).max(12),
 });
 type Values = z.infer<typeof schema>;
@@ -48,6 +53,8 @@ export function CardPaymentForm({ voucher, amountCents, onConfirmed }: Props) {
   const callCard = useServerFn(createCardCharge);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
+  const [cepLoading, setCepLoading] = useState(false);
+  const [cepError, setCepError] = useState<string | null>(null);
 
   const form = useForm<Values>({
     resolver: zodResolver(schema),
@@ -58,6 +65,41 @@ export function CardPaymentForm({ voucher, amountCents, onConfirmed }: Props) {
     const max = amountCents >= 1000 ? 12 : 1;
     return Array.from({ length: max }, (_, i) => i + 1);
   }, [amountCents]);
+
+  const cepValue = form.watch("holderPostalCode");
+
+  useEffect(() => {
+    const digits = (cepValue ?? "").replace(/\D/g, "");
+    if (digits.length !== 8) {
+      setCepError(null);
+      return;
+    }
+    let cancelled = false;
+    setCepLoading(true);
+    setCepError(null);
+    fetch(`https://viacep.com.br/ws/${digits}/json/`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (cancelled) return;
+        if (d?.erro) {
+          setCepError("CEP não encontrado. Preencha manualmente.");
+          return;
+        }
+        form.setValue("holderAddress", d.logradouro ?? "", { shouldValidate: true });
+        form.setValue("holderNeighborhood", d.bairro ?? "", { shouldValidate: true });
+        form.setValue("holderCity", d.localidade ?? "", { shouldValidate: true });
+        form.setValue("holderState", (d.uf ?? "").toUpperCase(), { shouldValidate: true });
+      })
+      .catch(() => {
+        if (!cancelled) setCepError("Não foi possível buscar o CEP. Preencha manualmente.");
+      })
+      .finally(() => {
+        if (!cancelled) setCepLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [cepValue, form]);
 
   const onSubmit = async (v: Values) => {
     const [mm, yyRaw] = v.expiry.split("/");
@@ -76,6 +118,11 @@ export function CardPaymentForm({ voucher, amountCents, onConfirmed }: Props) {
           holderCpf: v.holderCpf,
           holderPostalCode: v.holderPostalCode,
           holderAddressNumber: v.holderAddressNumber,
+          holderAddress: v.holderAddress.trim(),
+          holderNeighborhood: v.holderNeighborhood.trim(),
+          holderCity: v.holderCity.trim(),
+          holderState: v.holderState.trim().toUpperCase(),
+          holderComplement: v.holderComplement?.trim() || "",
           installments: Number(v.installments),
         },
       })) as Result;
@@ -163,58 +210,108 @@ export function CardPaymentForm({ voucher, amountCents, onConfirmed }: Props) {
         )}
       </div>
 
-      <div className="grid gap-3 grid-cols-2">
+      <div className="space-y-2">
+        <Label>CPF do titular</Label>
+        <Input
+          inputMode="numeric"
+          placeholder="000.000.000-00"
+          {...form.register("holderCpf")}
+          onChange={(e) => form.setValue("holderCpf", maskCpf(e.target.value))}
+        />
+        {form.formState.errors.holderCpf && (
+          <p className="text-xs text-destructive">{form.formState.errors.holderCpf.message}</p>
+        )}
+      </div>
+
+      <div className="border-t pt-4 space-y-4">
+        <p className="text-sm font-medium">Endereço de cobrança</p>
+
+        <div className="grid gap-3 grid-cols-[1fr_1fr]">
+          <div className="space-y-2">
+            <Label>CEP</Label>
+            <div className="relative">
+              <Input
+                inputMode="numeric"
+                placeholder="00000-000"
+                {...form.register("holderPostalCode")}
+                onChange={(e) => form.setValue("holderPostalCode", maskCep(e.target.value))}
+              />
+              {cepLoading && (
+                <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 size-4 animate-spin text-muted-foreground" />
+              )}
+            </div>
+            {form.formState.errors.holderPostalCode && (
+              <p className="text-xs text-destructive">{form.formState.errors.holderPostalCode.message}</p>
+            )}
+            {cepError && <p className="text-xs text-muted-foreground">{cepError}</p>}
+          </div>
+          <div className="space-y-2">
+            <Label>Número</Label>
+            <Input placeholder="123 ou S/N" {...form.register("holderAddressNumber")} />
+            {form.formState.errors.holderAddressNumber && (
+              <p className="text-xs text-destructive">{form.formState.errors.holderAddressNumber.message}</p>
+            )}
+          </div>
+        </div>
+
         <div className="space-y-2">
-          <Label>CPF do titular</Label>
-          <Input
-            inputMode="numeric"
-            placeholder="000.000.000-00"
-            {...form.register("holderCpf")}
-            onChange={(e) => form.setValue("holderCpf", maskCpf(e.target.value))}
-          />
-          {form.formState.errors.holderCpf && (
-            <p className="text-xs text-destructive">{form.formState.errors.holderCpf.message}</p>
+          <Label>Logradouro</Label>
+          <Input placeholder="Rua / Av." {...form.register("holderAddress")} />
+          {form.formState.errors.holderAddress && (
+            <p className="text-xs text-destructive">{form.formState.errors.holderAddress.message}</p>
           )}
         </div>
+
         <div className="space-y-2">
-          <Label>CEP</Label>
-          <Input
-            inputMode="numeric"
-            placeholder="00000-000"
-            {...form.register("holderPostalCode")}
-            onChange={(e) => form.setValue("holderPostalCode", maskCep(e.target.value))}
-          />
-          {form.formState.errors.holderPostalCode && (
-            <p className="text-xs text-destructive">{form.formState.errors.holderPostalCode.message}</p>
-          )}
+          <Label>Complemento <span className="text-muted-foreground font-normal">(opcional)</span></Label>
+          <Input placeholder="Apto, bloco, sala…" {...form.register("holderComplement")} />
+        </div>
+
+        <div className="grid gap-3 grid-cols-[1fr_1fr_80px]">
+          <div className="space-y-2">
+            <Label>Bairro</Label>
+            <Input {...form.register("holderNeighborhood")} />
+            {form.formState.errors.holderNeighborhood && (
+              <p className="text-xs text-destructive">{form.formState.errors.holderNeighborhood.message}</p>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label>Cidade</Label>
+            <Input {...form.register("holderCity")} />
+            {form.formState.errors.holderCity && (
+              <p className="text-xs text-destructive">{form.formState.errors.holderCity.message}</p>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label>UF</Label>
+            <Input
+              maxLength={2}
+              {...form.register("holderState")}
+              onChange={(e) => form.setValue("holderState", e.target.value.toUpperCase())}
+            />
+            {form.formState.errors.holderState && (
+              <p className="text-xs text-destructive">{form.formState.errors.holderState.message}</p>
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="grid gap-3 grid-cols-2">
-        <div className="space-y-2">
-          <Label>Número do endereço</Label>
-          <Input {...form.register("holderAddressNumber")} />
-          {form.formState.errors.holderAddressNumber && (
-            <p className="text-xs text-destructive">{form.formState.errors.holderAddressNumber.message}</p>
-          )}
-        </div>
-        <div className="space-y-2">
-          <Label>Parcelas</Label>
-          <Select
-            defaultValue="1"
-            onValueChange={(v) => form.setValue("installments", Number(v) as any)}
-          >
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {installmentOptions.map((n) => (
-                <SelectItem key={n} value={String(n)}>
-                  {n}x de R$ {((amountCents / n) / 100).toFixed(2).replace(".", ",")}
-                  {n > 1 ? " (com juros)" : ""}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+      <div className="space-y-2">
+        <Label>Parcelas</Label>
+        <Select
+          defaultValue="1"
+          onValueChange={(v) => form.setValue("installments", Number(v) as any)}
+        >
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {installmentOptions.map((n) => (
+              <SelectItem key={n} value={String(n)}>
+                {n}x de R$ {((amountCents / n) / 100).toFixed(2).replace(".", ",")}
+                {n > 1 ? " (com juros)" : ""}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <Button type="submit" variant="hero" className="w-full" disabled={submitting}>
