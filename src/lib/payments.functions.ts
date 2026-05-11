@@ -191,6 +191,11 @@ export const createCardCharge = createServerFn({ method: "POST" })
           cpfCnpj: cleanCpf,
           postalCode: cleanCep,
           addressNumber: data.holderAddressNumber,
+          address: data.holderAddress,
+          province: data.holderNeighborhood,
+          city: data.holderCity,
+          state: data.holderState.toUpperCase(),
+          complement: data.holderComplement?.trim() || undefined,
           phone: cleanPhone || undefined,
         },
       });
