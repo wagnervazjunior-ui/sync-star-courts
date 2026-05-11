@@ -218,9 +218,38 @@ function SuccessPage() {
                     </Button>
                   </div>
                 ) : (
-                  <Button variant="hero" className="w-full" onClick={handleGenerate} disabled={generating}>
-                    {generating ? "Gerando PIX…" : "Gerar PIX"}
-                  </Button>
+                  <form
+                    className="space-y-3"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const clean = cpfInput.replace(/\D/g, "");
+                      if (clean.length < 11) {
+                        toast.error("Informe um CPF válido");
+                        return;
+                      }
+                      handleGenerate(clean);
+                    }}
+                  >
+                    <div>
+                      <label className="text-xs uppercase tracking-widest text-muted-foreground">
+                        CPF do pagador
+                      </label>
+                      <input
+                        inputMode="numeric"
+                        autoComplete="off"
+                        value={cpfInput}
+                        onChange={(e) => setCpfInput(maskCpf(e.target.value))}
+                        placeholder="000.000.000-00"
+                        className="mt-1 w-full rounded-md border border-border/50 bg-background px-3 py-2 text-sm"
+                      />
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Necessário para gerar a cobrança PIX.
+                      </p>
+                    </div>
+                    <Button type="submit" variant="hero" className="w-full" disabled={generating}>
+                      {generating ? "Gerando PIX…" : "Gerar PIX"}
+                    </Button>
+                  </form>
                 )}
               </TabsContent>
 
