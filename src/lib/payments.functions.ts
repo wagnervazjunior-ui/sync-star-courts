@@ -59,10 +59,25 @@ export const createPixCharge = createServerFn({ method: "POST" })
     const valueCents = cat?.price_cents ?? 0;
     if (valueCents <= 0) throw new Error("Categoria sem preço configurado");
 
+    const cleanCpf = (data.cpf ?? reg.payer_cpf ?? "").replace(/\D/g, "");
+    if (!cleanCpf || cleanCpf.length < 11) {
+      throw new Error("CPF_REQUIRED");
+    }
+    if (data.cpf && data.cpf !== reg.payer_cpf) {
+      await supabaseAdmin.rpc("set_registration_payer", {
+        _id: reg.id,
+        _cpf: cleanCpf,
+        _postal_code: null,
+        _payment_method: "pix",
+        _installments: 1,
+      });
+    }
+
     const customer = await findOrCreateCustomer({
       name: reg.athlete1_name,
       email: reg.contact_email,
       phone: reg.contact_phone,
+      cpfCnpj: cleanCpf,
       externalReference: reg.id,
     });
 
