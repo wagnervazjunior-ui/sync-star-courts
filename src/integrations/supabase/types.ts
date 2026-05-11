@@ -204,7 +204,11 @@ export type Database = {
           contact_phone: string
           created_at: string
           id: string
+          installments: number
+          payer_cpf: string | null
+          payer_postal_code: string | null
           payment_id: string | null
+          payment_method: string | null
           pix_expires_at: string | null
           pix_qr_code: string | null
           pix_qr_code_base64: string | null
@@ -230,7 +234,11 @@ export type Database = {
           contact_phone?: string
           created_at?: string
           id?: string
+          installments?: number
+          payer_cpf?: string | null
+          payer_postal_code?: string | null
           payment_id?: string | null
+          payment_method?: string | null
           pix_expires_at?: string | null
           pix_qr_code?: string | null
           pix_qr_code_base64?: string | null
@@ -256,7 +264,11 @@ export type Database = {
           contact_phone?: string
           created_at?: string
           id?: string
+          installments?: number
+          payer_cpf?: string | null
+          payer_postal_code?: string | null
           payment_id?: string | null
+          payment_method?: string | null
           pix_expires_at?: string | null
           pix_qr_code?: string | null
           pix_qr_code_base64?: string | null
@@ -400,6 +412,16 @@ export type Database = {
         Args: { _user_id: string; _value: boolean }
         Returns: undefined
       }
+      set_registration_payer: {
+        Args: {
+          _cpf: string
+          _id: string
+          _installments: number
+          _payment_method: string
+          _postal_code: string
+        }
+        Returns: undefined
+      }
       set_registration_pix: {
         Args: {
           _amount_cents: number
@@ -412,11 +434,15 @@ export type Database = {
         }
         Returns: undefined
       }
+      set_registration_processing: {
+        Args: { _payment_id: string; _registration_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "admin" | "master"
       category_gender: "male" | "female" | "mixed"
-      registration_status: "pending" | "confirmed" | "cancelled"
+      registration_status: "pending" | "confirmed" | "cancelled" | "processing"
       shirt_size: "P" | "M" | "G" | "GG" | "XG"
     }
     CompositeTypes: {
@@ -547,7 +573,7 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "master"],
       category_gender: ["male", "female", "mixed"],
-      registration_status: ["pending", "confirmed", "cancelled"],
+      registration_status: ["pending", "confirmed", "cancelled", "processing"],
       shirt_size: ["P", "M", "G", "GG", "XG"],
     },
   },
