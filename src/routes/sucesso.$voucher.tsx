@@ -25,9 +25,18 @@ type RegInfo = {
   pix_qr_code_base64: string | null;
   pix_expires_at: string | null;
   amount_cents: number | null;
+  payer_cpf: string | null;
   category?: { name?: string; price_cents?: number };
   championship?: { name?: string };
 };
+
+function maskCpf(v: string) {
+  const d = v.replace(/\D/g, "").slice(0, 11);
+  return d
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d)/, "$1.$2")
+    .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+}
 
 function SuccessPage() {
   const { voucher } = Route.useParams();
