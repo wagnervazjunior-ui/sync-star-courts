@@ -73,29 +73,36 @@ function SuccessPage() {
   const [generating, setGenerating] = useState(false);
   const [mock, setMock] = useState(false);
   const [tab, setTab] = useState<"pix" | "card">("pix");
+  const [cpfInput, setCpfInput] = useState("");
 
-  const handleGenerate = async () => {
+  const handleGenerate = async (cpfArg?: string) => {
     setGenerating(true);
     try {
-      const res = await callCreatePix({ data: { voucher } });
+      const cpf = (cpfArg ?? cpfInput).replace(/\D/g, "") || undefined;
+      const res = await callCreatePix({ data: { voucher, cpf } });
       if ("mock" in res) setMock(res.mock);
       qc.invalidateQueries({ queryKey: ["voucher", voucher] });
     } catch (err: any) {
-      toast.error(err?.message ?? "Erro ao gerar PIX");
+      const msg = err?.message ?? "Erro ao gerar PIX";
+      if (msg.includes("CPF_REQUIRED")) {
+        toast.error("Informe o CPF para gerar o PIX");
+      } else {
+        toast.error(msg);
+      }
     } finally {
       setGenerating(false);
     }
   };
 
-  // Auto-generate PIX on first load if pending without PIX (only when PIX tab is active)
+  // Auto-generate PIX if we already have CPF saved
   useEffect(() => {
     if (!data) return;
     if (tab !== "pix") return;
-    if (data.status === "pending" && !data.pix_qr_code && !generating) {
-      handleGenerate();
+    if (data.status === "pending" && !data.pix_qr_code && !generating && data.payer_cpf) {
+      handleGenerate(data.payer_cpf);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data?.id, tab]);
+  }, [data?.id, tab, data?.payer_cpf]);
 
   if (isLoading) {
     return (
