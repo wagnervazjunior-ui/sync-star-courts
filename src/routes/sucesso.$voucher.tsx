@@ -217,6 +217,21 @@ function SuccessPage() {
                     <Button variant="ghost" className="w-full" onClick={() => qc.invalidateQueries({ queryKey: ["voucher", voucher] })}>
                       Já paguei, atualizar
                     </Button>
+                    <Button
+                      variant="outline"
+                      className="w-full border-yellow-500/40 text-yellow-200 hover:bg-yellow-500/10"
+                      onClick={async () => {
+                        try {
+                          await callSimulate({ data: { voucher } });
+                          toast.success("Pagamento simulado (sandbox)");
+                          qc.invalidateQueries({ queryKey: ["voucher", voucher] });
+                        } catch (err: any) {
+                          toast.error(err?.message ?? "Falha ao simular");
+                        }
+                      }}
+                    >
+                      Simular pagamento (sandbox)
+                    </Button>
                   </div>
                 ) : (
                   <form
