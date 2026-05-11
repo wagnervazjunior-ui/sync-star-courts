@@ -57,10 +57,26 @@ export async function findOrCreateCustomer(input: {
     return { id: `mock_cus_${Buffer.from(input.email).toString("hex").slice(0, 12)}` };
   }
   // Try to find by email first
-  const found = await asaasFetch<{ data: AsaasCustomer[] }>(
+  const found = await asaasFetch<{ data: (AsaasCustomer & { cpfCnpj?: string | null })[] }>(
     `/customers?email=${encodeURIComponent(input.email)}`,
   );
-  if (found.data?.[0]) return found.data[0];
+  const existing = found.data?.[0];
+  if (existing) {
+    // If we have a CPF and the existing customer is missing it (or differs), update.
+    if (input.cpfCnpj && (!existing.cpfCnpj || existing.cpfCnpj.replace(/\D/g, "") !== input.cpfCnpj.replace(/\D/g, ""))) {
+      await asaasFetch(`/customers/${existing.id}`, {
+        method: "POST",
+        json: {
+          name: input.name,
+          email: input.email,
+          mobilePhone: input.phone,
+          cpfCnpj: input.cpfCnpj,
+          externalReference: input.externalReference,
+        },
+      });
+    }
+    return { id: existing.id };
+  }
   return asaasFetch<AsaasCustomer>("/customers", {
     method: "POST",
     json: {
