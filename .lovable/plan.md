@@ -1,45 +1,33 @@
-## Plano consolidado
+## Plano: ajustes de performance
 
-### 1. Migração SQL (uma única)
-- Corrigir policy `championships_select_public`: remover `OR has_role(admin)`, deixando apenas `active = true` (público) e mantendo `championships_admin_select_admin` para admins.
-- Criar RPC `list_manageable_championships()` (SECURITY DEFINER) retornando campeonatos visíveis ao admin (master → todos; admin comum → criados por ele OU em `championship_admins`).
-- Criar RPC `release_expired_registrations()` (SECURITY DEFINER): cancela `pending` com `pix_expires_at < now() - 15min`.
-- Ajustar `create_registration`: contagem exclui `pending` claramente expirado (`pix_expires_at < now() - 15min`).
-- Índices:
-  - `registrations_category_status_idx (category_id, status)`
-  - `registrations_pix_expires_idx (pix_expires_at) WHERE status='pending'`
-  - `registrations_asaas_payment_id_uniq (asaas_payment_id) WHERE asaas_payment_id IS NOT NULL`
-- Habilitar `pg_cron` + `pg_net` e agendar `release_expired_registrations()` a cada 5 min.
+### 1. `staleTime` global no QueryClient
+- Em `src/router.tsx`, ao criar o `QueryClient` dentro de `getRouter()`, configurar:
+  - `defaultOptions.queries.staleTime: 30_000` (30s — clicks entre abas/voltar não disparam refetch)
+  - `defaultOptions.queries.gcTime: 5 * 60_000` (5min em cache)
+  - `refetchOnWindowFocus: false` (evita refetch toda vez que a aba volta a foco)
+- Manter `defaultPreloadStaleTime: 0` no router (já documentado para integração com Query).
+- Ganho: navegação no admin fica praticamente instantânea entre telas já visitadas; reduz queries redundantes ao Supabase.
 
-### 2. Webhook idempotente
-- `src/routes/api/public/asaas-webhook.ts`: nas transições para `cancelled`/`refunded`, só atualizar se status atual não for `confirmed` (evita reverter por evento fora de ordem). Confirmação continua idempotente.
+### 2. RPC `dashboard_stats` (substitui contagem no cliente)
+Hoje `admin.index.tsx` faz `select` em **todas** as `registrations` e conta no JS — cresce O(n) e fica pesado.
 
-### 3. Cache de páginas públicas
-- `src/routes/campeonatos.index.tsx` e `campeonatos.$slug.tsx`: mover fetch para `createServerFn` com `Cache-Control: public, s-maxage=60, stale-while-revalidate=300`.
-
-### 4. Visibilidade do admin
-- `admin.index.tsx`, `admin.campeonatos.index.tsx`: trocar `from("championships").select(...)` por RPC `list_manageable_championships()`.
-- Confirmar que `admin.campeonatos.$id.tsx` usa `can_view_championship` (já protegido por RLS).
-
-### 5. UX admin
-- `admin.campeonatos.index.tsx`: remover botão "Categorias" do card (subaba já cobre).
-- `admin.inscricoes.tsx` e `admin.categorias.$categoryId.tsx`: remover downloads de planilha (ficam só na subaba `planilhas` do campeonato).
-
-### 6. Visual do menu lateral (`admin.tsx`)
-- Sidebar: `bg-card` com gradient sutil `from-card to-card/80`, `border-border`.
-- NavItem default `text-foreground/80`, hover `bg-accent/60`, ativo mantém `bg-gradient-primary text-primary-foreground shadow-elegant`.
-- Adicionar label "Administração" + `Separator` abaixo do logo, e separator antes do bloco e-mail/sair.
-- Mobile top-bar: `bg-card`, `border-border`, botões em pills com ícones (`LayoutDashboard`, `Trophy`, `ListChecks`, `Shield`) com mesmo estilo ativo.
-- Apenas tokens semânticos de `src/styles.css`.
+- **Migration SQL**: criar função `public.dashboard_stats(_championship_id uuid DEFAULT NULL)`:
+  - `SECURITY DEFINER`, `STABLE`, `search_path = public`
+  - Verifica permissão: se `_championship_id` for `NULL`, exige `has_role(auth.uid(),'master')`; se vier um id, exige `can_view_championship(auth.uid(), _championship_id)`.
+  - Retorna `TABLE(total bigint, pending bigint, confirmed bigint, cancelled bigint, revenue_cents bigint)` usando `count(*) FILTER (WHERE status = ...)` e `SUM(price_cents) FILTER (WHERE status='confirmed')` com `JOIN categories`.
+  - Quando `_championship_id` é `NULL` para master: agrega tudo. Para admin não-master sem id: erro (UI sempre passará id ou usará lista de campeonatos visíveis — ver abaixo).
+- **Índice complementar** (se ainda não existir explicitamente): `registrations(category_id, status)` — já planejado anteriormente, confirmar.
+- **Front (`src/routes/admin.index.tsx`)**:
+  - Trocar a query atual por `supabase.rpc('dashboard_stats', { _championship_id: championshipId === 'all' ? null : championshipId })`.
+  - Para admin não-master com `"all"` selecionado, iterar sobre `list_manageable_championships()` e somar — ou simplesmente forçar seleção de um campeonato (default: primeiro da lista). Recomendo **default no primeiro campeonato visível** em vez de "all" para não-master, evita N chamadas.
+  - Card "Campeonatos ativos" continua usando o resultado de `list_manageable_championships()`.
 
 ### Arquivos
-- Nova migration SQL
-- `supabase--insert` para agendar `pg_cron` (dado de ambiente)
-- `src/routes/api/public/asaas-webhook.ts`
-- `src/routes/campeonatos.index.tsx`, `src/routes/campeonatos.$slug.tsx`
-- `src/routes/admin.tsx`, `admin.index.tsx`, `admin.campeonatos.index.tsx`, `admin.inscricoes.tsx`, `admin.categorias.$categoryId.tsx`
+- `src/router.tsx` (defaultOptions do QueryClient)
+- Nova migration SQL (`dashboard_stats` RPC)
+- `src/routes/admin.index.tsx` (trocar contagem cliente por RPC)
 
 ### Garantias
-- **Overbooking**: `FOR UPDATE` na categoria + contagem dentro da transação + índice único em `asaas_payment_id` → zero risco mesmo com pagamentos simultâneos.
-- **Escala de leitura**: cache edge de 60s nas páginas públicas reduz drasticamente carga no banco.
-- **Slots fantasmas**: cron de 5 min libera `pending` expirado.
+- **Sem mudança de comportamento visível** além da velocidade.
+- **Segurança preservada**: a RPC valida papel/visibilidade antes de retornar números.
+- **Escala**: dashboard deixa de baixar todas as inscrições — passa a fazer 1 query agregada no banco (ms, não segundos).
