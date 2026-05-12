@@ -186,3 +186,21 @@ export async function getPixQrCode(paymentId: string): Promise<PixQrCode> {
   }
   return asaasFetch<PixQrCode>(`/payments/${paymentId}/pixQrCode`);
 }
+
+export async function receivePaymentInCash(input: {
+  paymentId: string;
+  valueCents: number;
+}): Promise<{ status: string }> {
+  if (isAsaasMock()) {
+    return { status: "RECEIVED_IN_CASH" };
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  return asaasFetch<{ status: string }>(`/payments/${input.paymentId}/receiveInCash`, {
+    method: "POST",
+    json: {
+      paymentDate: today,
+      value: Number((input.valueCents / 100).toFixed(2)),
+      notifyCustomer: false,
+    },
+  });
+}

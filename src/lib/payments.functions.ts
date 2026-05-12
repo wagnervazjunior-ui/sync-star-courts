@@ -262,13 +262,31 @@ export const simulatePayment = createServerFn({ method: "POST" })
     const voucher = data.voucher.toUpperCase();
     const { data: reg, error } = await supabaseAdmin
       .from("registrations")
-      .select("id, status, asaas_payment_id")
+      .select("id, status, asaas_payment_id, amount_cents")
       .eq("voucher_code", voucher)
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!reg) throw new Error("Inscrição não encontrada");
     if (reg.status === "confirmed") return { status: "confirmed" as const };
 
+    // Preferred path: tell Asaas the payment was received in cash, which
+    // updates the sandbox panel and triggers the PAYMENT_RECEIVED webhook
+    // that confirms the registration through /api/public/asaas-webhook.
+    if (reg.asaas_payment_id && !isAsaasMock()) {
+      const { receivePaymentInCash } = await import("./asaas.server");
+      try {
+        await receivePaymentInCash({
+          paymentId: reg.asaas_payment_id,
+          valueCents: reg.amount_cents ?? 0,
+        });
+        return { status: "pending_webhook" as const };
+      } catch (err: any) {
+        // Fall through to local confirmation if Asaas refuses (e.g. already received)
+        console.error("[simulatePayment] receiveInCash failed", err?.message);
+      }
+    }
+
+    // Fallback: local confirmation (mock mode or no payment id yet).
     const paymentId = reg.asaas_payment_id ?? `SIMULATED_${reg.id}`;
     const { error: rpcErr } = await supabaseAdmin.rpc("confirm_registration_by_payment", {
       _payment_id: paymentId,

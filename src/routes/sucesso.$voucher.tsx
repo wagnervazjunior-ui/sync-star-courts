@@ -222,8 +222,12 @@ function SuccessPage() {
                       className="w-full border-yellow-500/40 text-yellow-200 hover:bg-yellow-500/10"
                       onClick={async () => {
                         try {
-                          await callSimulate({ data: { voucher } });
-                          toast.success("Pagamento simulado (sandbox)");
+                          const res = await callSimulate({ data: { voucher } });
+                          if (res.status === "pending_webhook") {
+                            toast.success("Pagamento simulado — aguardando confirmação do Asaas");
+                          } else {
+                            toast.success("Pagamento simulado (sandbox)");
+                          }
                           qc.invalidateQueries({ queryKey: ["voucher", voucher] });
                         } catch (err: any) {
                           toast.error(err?.message ?? "Falha ao simular");
