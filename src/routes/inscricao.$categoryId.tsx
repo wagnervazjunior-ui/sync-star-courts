@@ -223,7 +223,7 @@ function UniformNotice({ championship }: { championship: any }) {
       <AlertDescription>
         {expired
           ? `O prazo de garantia do tamanho do uniforme expirou em ${formatted}. O tamanho está sujeito à disponibilidade.`
-          : `Garantimos a troca do tamanho para inscrições feitas até ${formatted}. Após essa data, o tamanho fica sujeito à disponibilidade.`}
+          : `Garantimos o tamanho do uniforme para inscrições feitas até ${formatted}. Após essa data, o tamanho fica sujeito à disponibilidade.`}
       </AlertDescription>
     </Alert>
   );
