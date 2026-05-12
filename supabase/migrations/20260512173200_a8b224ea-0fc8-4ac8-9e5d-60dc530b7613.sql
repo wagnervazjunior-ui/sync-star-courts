@@ -1,0 +1,1 @@
+ALTER TABLE public.registrations DROP CONSTRAINT IF EXISTS registrations_category_id_contact_email_key;
