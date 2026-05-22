@@ -13,7 +13,7 @@ import { Loader2, AlertTriangle, CheckCircle2, Clock } from "lucide-react";
 const schema = z.object({
   holderName: z.string().trim().min(3, "Nome impresso no cartão"),
   cardNumber: z.string().trim().min(13, "Número inválido").max(23),
-  expiry: z.string().regex(/^\d{2}\/\d{2,4}$/, "MM/AA"),
+  expiry: z.string().regex(/^(0[1-9]|1[0-2])\/\d{2}$/, "MM/AA"),
   ccv: z.string().regex(/^\d{3,4}$/, "CCV inválido"),
   holderCpf: z.string().trim().min(11, "CPF inválido").max(14),
   holderPostalCode: z.string().trim().min(8, "CEP inválido").max(9),
@@ -30,7 +30,7 @@ type Values = z.infer<typeof schema>;
 const maskCard = (v: string) =>
   v.replace(/\D/g, "").slice(0, 19).replace(/(\d{4})(?=\d)/g, "$1 ").trim();
 const maskExpiry = (v: string) => {
-  const d = v.replace(/\D/g, "").slice(0, 6);
+  const d = v.replace(/\D/g, "").slice(0, 4);
   if (d.length <= 2) return d;
   return `${d.slice(0, 2)}/${d.slice(2)}`;
 };
@@ -103,7 +103,7 @@ export function CardPaymentForm({ voucher, amountCents, onConfirmed }: Props) {
 
   const onSubmit = async (v: Values) => {
     const [mm, yyRaw] = v.expiry.split("/");
-    const yy = yyRaw.length === 2 ? `20${yyRaw}` : yyRaw;
+    const yy = yyRaw.length === 2 ? `20${yyRaw}` : yyRaw.length === 4 ? yyRaw : "";
     setSubmitting(true);
     setResult(null);
     try {
