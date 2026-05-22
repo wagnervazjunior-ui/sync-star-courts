@@ -30,7 +30,7 @@ type Values = z.infer<typeof schema>;
 const maskCard = (v: string) =>
   v.replace(/\D/g, "").slice(0, 19).replace(/(\d{4})(?=\d)/g, "$1 ").trim();
 const maskExpiry = (v: string) => {
-  const d = v.replace(/\D/g, "").slice(0, 6);
+  const d = v.replace(/\D/g, "").slice(0, 4);
   if (d.length <= 2) return d;
   return `${d.slice(0, 2)}/${d.slice(2)}`;
 };
