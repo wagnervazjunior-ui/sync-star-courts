@@ -103,7 +103,7 @@ export function CardPaymentForm({ voucher, amountCents, onConfirmed }: Props) {
 
   const onSubmit = async (v: Values) => {
     const [mm, yyRaw] = v.expiry.split("/");
-    const yy = yyRaw.length === 2 ? `20${yyRaw}` : yyRaw;
+    const yy = yyRaw.length === 2 ? `20${yyRaw}` : yyRaw.length === 4 ? yyRaw : "";
     setSubmitting(true);
     setResult(null);
     try {
