@@ -59,6 +59,7 @@ export const Route = createFileRoute("/api/public/asaas-webhook")({
               _payment_id: payment.id,
               _registration_id: registrationId,
             });
+            await sendVoucherConfirmationEmail(registrationId);
           } else if (event === "PAYMENT_AWAITING_RISK_ANALYSIS") {
             await supabaseAdmin.rpc("set_registration_processing", {
               _payment_id: payment.id,
