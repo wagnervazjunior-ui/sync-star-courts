@@ -58,25 +58,15 @@ function SuccessPage() {
       if (error) throw error;
       return data as RegInfo | null;
     },
+    // Poll for status changes while payment is pending/processing.
+    refetchInterval: (q) => {
+      const d = q.state.data as RegInfo | null | undefined;
+      if (!d) return 5000;
+      return d.status === "confirmed" || d.status === "cancelled" ? false : 5000;
+    },
   });
 
-  // Realtime: when our registration row changes, refetch.
-  useEffect(() => {
-    if (!data?.id) return;
-    const channel = supabase
-      .channel(`reg-${data.id}`)
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "registrations", filter: `id=eq.${data.id}` },
-        () => {
-          qc.invalidateQueries({ queryKey: ["voucher", voucher] });
-        },
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [data?.id, voucher, qc]);
+
 
   const [generating, setGenerating] = useState(false);
   const [mock, setMock] = useState(false);
