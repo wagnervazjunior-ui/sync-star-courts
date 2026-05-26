@@ -4,13 +4,14 @@ import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { createPixCharge, simulatePayment } from "@/lib/payments.functions";
+import { resendVoucherEmail } from "@/lib/voucher.functions";
 import { PublicHeader } from "@/components/PublicHeader";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { CardPaymentForm } from "@/components/CardPaymentForm";
-import { CheckCircle2, Copy, Loader2, AlertTriangle, QrCode, CreditCard, Clock, MessageCircle } from "lucide-react";
+import { CheckCircle2, Copy, Loader2, AlertTriangle, QrCode, CreditCard, Clock, MessageCircle, Ticket, Mail } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/sucesso/$voucher")({
@@ -45,6 +46,8 @@ function SuccessPage() {
   const qc = useQueryClient();
   const callCreatePix = useServerFn(createPixCharge);
   const callSimulate = useServerFn(simulatePayment);
+  const callResend = useServerFn(resendVoucherEmail);
+  const [resending, setResending] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["voucher", voucher],
@@ -174,14 +177,43 @@ function SuccessPage() {
             <p><strong>Campeonato:</strong> {data.championship?.name}</p>
             <p><strong>Categoria:</strong> {data.category?.name}</p>
             <p><strong>Valor:</strong> R$ {(amount / 100).toFixed(2).replace(".", ",")}</p>
-            <p className="mt-2"><strong>Status:</strong>{" "}
+            <div className="mt-2 flex items-center gap-2"><strong>Status:</strong>
               <Badge variant={isConfirmed ? "default" : "secondary"}>{statusLabel}</Badge>
-            </p>
+            </div>
           </div>
+          {isConfirmed && (
+            <div className="mt-6 space-y-2">
+              <Button asChild variant="hero" className="w-full">
+                <Link to="/voucher/$id" params={{ id: data.id }}>
+                  <Ticket className="size-4 mr-2" />
+                  Acessar meu voucher
+                </Link>
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full"
+                disabled={resending}
+                onClick={async () => {
+                  setResending(true);
+                  try {
+                    const res = await callResend({ data: { id: data.id } });
+                    toast.success(`E-mail reenviado para ${res.to}`);
+                  } catch (err: any) {
+                    toast.error(err?.message ?? "Falha ao reenviar e-mail");
+                  } finally {
+                    setResending(false);
+                  }
+                }}
+              >
+                <Mail className="size-4 mr-2" />
+                {resending ? "Enviando…" : "Reenviar e-mail de confirmação"}
+              </Button>
+            </div>
+          )}
           {isConfirmed && data.contact_phone && (() => {
             const digits = (data.contact_phone ?? "").replace(/\D/g, "");
             const e164 = digits.startsWith("55") ? digits : `55${digits}`;
-            const url = typeof window !== "undefined" ? window.location.href : "";
+            const url = typeof window !== "undefined" ? window.location.origin + "/voucher/" + data.id : "";
             const lines = [
               `🏆 *${data.championship?.name ?? "Open Sync"}*`,
               `Categoria: ${data.category?.name ?? ""}`,
@@ -190,14 +222,14 @@ function SuccessPage() {
               `Voucher: *${voucher}*`,
               `Valor: R$ ${(amount / 100).toFixed(2).replace(".", ",")}`,
               `✅ Pagamento confirmado`,
-              url ? `Comprovante: ${url}` : "",
+              url ? `Acesse seu voucher: ${url}` : "",
             ].filter(Boolean);
             const msg = encodeURIComponent(lines.join("\n"));
             return (
               <Button
                 asChild
                 variant="outline"
-                className="mt-6 w-full border-green-500/40 text-green-400 hover:bg-green-500/10 hover:text-green-300"
+                className="mt-2 w-full border-green-500/40 text-green-400 hover:bg-green-500/10 hover:text-green-300"
               >
                 <a
                   href={`https://wa.me/${e164}?text=${msg}`}
