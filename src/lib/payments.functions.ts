@@ -2,6 +2,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequestIP } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { sendVoucherConfirmationEmail } from "./email/send-voucher.server";
 import {
   findOrCreateCustomer,
   createPixCharge as asaasCreatePixCharge,
@@ -232,7 +234,6 @@ export const createCardCharge = createServerFn({ method: "POST" })
         _payment_id: charge.id,
         _registration_id: reg.id,
       });
-      const { sendVoucherConfirmationEmail } = await import("./email/send-voucher.server");
       await sendVoucherConfirmationEmail(reg.id);
       return { status: "confirmed" as const, mock: isAsaasMock() };
     }
@@ -295,7 +296,26 @@ export const simulatePayment = createServerFn({ method: "POST" })
       _registration_id: reg.id,
     });
     if (rpcErr) throw new Error(rpcErr.message);
-    const { sendVoucherConfirmationEmail } = await import("./email/send-voucher.server");
     await sendVoucherConfirmationEmail(reg.id);
     return { status: "confirmed" as const };
+  });
+
+// Admin: confirm a registration manually (e.g. cash payment) and trigger
+// the voucher confirmation email. Protected by Supabase auth.
+export const confirmRegistrationManually = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ registrationId: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { error } = await supabaseAdmin.rpc("confirm_registration", {
+      _id: data.registrationId,
+    });
+    if (error) throw new Error(error.message);
+    try {
+      await sendVoucherConfirmationEmail(data.registrationId);
+    } catch (err) {
+      console.error("[confirmRegistrationManually] email error", err);
+    }
+    return { ok: true as const };
   });

@@ -1,7 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
+import { confirmRegistrationManually } from "@/lib/payments.functions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -58,9 +60,20 @@ function InscricoesPage() {
 
   const filteredCategories = (categories ?? []).filter((c: any) => championshipId === "all" || c.championship_id === championshipId);
 
+  const callConfirmManually = useServerFn(confirmRegistrationManually);
+
   const updateStatus = async (id: string, action: "confirm" | "cancel") => {
-    const fn = action === "confirm" ? "confirm_registration" : "cancel_registration";
-    const { error } = await supabase.rpc(fn, { _id: id });
+    if (action === "confirm") {
+      try {
+        await callConfirmManually({ data: { registrationId: id } });
+        toast.success("Inscrição confirmada (email enviado)");
+        qc.invalidateQueries({ queryKey: ["adm-regs"] });
+      } catch (err: any) {
+        toast.error(err?.message ?? "Erro ao confirmar");
+      }
+      return;
+    }
+    const { error } = await supabase.rpc("cancel_registration", { _id: id });
     if (error) toast.error(error.message);
     else { toast.success("Atualizado"); qc.invalidateQueries({ queryKey: ["adm-regs"] }); }
   };
