@@ -114,6 +114,29 @@ function SuccessPage() {
     );
   }
 
+  if (error) {
+    return (
+      <div className="min-h-screen">
+        <PublicHeader />
+        <main className="mx-auto max-w-xl px-4 py-12">
+          <Card className="p-8 text-center space-y-4">
+            <AlertTriangle className="mx-auto size-10 text-destructive" />
+            <div>
+              <p className="font-semibold">Não foi possível carregar o voucher</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Verifique sua conexão e tente novamente.
+              </p>
+            </div>
+            <Button onClick={() => refetch()} disabled={isFetching} variant="hero">
+              {isFetching ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
+              Tentar novamente
+            </Button>
+          </Card>
+        </main>
+      </div>
+    );
+  }
+
   if (!data) {
     return (
       <div className="min-h-screen">
