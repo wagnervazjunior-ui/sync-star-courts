@@ -1,75 +1,96 @@
-## Diagnóstico
+## Resumo
 
-Três problemas distintos:
+Adicionar ao plano anterior (Resend + webhook + WhatsApp nativo do Asaas):
 
-### 1. Botão WhatsApp aparece antes da confirmação
-Em `src/routes/sucesso.$voucher.tsx`, o botão é renderizado sempre que existe `contact_phone`, independente do status. Precisa ficar visível **só quando `isConfirmed === true`**.
+5. **Nova página `/voucher/$id`** — voucher oficial com QR Code, print/PDF, e bloqueio se não confirmado.
+6. **Email Resend** passa a incluir botão "Acessar Meu Voucher" apontando para `/voucher/$id`.
+7. **WhatsApp do Asaas** — passos no painel para customizar a mensagem com o link.
 
-### 2. WhatsApp "não funciona"
-O link usa `window.open(..., "_blank")`. Provável causa: bloqueio de popup ou número mal formatado quando o telefone salvo já vem com `55` ou com `+`. Vou trocar para um `<a target="_blank">` (mais confiável que `window.open`) e normalizar o telefone removendo `+` e evitando duplicar `55`.
-
-### 3. Email não sai no PIX nem na confirmação manual
-- **PIX (webhook Asaas)**: o webhook *chama* `sendVoucherConfirmationEmail`, mas a função hoje é um **stub** que só faz `console.info` — não envia email nenhum. Por isso não chega no PIX nem no cartão.
-- **Confirmação manual (admin)**: a tela `admin.inscricoes.tsx` chama o RPC `confirm_registration` direto do client e **nunca passa pelo helper de email**. Mesmo se o helper estivesse ativo, esse caminho não dispararia nada.
-
-A causa raiz do email é a mesma: a infra de email ainda não foi provisionada (você pediu para deixar o domínio para o final). Sem a infra, nenhum dos três caminhos (PIX, cartão, confirmação manual) consegue mandar email — só loga.
+(Itens 1-4 do plano anterior continuam: PAYMENT_OVERDUE, conector Resend, template Athletic Dark Mode, WhatsApp nativo.)
 
 ---
 
-## Plano
+## 5. Página pública `/voucher/$id` (mobile-first)
 
-### A. Ajustes de UI (imediato, sem depender de email)
+**Arquivo novo**: `src/routes/voucher.$id.tsx` (a rota `/voucher` atual — busca por código — fica como está, só convive).
 
-**`src/routes/sucesso.$voucher.tsx`**
-- Mostrar o botão "Enviar voucher pelo WhatsApp" **apenas quando `isConfirmed`** (não mais em pending/processing).
-- Trocar `window.open` por `<Button asChild><a href=... target="_blank" rel="noopener noreferrer">`.
-- Normalizar telefone: remover tudo que não é dígito, remover `+`, e só prefixar `55` se ainda não começar com `55` E o número tiver 10–11 dígitos (DDD + número BR). Mensagem pré-preenchida fica como está.
+**Conteúdo**:
+- Cabeçalho com logo Open Sync.
+- Nome do campeonato + categoria.
+- Card da dupla: nome do time, atleta 1 (nome + camiseta + shorts), atleta 2 (idem).
+- **QR Code** com o `registration.id` (biblioteca `qrcode.react` — leve, ~5KB).
+- Voucher code `OS-XXXXXX` em mono grande.
+- Status badge (Confirmado / Pendente / Cancelado).
+- Botão topo: **"Salvar em PDF / Imprimir"** → `window.print()` + CSS `@media print` que esconde header/botões e deixa o card limpo numa folha A4.
+- Footer com data/local do campeonato.
 
-### B. Disparar email também na confirmação manual do admin
+**Carregamento dos dados**:
+- Server function `getVoucherById` (nova, em `src/lib/voucher.functions.ts`) que usa `supabaseAdmin` e retorna apenas campos públicos (sem CPF, sem email/telefone, sem dados de pagamento).
+- Como o `id` é um UUID não-adivinhável (gen_random_uuid), o link funciona como token (mesmo padrão da página `/sucesso/$voucher`).
 
-Criar server function `confirmRegistrationManually` em `src/lib/payments.functions.ts` (ou em um novo `src/lib/admin.functions.ts`) protegida por `requireSupabaseAuth`, que:
-1. Chama `confirm_registration` (RPC já existente).
-2. Em sucesso, chama `sendVoucherConfirmationEmail(registrationId)` dentro de try/catch (não quebra se email falhar).
+**Segurança / bloqueio**:
+- Se `status === 'confirmed'`: renderiza tudo, inclusive QR Code.
+- Se `status === 'pending'` ou `processing`: mostra card de aviso "Pagamento ainda não confirmado. O voucher ficará disponível assim que o pagamento for processado." — **sem QR Code**.
+- Se `status === 'cancelled'`: mostra "Esta inscrição foi cancelada. Procure a organização se houver dúvidas." — **sem QR Code**.
+- Se ID não existe: 404 amigável.
 
-Atualizar `src/routes/admin.inscricoes.tsx` para usar essa server function no botão de confirmar (cancelar continua usando RPC direto).
+## 6. Email Resend (atualiza item B do plano anterior)
 
-### C. Ativar envio de email real (PIX, cartão e confirmação manual)
+O HTML Athletic Dark Mode passa a ter **dois CTAs**:
+- **Botão primário** (laranja, destaque): "🎟️ Acessar Meu Voucher" → `https://{site}/voucher/{registrationId}`
+- Link secundário menor: "Consultar por código" → `/sucesso/{voucher_code}`
 
-A chamada já existe nos três caminhos; só falta a infra. Proponho fazer agora o setup mínimo de infra de email **usando o domínio padrão Lovable** (sem precisar configurar `opensync.com.br` ainda):
+A URL base vem de `process.env.PUBLIC_SITE_URL` (vou adicionar como secret, default `https://sync-star-courts.lovable.app`).
 
-1. **Setup da infra de email** (cria filas, dispatcher, tabelas, cron).
-2. **Scaffold de email transacional** (cria as rotas `send-transactional-email`, suppression, unsubscribe).
-3. **Criar template React Email** `voucher-confirmed.tsx` em `src/lib/email-templates/`:
-   - Assunto: `Inscrição confirmada — {Campeonato} • Voucher {OS-XXXXXX}`
-   - Corpo: voucher em destaque, dupla, categoria, valor, link da página de sucesso.
-4. **Substituir o stub** `src/lib/email/send-voucher.server.ts` por uma implementação real que:
-   - Lê os dados da inscrição.
-   - Chama internamente a rota `send-transactional-email` com `templateName: "voucher-confirmed"`, `recipientEmail: contact_email`, `idempotencyKey: voucher-confirmed-{registrationId}`, e `templateData` com os campos do voucher.
-   - Continua dentro de try/catch (webhook não pode quebrar).
-5. **Página `/unsubscribe`** simples (requisito do scaffold).
+## 7. WhatsApp via Asaas — passo a passo (sem código)
 
-Resultado: emails passam a sair imediatamente, vindos do remetente padrão Lovable. Quando você quiser, configuramos `opensync.com.br` como sender — basta o setup do domínio, sem mexer no código.
+O Asaas permite **mensagem personalizada por evento** no painel:
+
+1. Painel Asaas → **Configurações → Notificações → WhatsApp**.
+2. Ativar evento **"Pagamento confirmado"**.
+3. No campo de mensagem customizada, colar:
+   ```
+   Fala, Atleta! Inscrição CONFIRMADA para a sua dupla no Open Sync! 🔥🏐
+   Acesse o link abaixo para visualizar seu voucher oficial, conferir o tamanho das camisetas e apresentar no dia do torneio:
+   {linkPagamento}
+   Nos vemos na arena!
+   ```
+
+**Limitação**: o Asaas usa variáveis dele (`{linkPagamento}`, `{valor}`, `{cliente}`) — **não tem variável para link customizado nosso**. Duas saídas:
+
+- **Opção A (sem código extra)**: usar `{linkPagamento}` (link da fatura Asaas) — atleta clica, vê comprovante, e no comprovante a gente passa o link do voucher via `description` do pagamento. Já estamos preenchendo `description` em `createPixCharge` — vou ajustar pra incluir `Voucher: {site}/voucher/{id}` no texto.
+- **Opção B (recomendada se quiser link direto)**: usar **Evolution API** num próximo passo, com mensagem 100% nossa. Fica como evolução futura — não entra agora.
+
+→ Vou implementar **Opção A** agora (ajuste em `createPixCharge` no `src/lib/payments.functions.ts` pra incluir o link no `description`).
 
 ---
 
-## Detalhes técnicos
+## Arquivos afetados (acumulado: itens 1-7)
 
-**Arquivos afetados**
-- `src/routes/sucesso.$voucher.tsx` — esconder WhatsApp até confirmar; link via `<a>`.
-- `src/lib/payments.functions.ts` (ou novo `src/lib/admin.functions.ts`) — nova `confirmRegistrationManually`.
-- `src/routes/admin.inscricoes.tsx` — usar a server fn no confirmar.
-- `src/lib/email/send-voucher.server.ts` — chamar rota transacional real.
-- `src/lib/email-templates/voucher-confirmed.tsx` (novo) + `registry.ts`.
-- Rotas de email transacional + `/unsubscribe` (geradas pelo scaffold).
+**Novos**:
+- `src/routes/voucher.$id.tsx` — página pública do voucher.
+- `src/lib/voucher.functions.ts` — server function pública (sem auth) que lê por ID.
+- `src/lib/email-templates/voucher-confirmed.ts` — HTML Athletic Dark Mode com botão "Acessar Meu Voucher".
 
-**Idempotência**: `voucher-confirmed-{registration_id}` evita duplicatas em re-entrega de webhook ou múltiplos cliques de confirmar.
+**Editados**:
+- `src/routes/api/public/asaas-webhook.ts` — adicionar `PAYMENT_OVERDUE` na branch de cancelamento.
+- `src/lib/email/send-voucher.server.ts` — substituir stub por Resend (com URL do voucher).
+- `src/lib/payments.functions.ts` — incluir link do voucher no `description` da cobrança PIX/cartão (Opção A do WhatsApp).
+- `.lovable/plan.md` — atualizar.
+
+**Dependências**:
+- `bun add qrcode.react` (~5KB, sem deps).
+
+**Secrets a adicionar**:
+- `PUBLIC_SITE_URL` (ex.: `https://sync-star-courts.lovable.app`).
+- (Resend já será conectado via conector — `RESEND_API_KEY` + `LOVABLE_API_KEY` já vêm.)
 
 ---
 
-## Alternativa, se preferir adiar o email
+## Ordem de execução
 
-Se você ainda quiser deixar TODO o email para o final junto com o domínio, posso entregar agora **só A + B** (WhatsApp corrigido + confirmação manual passando pelo helper de email), e o helper continua como stub — assim, no dia que ativarmos a infra, os três caminhos já vão funcionar sem mais alterações de código.
-
-Qual prefere?
-1. **Plano completo (A + B + C)** — email já funciona hoje, sem domínio próprio.
-2. **Só A + B agora** — email só liga quando configurarmos `opensync.com.br` no final.
+1. Você aprova este plano.
+2. Eu disparo o diálogo do conector Resend.
+3. Eu peço o secret `PUBLIC_SITE_URL`.
+4. Eu instalo `qrcode.react`, crio `/voucher/$id`, `voucher.functions.ts`, template do email, e atualizo webhook + send-voucher + payments.
+5. Você ativa as notificações WhatsApp no painel Asaas (passo a passo que mando depois).
