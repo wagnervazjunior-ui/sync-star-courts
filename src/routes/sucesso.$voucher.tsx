@@ -178,31 +178,38 @@ function SuccessPage() {
               <Badge variant={isConfirmed ? "default" : "secondary"}>{statusLabel}</Badge>
             </p>
           </div>
-          {data.contact_phone && (
-            <Button
-              variant="outline"
-              className="mt-6 w-full border-green-500/40 text-green-400 hover:bg-green-500/10 hover:text-green-300"
-              onClick={() => {
-                const phone = (data.contact_phone ?? "").replace(/\D/g, "");
-                const e164 = phone.startsWith("55") ? phone : `55${phone}`;
-                const url = typeof window !== "undefined" ? window.location.href : "";
-                const lines = [
-                  `🏆 *${data.championship?.name ?? "Open Sync"}*`,
-                  `Categoria: ${data.category?.name ?? ""}`,
-                  data.team_name ? `Dupla: ${data.team_name}` : "",
-                  ``,
-                  `Voucher: *${voucher}*`,
-                  `Valor: R$ ${(amount / 100).toFixed(2).replace(".", ",")}`,
-                  isConfirmed ? `✅ Pagamento confirmado` : `Acompanhe o pagamento: ${url}`,
-                ].filter(Boolean);
-                const msg = encodeURIComponent(lines.join("\n"));
-                window.open(`https://wa.me/${e164}?text=${msg}`, "_blank", "noopener,noreferrer");
-              }}
-            >
-              <MessageCircle className="size-4 mr-2" />
-              Enviar voucher pelo WhatsApp
-            </Button>
-          )}
+          {isConfirmed && data.contact_phone && (() => {
+            const digits = (data.contact_phone ?? "").replace(/\D/g, "");
+            const e164 = digits.startsWith("55") ? digits : `55${digits}`;
+            const url = typeof window !== "undefined" ? window.location.href : "";
+            const lines = [
+              `🏆 *${data.championship?.name ?? "Open Sync"}*`,
+              `Categoria: ${data.category?.name ?? ""}`,
+              data.team_name ? `Dupla: ${data.team_name}` : "",
+              ``,
+              `Voucher: *${voucher}*`,
+              `Valor: R$ ${(amount / 100).toFixed(2).replace(".", ",")}`,
+              `✅ Pagamento confirmado`,
+              url ? `Comprovante: ${url}` : "",
+            ].filter(Boolean);
+            const msg = encodeURIComponent(lines.join("\n"));
+            return (
+              <Button
+                asChild
+                variant="outline"
+                className="mt-6 w-full border-green-500/40 text-green-400 hover:bg-green-500/10 hover:text-green-300"
+              >
+                <a
+                  href={`https://wa.me/${e164}?text=${msg}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <MessageCircle className="size-4 mr-2" />
+                  Enviar voucher pelo WhatsApp
+                </a>
+              </Button>
+            );
+          })()}
         </Card>
 
         {!isConfirmed && !isProcessing && (
