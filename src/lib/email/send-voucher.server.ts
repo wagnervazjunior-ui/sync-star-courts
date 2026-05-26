@@ -78,9 +78,13 @@ export async function sendVoucherConfirmationEmail(registrationId: string) {
 
     if (!res.ok) {
       const body = await res.text();
-      console.error("[send-voucher] Resend failed", res.status, body);
+      console.error("[send-voucher] Resend failed", { status: res.status, body, to: reg.contact_email });
       return;
     }
+    await supabaseAdmin
+      .from("registrations")
+      .update({ last_email_sent_at: new Date().toISOString() })
+      .eq("id", registrationId);
     console.info("[send-voucher] sent", { to: reg.contact_email, voucher: reg.voucher_code });
   } catch (err) {
     console.error("[send-voucher] unexpected error", err);
