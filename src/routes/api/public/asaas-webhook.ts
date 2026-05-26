@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { sendVoucherConfirmationEmail } from "@/lib/email/send-voucher.server";
 
 const Payload = z.object({
   event: z.string(),
