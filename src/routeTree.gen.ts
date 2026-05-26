@@ -9,10 +9,10 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as VoucherRouteImport } from './routes/voucher'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as VoucherIndexRouteImport } from './routes/voucher.index'
 import { Route as CampeonatosIndexRouteImport } from './routes/campeonatos.index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as VoucherIdRouteImport } from './routes/voucher.$id'
@@ -26,11 +26,6 @@ import { Route as ApiPublicAsaasWebhookRouteImport } from './routes/api/public/a
 import { Route as AdminCategoriasCategoryIdRouteImport } from './routes/admin.categorias.$categoryId'
 import { Route as AdminCampeonatosIdRouteImport } from './routes/admin.campeonatos.$id'
 
-const VoucherRoute = VoucherRouteImport.update({
-  id: '/voucher',
-  path: '/voucher',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -46,6 +41,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const VoucherIndexRoute = VoucherIndexRouteImport.update({
+  id: '/voucher/',
+  path: '/voucher/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CampeonatosIndexRoute = CampeonatosIndexRouteImport.update({
   id: '/campeonatos/',
   path: '/campeonatos/',
@@ -57,9 +57,9 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
   getParentRoute: () => AdminRoute,
 } as any)
 const VoucherIdRoute = VoucherIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => VoucherRoute,
+  id: '/voucher/$id',
+  path: '/voucher/$id',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const SucessoVoucherRoute = SucessoVoucherRouteImport.update({
   id: '/sucesso/$voucher',
@@ -112,7 +112,6 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/login': typeof LoginRoute
-  '/voucher': typeof VoucherRouteWithChildren
   '/admin/administradores': typeof AdminAdministradoresRoute
   '/admin/inscricoes': typeof AdminInscricoesRoute
   '/campeonatos/$slug': typeof CampeonatosSlugRoute
@@ -121,6 +120,7 @@ export interface FileRoutesByFullPath {
   '/voucher/$id': typeof VoucherIdRoute
   '/admin/': typeof AdminIndexRoute
   '/campeonatos/': typeof CampeonatosIndexRoute
+  '/voucher/': typeof VoucherIndexRoute
   '/admin/campeonatos/$id': typeof AdminCampeonatosIdRoute
   '/admin/categorias/$categoryId': typeof AdminCategoriasCategoryIdRoute
   '/api/public/asaas-webhook': typeof ApiPublicAsaasWebhookRoute
@@ -129,7 +129,6 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
-  '/voucher': typeof VoucherRouteWithChildren
   '/admin/administradores': typeof AdminAdministradoresRoute
   '/admin/inscricoes': typeof AdminInscricoesRoute
   '/campeonatos/$slug': typeof CampeonatosSlugRoute
@@ -138,6 +137,7 @@ export interface FileRoutesByTo {
   '/voucher/$id': typeof VoucherIdRoute
   '/admin': typeof AdminIndexRoute
   '/campeonatos': typeof CampeonatosIndexRoute
+  '/voucher': typeof VoucherIndexRoute
   '/admin/campeonatos/$id': typeof AdminCampeonatosIdRoute
   '/admin/categorias/$categoryId': typeof AdminCategoriasCategoryIdRoute
   '/api/public/asaas-webhook': typeof ApiPublicAsaasWebhookRoute
@@ -148,7 +148,6 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/login': typeof LoginRoute
-  '/voucher': typeof VoucherRouteWithChildren
   '/admin/administradores': typeof AdminAdministradoresRoute
   '/admin/inscricoes': typeof AdminInscricoesRoute
   '/campeonatos/$slug': typeof CampeonatosSlugRoute
@@ -157,6 +156,7 @@ export interface FileRoutesById {
   '/voucher/$id': typeof VoucherIdRoute
   '/admin/': typeof AdminIndexRoute
   '/campeonatos/': typeof CampeonatosIndexRoute
+  '/voucher/': typeof VoucherIndexRoute
   '/admin/campeonatos/$id': typeof AdminCampeonatosIdRoute
   '/admin/categorias/$categoryId': typeof AdminCategoriasCategoryIdRoute
   '/api/public/asaas-webhook': typeof ApiPublicAsaasWebhookRoute
@@ -168,7 +168,6 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/login'
-    | '/voucher'
     | '/admin/administradores'
     | '/admin/inscricoes'
     | '/campeonatos/$slug'
@@ -177,6 +176,7 @@ export interface FileRouteTypes {
     | '/voucher/$id'
     | '/admin/'
     | '/campeonatos/'
+    | '/voucher/'
     | '/admin/campeonatos/$id'
     | '/admin/categorias/$categoryId'
     | '/api/public/asaas-webhook'
@@ -185,7 +185,6 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
-    | '/voucher'
     | '/admin/administradores'
     | '/admin/inscricoes'
     | '/campeonatos/$slug'
@@ -194,6 +193,7 @@ export interface FileRouteTypes {
     | '/voucher/$id'
     | '/admin'
     | '/campeonatos'
+    | '/voucher'
     | '/admin/campeonatos/$id'
     | '/admin/categorias/$categoryId'
     | '/api/public/asaas-webhook'
@@ -203,7 +203,6 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/login'
-    | '/voucher'
     | '/admin/administradores'
     | '/admin/inscricoes'
     | '/campeonatos/$slug'
@@ -212,6 +211,7 @@ export interface FileRouteTypes {
     | '/voucher/$id'
     | '/admin/'
     | '/campeonatos/'
+    | '/voucher/'
     | '/admin/campeonatos/$id'
     | '/admin/categorias/$categoryId'
     | '/api/public/asaas-webhook'
@@ -222,23 +222,17 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRouteWithChildren
   LoginRoute: typeof LoginRoute
-  VoucherRoute: typeof VoucherRouteWithChildren
   CampeonatosSlugRoute: typeof CampeonatosSlugRoute
   InscricaoCategoryIdRoute: typeof InscricaoCategoryIdRoute
   SucessoVoucherRoute: typeof SucessoVoucherRoute
+  VoucherIdRoute: typeof VoucherIdRoute
   CampeonatosIndexRoute: typeof CampeonatosIndexRoute
+  VoucherIndexRoute: typeof VoucherIndexRoute
   ApiPublicAsaasWebhookRoute: typeof ApiPublicAsaasWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/voucher': {
-      id: '/voucher'
-      path: '/voucher'
-      fullPath: '/voucher'
-      preLoaderRoute: typeof VoucherRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -260,6 +254,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/voucher/': {
+      id: '/voucher/'
+      path: '/voucher'
+      fullPath: '/voucher/'
+      preLoaderRoute: typeof VoucherIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/campeonatos/': {
       id: '/campeonatos/'
       path: '/campeonatos'
@@ -276,10 +277,10 @@ declare module '@tanstack/react-router' {
     }
     '/voucher/$id': {
       id: '/voucher/$id'
-      path: '/$id'
+      path: '/voucher/$id'
       fullPath: '/voucher/$id'
       preLoaderRoute: typeof VoucherIdRouteImport
-      parentRoute: typeof VoucherRoute
+      parentRoute: typeof rootRouteImport
     }
     '/sucesso/$voucher': {
       id: '/sucesso/$voucher'
@@ -367,28 +368,28 @@ const AdminRouteChildren: AdminRouteChildren = {
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
-interface VoucherRouteChildren {
-  VoucherIdRoute: typeof VoucherIdRoute
-}
-
-const VoucherRouteChildren: VoucherRouteChildren = {
-  VoucherIdRoute: VoucherIdRoute,
-}
-
-const VoucherRouteWithChildren =
-  VoucherRoute._addFileChildren(VoucherRouteChildren)
-
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRouteWithChildren,
   LoginRoute: LoginRoute,
-  VoucherRoute: VoucherRouteWithChildren,
   CampeonatosSlugRoute: CampeonatosSlugRoute,
   InscricaoCategoryIdRoute: InscricaoCategoryIdRoute,
   SucessoVoucherRoute: SucessoVoucherRoute,
+  VoucherIdRoute: VoucherIdRoute,
   CampeonatosIndexRoute: CampeonatosIndexRoute,
+  VoucherIndexRoute: VoucherIndexRoute,
   ApiPublicAsaasWebhookRoute: ApiPublicAsaasWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
