@@ -1,49 +1,75 @@
-## Objetivo
+## Diagnóstico
 
-Entregar o voucher para a dupla por dois canais:
-1. **WhatsApp** — botão na tela de sucesso que abre o WhatsApp com mensagem pronta (link `wa.me`, sem custo, sem API).
-2. **Email** — envio automático assim que o pagamento é confirmado pelo Asaas, com o voucher e dados da inscrição.
+Três problemas distintos:
 
-## 1. WhatsApp (link wa.me)
+### 1. Botão WhatsApp aparece antes da confirmação
+Em `src/routes/sucesso.$voucher.tsx`, o botão é renderizado sempre que existe `contact_phone`, independente do status. Precisa ficar visível **só quando `isConfirmed === true`**.
 
-Na tela `/sucesso/:voucher`, abaixo do card de status, adicionar um botão **"Enviar voucher pelo WhatsApp"** que:
-- Usa o `contact_phone` salvo na inscrição (já em formato BR).
-- Normaliza para E.164 sem `+` (ex: `5511999999999`).
-- Abre `https://wa.me/<phone>?text=<mensagem>` em nova aba.
-- Mensagem pronta: nome do campeonato, categoria, voucher, valor e link da página de sucesso.
+### 2. WhatsApp "não funciona"
+O link usa `window.open(..., "_blank")`. Provável causa: bloqueio de popup ou número mal formatado quando o telefone salvo já vem com `55` ou com `+`. Vou trocar para um `<a target="_blank">` (mais confiável que `window.open`) e normalizar o telefone removendo `+` e evitando duplicar `55`.
 
-Mostrar o botão tanto para inscrições pendentes quanto confirmadas, para a dupla compartilhar entre os atletas.
+### 3. Email não sai no PIX nem na confirmação manual
+- **PIX (webhook Asaas)**: o webhook *chama* `sendVoucherConfirmationEmail`, mas a função hoje é um **stub** que só faz `console.info` — não envia email nenhum. Por isso não chega no PIX nem no cartão.
+- **Confirmação manual (admin)**: a tela `admin.inscricoes.tsx` chama o RPC `confirm_registration` direto do client e **nunca passa pelo helper de email**. Mesmo se o helper estivesse ativo, esse caminho não dispararia nada.
 
-## 2. Email com voucher (após pagamento confirmado)
+A causa raiz do email é a mesma: a infra de email ainda não foi provisionada (você pediu para deixar o domínio para o final). Sem a infra, nenhum dos três caminhos (PIX, cartão, confirmação manual) consegue mandar email — só loga.
 
-### Fluxo
-- O webhook do Asaas (`/api/public/asaas-webhook`) já chama `confirm_registration_by_payment` quando o pagamento é confirmado.
-- Após essa confirmação, enfileirar um email para o `contact_email` da inscrição.
-- Idempotência: usar `voucher-confirmed-{registration_id}` como chave para evitar duplicatas em caso de re-entrega do webhook.
+---
 
-### Conteúdo do email
-- Assunto: "Inscrição confirmada — {Campeonato} • Voucher {OS-XXXXXX}"
-- Corpo: saudação com nome da dupla, voucher em destaque, categoria, valor pago, nomes dos atletas, link para a página de sucesso, e mensagem do que esperar no dia do evento.
+## Plano
 
-### Infraestrutura
-- Usar Lovable Emails (built-in). Domínio fica para configurar no final — o setup do domínio é pré-requisito para envios reais, mas posso já deixar todo o código pronto.
-- Quando o usuário decidir configurar o domínio, abrir o diálogo de setup, scaffold da infra de email transacional (`setup_email_infra` + `scaffold_transactional_email`) e criar o template React Email `voucher-confirmed.tsx`.
-- O webhook chamará o helper `sendTransactionalEmail` com o template `voucher-confirmed`.
+### A. Ajustes de UI (imediato, sem depender de email)
 
-### Ordem de execução
-Como o usuário pediu para configurar domínio só no final, vou:
-1. Implementar agora o botão de WhatsApp na tela de sucesso (entrega imediata).
-2. Implementar a chamada de envio de email no webhook do Asaas, mas deixar isolada num helper que não quebra se a infra de email ainda não estiver pronta (try/catch + log, sem falhar o webhook).
-3. Quando você pedir para configurar o domínio, eu rodo o scaffold da infra de email, crio o template e ativo o envio real.
+**`src/routes/sucesso.$voucher.tsx`**
+- Mostrar o botão "Enviar voucher pelo WhatsApp" **apenas quando `isConfirmed`** (não mais em pending/processing).
+- Trocar `window.open` por `<Button asChild><a href=... target="_blank" rel="noopener noreferrer">`.
+- Normalizar telefone: remover tudo que não é dígito, remover `+`, e só prefixar `55` se ainda não começar com `55` E o número tiver 10–11 dígitos (DDD + número BR). Mensagem pré-preenchida fica como está.
 
-## Arquivos afetados
+### B. Disparar email também na confirmação manual do admin
 
-- `src/routes/sucesso.$voucher.tsx` — adicionar botão WhatsApp.
-- `src/routes/api/public/asaas-webhook.ts` — após confirmar pagamento, disparar envio de email (com try/catch).
-- `src/lib/email/send-voucher.ts` (novo) — helper que monta payload e chama o envio; no-op silencioso se infra ainda não existe.
+Criar server function `confirmRegistrationManually` em `src/lib/payments.functions.ts` (ou em um novo `src/lib/admin.functions.ts`) protegida por `requireSupabaseAuth`, que:
+1. Chama `confirm_registration` (RPC já existente).
+2. Em sucesso, chama `sendVoucherConfirmationEmail(registrationId)` dentro de try/catch (não quebra se email falhar).
 
-## Fora de escopo (por ora)
+Atualizar `src/routes/admin.inscricoes.tsx` para usar essa server function no botão de confirmar (cancelar continua usando RPC direto).
 
-- Envio automático por WhatsApp via Twilio (custo + verificação WhatsApp Business).
-- Email no momento da criação da inscrição (apenas após confirmação, conforme escolhido).
-- Configuração do domínio de email (será feita no final).
+### C. Ativar envio de email real (PIX, cartão e confirmação manual)
+
+A chamada já existe nos três caminhos; só falta a infra. Proponho fazer agora o setup mínimo de infra de email **usando o domínio padrão Lovable** (sem precisar configurar `opensync.com.br` ainda):
+
+1. **Setup da infra de email** (cria filas, dispatcher, tabelas, cron).
+2. **Scaffold de email transacional** (cria as rotas `send-transactional-email`, suppression, unsubscribe).
+3. **Criar template React Email** `voucher-confirmed.tsx` em `src/lib/email-templates/`:
+   - Assunto: `Inscrição confirmada — {Campeonato} • Voucher {OS-XXXXXX}`
+   - Corpo: voucher em destaque, dupla, categoria, valor, link da página de sucesso.
+4. **Substituir o stub** `src/lib/email/send-voucher.server.ts` por uma implementação real que:
+   - Lê os dados da inscrição.
+   - Chama internamente a rota `send-transactional-email` com `templateName: "voucher-confirmed"`, `recipientEmail: contact_email`, `idempotencyKey: voucher-confirmed-{registrationId}`, e `templateData` com os campos do voucher.
+   - Continua dentro de try/catch (webhook não pode quebrar).
+5. **Página `/unsubscribe`** simples (requisito do scaffold).
+
+Resultado: emails passam a sair imediatamente, vindos do remetente padrão Lovable. Quando você quiser, configuramos `opensync.com.br` como sender — basta o setup do domínio, sem mexer no código.
+
+---
+
+## Detalhes técnicos
+
+**Arquivos afetados**
+- `src/routes/sucesso.$voucher.tsx` — esconder WhatsApp até confirmar; link via `<a>`.
+- `src/lib/payments.functions.ts` (ou novo `src/lib/admin.functions.ts`) — nova `confirmRegistrationManually`.
+- `src/routes/admin.inscricoes.tsx` — usar a server fn no confirmar.
+- `src/lib/email/send-voucher.server.ts` — chamar rota transacional real.
+- `src/lib/email-templates/voucher-confirmed.tsx` (novo) + `registry.ts`.
+- Rotas de email transacional + `/unsubscribe` (geradas pelo scaffold).
+
+**Idempotência**: `voucher-confirmed-{registration_id}` evita duplicatas em re-entrega de webhook ou múltiplos cliques de confirmar.
+
+---
+
+## Alternativa, se preferir adiar o email
+
+Se você ainda quiser deixar TODO o email para o final junto com o domínio, posso entregar agora **só A + B** (WhatsApp corrigido + confirmação manual passando pelo helper de email), e o helper continua como stub — assim, no dia que ativarmos a infra, os três caminhos já vão funcionar sem mais alterações de código.
+
+Qual prefere?
+1. **Plano completo (A + B + C)** — email já funciona hoje, sem domínio próprio.
+2. **Só A + B agora** — email só liga quando configurarmos `opensync.com.br` no final.
