@@ -305,6 +305,167 @@ export type Database = {
           },
         ]
       }
+      staff_invites: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          owner_admin_id: string
+          token: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          owner_admin_id: string
+          token: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          owner_admin_id?: string
+          token?: string
+        }
+        Relationships: []
+      }
+      staff_reimbursements: {
+        Row: {
+          amount_cents: number
+          category: Database["public"]["Enums"]["reimbursement_category"]
+          championship_id: string
+          created_at: string
+          description: string
+          expense_date: string
+          id: string
+          paid_at: string | null
+          paid_by: string | null
+          receipt_path: string | null
+          staff_id: string
+          status: Database["public"]["Enums"]["reimbursement_status"]
+          updated_at: string
+        }
+        Insert: {
+          amount_cents: number
+          category: Database["public"]["Enums"]["reimbursement_category"]
+          championship_id: string
+          created_at?: string
+          description: string
+          expense_date: string
+          id?: string
+          paid_at?: string | null
+          paid_by?: string | null
+          receipt_path?: string | null
+          staff_id: string
+          status?: Database["public"]["Enums"]["reimbursement_status"]
+          updated_at?: string
+        }
+        Update: {
+          amount_cents?: number
+          category?: Database["public"]["Enums"]["reimbursement_category"]
+          championship_id?: string
+          created_at?: string
+          description?: string
+          expense_date?: string
+          id?: string
+          paid_at?: string | null
+          paid_by?: string | null
+          receipt_path?: string | null
+          staff_id?: string
+          status?: Database["public"]["Enums"]["reimbursement_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_reimbursements_championship_id_fkey"
+            columns: ["championship_id"]
+            isOneToOne: false
+            referencedRelation: "championships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_reimbursements_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staffs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      staff_sessions: {
+        Row: {
+          created_at: string
+          expires_at: string
+          staff_id: string
+          token: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          staff_id: string
+          token: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          staff_id?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_sessions_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staffs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      staffs: {
+        Row: {
+          birthdate: string
+          contact_email: string | null
+          contact_phone: string | null
+          cpf: string
+          created_at: string
+          id: string
+          name: string
+          owner_admin_id: string
+          pix_key: string
+          pix_key_type: Database["public"]["Enums"]["pix_key_type"]
+          rg: string
+          updated_at: string
+        }
+        Insert: {
+          birthdate: string
+          contact_email?: string | null
+          contact_phone?: string | null
+          cpf: string
+          created_at?: string
+          id?: string
+          name: string
+          owner_admin_id: string
+          pix_key: string
+          pix_key_type: Database["public"]["Enums"]["pix_key_type"]
+          rg: string
+          updated_at?: string
+        }
+        Update: {
+          birthdate?: string
+          contact_email?: string | null
+          contact_phone?: string | null
+          cpf?: string
+          created_at?: string
+          id?: string
+          name?: string
+          owner_admin_id?: string
+          pix_key?: string
+          pix_key_type?: Database["public"]["Enums"]["pix_key_type"]
+          rg?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -465,7 +626,16 @@ export type Database = {
     Enums: {
       app_role: "admin" | "master"
       category_gender: "male" | "female" | "mixed"
+      pix_key_type: "cpf" | "email" | "phone" | "random"
       registration_status: "pending" | "confirmed" | "cancelled" | "processing"
+      reimbursement_category:
+        | "alimentacao"
+        | "transporte"
+        | "passagem"
+        | "gasolina"
+        | "hospedagem"
+        | "outro"
+      reimbursement_status: "pending" | "paid"
       shirt_size: "P" | "M" | "G" | "GG" | "XG"
     }
     CompositeTypes: {
@@ -596,7 +766,17 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "master"],
       category_gender: ["male", "female", "mixed"],
+      pix_key_type: ["cpf", "email", "phone", "random"],
       registration_status: ["pending", "confirmed", "cancelled", "processing"],
+      reimbursement_category: [
+        "alimentacao",
+        "transporte",
+        "passagem",
+        "gasolina",
+        "hospedagem",
+        "outro",
+      ],
+      reimbursement_status: ["pending", "paid"],
       shirt_size: ["P", "M", "G", "GG", "XG"],
     },
   },
