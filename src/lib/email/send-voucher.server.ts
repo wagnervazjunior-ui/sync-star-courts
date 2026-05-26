@@ -69,7 +69,7 @@ export async function sendVoucherConfirmationEmail(registrationId: string) {
         "X-Connection-Api-Key": RESEND_API_KEY,
       },
       body: JSON.stringify({
-        from: "Open Sync <onboarding@resend.dev>",
+        from: "Open Sync <no-reply@opensync.com.br>",
         to: [reg.contact_email],
         subject: buildVoucherEmailSubject(data),
         html: buildVoucherEmailHtml(data),
