@@ -64,12 +64,13 @@ export function buildVoucherEmailHtml(d: VoucherEmailData) {
             ${team}
             <div style="padding:12px 0;border-top:1px solid #262626">
               <p style="margin:0;font-size:15px;color:#fff;font-weight:600">${escape(d.athlete1Name)}</p>
-              <p style="margin:4px 0 0;font-size:13px;color:#9ca3af">Camisa: <span style="color:#22c55e;font-weight:600">${escape(d.athlete1Shirt)}</span></p>
+              <p style="margin:4px 0 0;font-size:13px;color:#9ca3af">Camisa: <span style="color:#22c55e;font-weight:600">${escape(d.athlete1Shirt)}</span> · Shorts: <span style="color:#22c55e;font-weight:600">${escape(d.athlete1Shorts)}</span></p>
             </div>
             <div style="padding:12px 0;border-top:1px solid #262626">
               <p style="margin:0;font-size:15px;color:#fff;font-weight:600">${escape(d.athlete2Name)}</p>
-              <p style="margin:4px 0 0;font-size:13px;color:#9ca3af">Camisa: <span style="color:#22c55e;font-weight:600">${escape(d.athlete2Shirt)}</span></p>
+              <p style="margin:4px 0 0;font-size:13px;color:#9ca3af">Camisa: <span style="color:#22c55e;font-weight:600">${escape(d.athlete2Shirt)}</span> · Shorts: <span style="color:#22c55e;font-weight:600">${escape(d.athlete2Shorts)}</span></p>
             </div>
+
           </div>
 
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
