@@ -100,6 +100,7 @@ function RegisterPage() {
         if (error.message.includes("SLOTS_FULL")) toast.error("Vagas esgotadas para esta categoria");
         else if (error.message.includes("AGE_RULE_VIOLATION")) toast.error("As idades não atendem à regra desta categoria");
         else if (error.message.includes("BIRTHDATE_REQUIRED")) toast.error("Informe a data de nascimento de cada atleta");
+        else if (error.message.includes("TERMS_NOT_ACCEPTED")) toast.error("Você precisa aceitar o termo para continuar");
         else toast.error(error.message);
         return;
       }
