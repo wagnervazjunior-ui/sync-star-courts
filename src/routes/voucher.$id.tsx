@@ -1,13 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { getVoucherById } from "@/lib/voucher.functions";
+import { getVoucherById, resendVoucherEmail } from "@/lib/voucher.functions";
 import { PublicHeader } from "@/components/PublicHeader";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Printer, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
+import { Loader2, Printer, AlertTriangle, CheckCircle2, XCircle, Mail } from "lucide-react";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/voucher/$id")({
   head: () => ({ meta: [{ title: "Voucher — Open Sync" }] }),
@@ -17,11 +19,26 @@ export const Route = createFileRoute("/voucher/$id")({
 function VoucherDetailPage() {
   const { id } = Route.useParams();
   const fetchVoucher = useServerFn(getVoucherById);
+  const callResend = useServerFn(resendVoucherEmail);
+  const [resending, setResending] = useState(false);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["voucher-detail", id],
     queryFn: () => fetchVoucher({ data: { id } }),
   });
+
+  const handleResend = async () => {
+    setResending(true);
+    try {
+      const res = await callResend({ data: { id } });
+      toast.success(`E-mail reenviado para ${res.to}`);
+    } catch (err: any) {
+      toast.error(err?.message ?? "Falha ao reenviar e-mail");
+    } finally {
+      setResending(false);
+    }
+  };
+
 
   if (isLoading) {
     return (
