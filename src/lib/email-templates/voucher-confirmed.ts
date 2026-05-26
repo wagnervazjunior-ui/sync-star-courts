@@ -8,12 +8,15 @@ export interface VoucherEmailData {
   teamName: string | null;
   athlete1Name: string;
   athlete1Shirt: string;
+  athlete1Shorts: string;
   athlete2Name: string;
   athlete2Shirt: string;
+  athlete2Shorts: string;
   voucherUrl: string;
   successUrl: string;
   amountCents: number;
 }
+
 
 export function buildVoucherEmailSubject(d: VoucherEmailData) {
   return `🏐 Inscrição confirmada — Voucher ${d.voucherCode} (${d.championshipName})`;
