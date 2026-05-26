@@ -179,6 +179,11 @@ function InscricoesPage() {
                   <p className="mt-1 text-xs italic text-muted-foreground">Obs.: {r.manual_confirmation_note}</p>
                 )}
                 <p className="mt-1 text-xs text-muted-foreground">{r.contact_email} · {new Date(r.created_at).toLocaleString("pt-BR")}</p>
+                {r.terms_accepted_at && (
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Termo aceito em {new Date(r.terms_accepted_at).toLocaleString("pt-BR")}
+                  </p>
+                )}
               </div>
               <div className="flex gap-1">
                 <Button size="sm" variant="outline" asChild><Link to="/admin/categorias/$categoryId" params={{ categoryId: r.category_id }}>Abrir categoria</Link></Button>
