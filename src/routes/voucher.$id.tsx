@@ -84,12 +84,19 @@ function VoucherDetailPage() {
       <div className="no-print"><PublicHeader /></div>
 
       <main className="mx-auto max-w-xl px-4 py-8 space-y-4">
-        <div className="no-print flex justify-end">
+        <div className="no-print flex flex-wrap justify-end gap-2">
+          {isConfirmed && (
+            <Button variant="outline" onClick={handleResend} disabled={resending}>
+              <Mail className="size-4 mr-2" />
+              {resending ? "Enviando…" : "Reenviar e-mail"}
+            </Button>
+          )}
           <Button variant="outline" onClick={() => window.print()}>
             <Printer className="size-4 mr-2" />
-            Salvar em PDF / Imprimir
+            Baixar voucher (PDF)
           </Button>
         </div>
+
 
         <Card className="voucher-card p-8 bg-gradient-card border-border/50 shadow-elegant">
           <div className="text-center border-b border-border/50 pb-6">
