@@ -1,48 +1,49 @@
-## 1. Frase de garantia do uniforme
+## Objetivo
 
-Em `src/routes/inscricao.$categoryId.tsx` (linha 227), substituir o texto atual por:
+Entregar o voucher para a dupla por dois canais:
+1. **WhatsApp** — botão na tela de sucesso que abre o WhatsApp com mensagem pronta (link `wa.me`, sem custo, sem API).
+2. **Email** — envio automático assim que o pagamento é confirmado pelo Asaas, com o voucher e dados da inscrição.
 
-> "Garantimos o tamanho do uniforme para inscrições feitas até {data}. Após essa data, o tamanho fica sujeito à disponibilidade."
+## 1. WhatsApp (link wa.me)
 
-A data continua vindo de `championship.shirt_size_guarantee_until` (já formatada). A mensagem para prazo expirado (linha 226) é mantida.
+Na tela `/sucesso/:voucher`, abaixo do card de status, adicionar um botão **"Enviar voucher pelo WhatsApp"** que:
+- Usa o `contact_phone` salvo na inscrição (já em formato BR).
+- Normaliza para E.164 sem `+` (ex: `5511999999999`).
+- Abre `https://wa.me/<phone>?text=<mensagem>` em nova aba.
+- Mensagem pronta: nome do campeonato, categoria, voucher, valor e link da página de sucesso.
 
-## 2. Permitir mesmo e-mail em mais de uma inscrição
+Mostrar o botão tanto para inscrições pendentes quanto confirmadas, para a dupla compartilhar entre os atletas.
 
-Hoje existe um índice único `registrations_category_id_contact_email_key (category_id, contact_email)` que impede a mesma pessoa de se inscrever duas vezes na mesma categoria — e por extensão também trava quando há tentativas de retry após pending/cancelled. Como a regra do negócio permite que a mesma pessoa jogue mais de uma categoria (e até forme duplas diferentes), vamos remover essa restrição.
+## 2. Email com voucher (após pagamento confirmado)
 
-**Migração:**
-```sql
-DROP INDEX IF EXISTS public.registrations_category_id_contact_email_key;
-```
+### Fluxo
+- O webhook do Asaas (`/api/public/asaas-webhook`) já chama `confirm_registration_by_payment` quando o pagamento é confirmado.
+- Após essa confirmação, enfileirar um email para o `contact_email` da inscrição.
+- Idempotência: usar `voucher-confirmed-{registration_id}` como chave para evitar duplicatas em caso de re-entrega do webhook.
 
-Também removo a mensagem de tratamento de erro `"Já existe inscrição com este e-mail"` em `src/routes/inscricao.$categoryId.tsx` (linha 101), já que o caminho `duplicate` deixa de existir.
+### Conteúdo do email
+- Assunto: "Inscrição confirmada — {Campeonato} • Voucher {OS-XXXXXX}"
+- Corpo: saudação com nome da dupla, voucher em destaque, categoria, valor pago, nomes dos atletas, link para a página de sucesso, e mensagem do que esperar no dia do evento.
 
-A unicidade de vaga continua garantida por `voucher_code` único e pelo controle de `max_slots` dentro de `create_registration`.
+### Infraestrutura
+- Usar Lovable Emails (built-in). Domínio fica para configurar no final — o setup do domínio é pré-requisito para envios reais, mas posso já deixar todo o código pronto.
+- Quando o usuário decidir configurar o domínio, abrir o diálogo de setup, scaffold da infra de email transacional (`setup_email_infra` + `scaffold_transactional_email`) e criar o template React Email `voucher-confirmed.tsx`.
+- O webhook chamará o helper `sendTransactionalEmail` com o template `voucher-confirmed`.
 
-## 3. Simular pagamento PIX refletindo no painel Asaas
+### Ordem de execução
+Como o usuário pediu para configurar domínio só no final, vou:
+1. Implementar agora o botão de WhatsApp na tela de sucesso (entrega imediata).
+2. Implementar a chamada de envio de email no webhook do Asaas, mas deixar isolada num helper que não quebra se a infra de email ainda não estiver pronta (try/catch + log, sem falhar o webhook).
+3. Quando você pedir para configurar o domínio, eu rodo o scaffold da infra de email, crio o template e ativo o envio real.
 
-**Problema:** o botão "Simular pagamento (sandbox)" hoje chama o RPC `confirm_registration_by_payment` direto no banco. Isso confirma a inscrição localmente, mas o Asaas não sabe — por isso a cobrança continua "Pendente" no painel sandbox e nenhum webhook é disparado.
+## Arquivos afetados
 
-**Solução:** usar o endpoint oficial do Asaas `POST /v3/payments/{id}/receiveInCash`, que marca a cobrança como `RECEIVED_IN_CASH` no painel e dispara o webhook `PAYMENT_RECEIVED` normalmente — o webhook então confirma a inscrição pela rota já existente (`/api/public/asaas-webhook`).
+- `src/routes/sucesso.$voucher.tsx` — adicionar botão WhatsApp.
+- `src/routes/api/public/asaas-webhook.ts` — após confirmar pagamento, disparar envio de email (com try/catch).
+- `src/lib/email/send-voucher.ts` (novo) — helper que monta payload e chama o envio; no-op silencioso se infra ainda não existe.
 
-**Mudanças:**
+## Fora de escopo (por ora)
 
-- `src/lib/asaas.server.ts`: adicionar helper
-  ```ts
-  export async function receivePaymentInCash(paymentId: string, valueCents: number)
-  ```
-  que faz `POST /payments/{paymentId}/receiveInCash` com body `{ paymentDate: hoje (YYYY-MM-DD), value, notifyCustomer: false }`. No modo mock, retorna `{ status: "RECEIVED_IN_CASH" }`.
-
-- `src/lib/payments.functions.ts` — `simulatePayment`:
-  - Continuar bloqueando em `ASAAS_ENV === "production"`.
-  - Carregar a registration (precisa de `asaas_payment_id` e `amount_cents`).
-  - Se houver `asaas_payment_id`, chamar `receivePaymentInCash`. O Asaas vai disparar o webhook que confirma a inscrição.
-  - Fallback: se a cobrança ainda não tem `asaas_payment_id` (PIX nunca gerado) ou estamos em modo mock, manter o caminho atual via RPC `confirm_registration_by_payment` para permitir testar o fluxo de UI.
-  - Retornar `{ status: "confirmed" | "pending_webhook" }` para a UI mostrar feedback adequado.
-
-- `src/routes/sucesso.$voucher.tsx`: ajustar o toast para "Pagamento simulado — aguardando confirmação do Asaas" quando o resultado for `pending_webhook` (a tela já atualiza sozinha via realtime quando o webhook chega).
-
-### Fora de escopo
-- Webhook handler já trata `PAYMENT_RECEIVED` corretamente; não precisa mudar.
-- Sem mudanças no fluxo de cartão.
-- Sem mudanças em `create_registration` além do índice removido.
+- Envio automático por WhatsApp via Twilio (custo + verificação WhatsApp Business).
+- Email no momento da criação da inscrição (apenas após confirmação, conforme escolhido).
+- Configuração do domínio de email (será feita no final).
