@@ -17,6 +17,7 @@ import { Route as CampeonatosIndexRouteImport } from './routes/campeonatos.index
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as VoucherIdRouteImport } from './routes/voucher.$id'
 import { Route as SucessoVoucherRouteImport } from './routes/sucesso.$voucher'
+import { Route as StaffPainelRouteImport } from './routes/staff.painel'
 import { Route as StaffLoginRouteImport } from './routes/staff.login'
 import { Route as InscricaoCategoryIdRouteImport } from './routes/inscricao.$categoryId'
 import { Route as CampeonatosSlugRouteImport } from './routes/campeonatos.$slug'
@@ -66,6 +67,11 @@ const VoucherIdRoute = VoucherIdRouteImport.update({
 const SucessoVoucherRoute = SucessoVoucherRouteImport.update({
   id: '/sucesso/$voucher',
   path: '/sucesso/$voucher',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StaffPainelRoute = StaffPainelRouteImport.update({
+  id: '/staff/painel',
+  path: '/staff/painel',
   getParentRoute: () => rootRouteImport,
 } as any)
 const StaffLoginRoute = StaffLoginRouteImport.update({
@@ -129,6 +135,7 @@ export interface FileRoutesByFullPath {
   '/campeonatos/$slug': typeof CampeonatosSlugRoute
   '/inscricao/$categoryId': typeof InscricaoCategoryIdRoute
   '/staff/login': typeof StaffLoginRoute
+  '/staff/painel': typeof StaffPainelRoute
   '/sucesso/$voucher': typeof SucessoVoucherRoute
   '/voucher/$id': typeof VoucherIdRoute
   '/admin/': typeof AdminIndexRoute
@@ -148,6 +155,7 @@ export interface FileRoutesByTo {
   '/campeonatos/$slug': typeof CampeonatosSlugRoute
   '/inscricao/$categoryId': typeof InscricaoCategoryIdRoute
   '/staff/login': typeof StaffLoginRoute
+  '/staff/painel': typeof StaffPainelRoute
   '/sucesso/$voucher': typeof SucessoVoucherRoute
   '/voucher/$id': typeof VoucherIdRoute
   '/admin': typeof AdminIndexRoute
@@ -169,6 +177,7 @@ export interface FileRoutesById {
   '/campeonatos/$slug': typeof CampeonatosSlugRoute
   '/inscricao/$categoryId': typeof InscricaoCategoryIdRoute
   '/staff/login': typeof StaffLoginRoute
+  '/staff/painel': typeof StaffPainelRoute
   '/sucesso/$voucher': typeof SucessoVoucherRoute
   '/voucher/$id': typeof VoucherIdRoute
   '/admin/': typeof AdminIndexRoute
@@ -191,6 +200,7 @@ export interface FileRouteTypes {
     | '/campeonatos/$slug'
     | '/inscricao/$categoryId'
     | '/staff/login'
+    | '/staff/painel'
     | '/sucesso/$voucher'
     | '/voucher/$id'
     | '/admin/'
@@ -210,6 +220,7 @@ export interface FileRouteTypes {
     | '/campeonatos/$slug'
     | '/inscricao/$categoryId'
     | '/staff/login'
+    | '/staff/painel'
     | '/sucesso/$voucher'
     | '/voucher/$id'
     | '/admin'
@@ -230,6 +241,7 @@ export interface FileRouteTypes {
     | '/campeonatos/$slug'
     | '/inscricao/$categoryId'
     | '/staff/login'
+    | '/staff/painel'
     | '/sucesso/$voucher'
     | '/voucher/$id'
     | '/admin/'
@@ -249,6 +261,7 @@ export interface RootRouteChildren {
   CampeonatosSlugRoute: typeof CampeonatosSlugRoute
   InscricaoCategoryIdRoute: typeof InscricaoCategoryIdRoute
   StaffLoginRoute: typeof StaffLoginRoute
+  StaffPainelRoute: typeof StaffPainelRoute
   SucessoVoucherRoute: typeof SucessoVoucherRoute
   VoucherIdRoute: typeof VoucherIdRoute
   CampeonatosIndexRoute: typeof CampeonatosIndexRoute
@@ -313,6 +326,13 @@ declare module '@tanstack/react-router' {
       path: '/sucesso/$voucher'
       fullPath: '/sucesso/$voucher'
       preLoaderRoute: typeof SucessoVoucherRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/staff/painel': {
+      id: '/staff/painel'
+      path: '/staff/painel'
+      fullPath: '/staff/painel'
+      preLoaderRoute: typeof StaffPainelRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/staff/login': {
@@ -415,6 +435,7 @@ const rootRouteChildren: RootRouteChildren = {
   CampeonatosSlugRoute: CampeonatosSlugRoute,
   InscricaoCategoryIdRoute: InscricaoCategoryIdRoute,
   StaffLoginRoute: StaffLoginRoute,
+  StaffPainelRoute: StaffPainelRoute,
   SucessoVoucherRoute: SucessoVoucherRoute,
   VoucherIdRoute: VoucherIdRoute,
   CampeonatosIndexRoute: CampeonatosIndexRoute,
