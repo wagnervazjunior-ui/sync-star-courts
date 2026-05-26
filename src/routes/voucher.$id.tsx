@@ -76,9 +76,28 @@ function VoucherDetailPage() {
     <div className="min-h-screen voucher-print-root">
       <style>{`
         @media print {
+          @page { size: A4; margin: 8mm; }
+          html, body { background: white !important; }
           .no-print { display: none !important; }
           .voucher-print-root { background: white !important; }
-          .voucher-card { box-shadow: none !important; border: 1px solid #ddd !important; }
+          main { padding: 0 !important; margin: 0 !important; max-width: 100% !important; }
+          .voucher-card {
+            box-shadow: none !important;
+            border: 1px solid #ddd !important;
+            padding: 16px !important;
+            page-break-inside: avoid;
+            break-inside: avoid;
+            font-size: 11px;
+          }
+          .voucher-card h1 { font-size: 18px !important; }
+          .voucher-card .text-2xl { font-size: 16px !important; }
+          .voucher-card .text-lg { font-size: 13px !important; }
+          .voucher-card .p-8 { padding: 16px !important; }
+          .voucher-card .p-6 { padding: 10px !important; }
+          .voucher-card .p-4 { padding: 8px !important; }
+          .voucher-card .mt-6 { margin-top: 10px !important; }
+          .voucher-card .mt-4 { margin-top: 8px !important; }
+          .voucher-card .pb-6 { padding-bottom: 10px !important; }
         }
       `}</style>
       <div className="no-print"><PublicHeader /></div>
