@@ -204,7 +204,9 @@ function RegisterPage() {
               </div>
             ))}
 
-            <Button type="submit" variant="hero" size="lg" className="w-full" disabled={submitting}>
+            {ctx && <TermsBlock ctx={ctx} form={form} />}
+
+            <Button type="submit" variant="hero" size="lg" className="w-full" disabled={submitting || !form.watch("terms_accepted")}>
               {submitting ? "Enviando…" : "Confirmar inscrição"}
             </Button>
           </form>
