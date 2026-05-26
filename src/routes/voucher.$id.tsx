@@ -27,6 +27,17 @@ function VoucherDetailPage() {
     queryFn: () => fetchVoucher({ data: { id } }),
   });
 
+  useEffect(() => {
+    if (!data) return;
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("print") === "1") {
+      const t = setTimeout(() => window.print(), 400);
+      return () => clearTimeout(t);
+    }
+  }, [data]);
+
+
   const handleResend = async () => {
     setResending(true);
     try {
