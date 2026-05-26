@@ -46,6 +46,8 @@ function SuccessPage() {
   const qc = useQueryClient();
   const callCreatePix = useServerFn(createPixCharge);
   const callSimulate = useServerFn(simulatePayment);
+  const callResend = useServerFn(resendVoucherEmail);
+  const [resending, setResending] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["voucher", voucher],
