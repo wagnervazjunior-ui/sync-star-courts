@@ -60,9 +60,20 @@ function InscricoesPage() {
 
   const filteredCategories = (categories ?? []).filter((c: any) => championshipId === "all" || c.championship_id === championshipId);
 
+  const callConfirmManually = useServerFn(confirmRegistrationManually);
+
   const updateStatus = async (id: string, action: "confirm" | "cancel") => {
-    const fn = action === "confirm" ? "confirm_registration" : "cancel_registration";
-    const { error } = await supabase.rpc(fn, { _id: id });
+    if (action === "confirm") {
+      try {
+        await callConfirmManually({ data: { registrationId: id } });
+        toast.success("Inscrição confirmada (email enviado)");
+        qc.invalidateQueries({ queryKey: ["adm-regs"] });
+      } catch (err: any) {
+        toast.error(err?.message ?? "Erro ao confirmar");
+      }
+      return;
+    }
+    const { error } = await supabase.rpc("cancel_registration", { _id: id });
     if (error) toast.error(error.message);
     else { toast.success("Atualizado"); qc.invalidateQueries({ queryKey: ["adm-regs"] }); }
   };
