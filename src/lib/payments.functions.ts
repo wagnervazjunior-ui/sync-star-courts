@@ -234,7 +234,6 @@ export const createCardCharge = createServerFn({ method: "POST" })
         _payment_id: charge.id,
         _registration_id: reg.id,
       });
-      const { sendVoucherConfirmationEmail } = await import("./email/send-voucher.server");
       await sendVoucherConfirmationEmail(reg.id);
       return { status: "confirmed" as const, mock: isAsaasMock() };
     }
