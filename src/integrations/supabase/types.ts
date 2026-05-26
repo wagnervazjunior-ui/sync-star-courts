@@ -205,6 +205,9 @@ export type Database = {
           created_at: string
           id: string
           installments: number
+          last_email_sent_at: string | null
+          manual_confirmation_note: string | null
+          manual_confirmation_reason: string | null
           payer_cpf: string | null
           payer_postal_code: string | null
           payment_id: string | null
@@ -235,6 +238,9 @@ export type Database = {
           created_at?: string
           id?: string
           installments?: number
+          last_email_sent_at?: string | null
+          manual_confirmation_note?: string | null
+          manual_confirmation_reason?: string | null
           payer_cpf?: string | null
           payer_postal_code?: string | null
           payment_id?: string | null
@@ -265,6 +271,9 @@ export type Database = {
           created_at?: string
           id?: string
           installments?: number
+          last_email_sent_at?: string | null
+          manual_confirmation_note?: string | null
+          manual_confirmation_reason?: string | null
           payer_cpf?: string | null
           payer_postal_code?: string | null
           payment_id?: string | null
@@ -319,7 +328,12 @@ export type Database = {
         Returns: boolean
       }
       cancel_registration: { Args: { _id: string }; Returns: undefined }
-      confirm_registration: { Args: { _id: string }; Returns: undefined }
+      confirm_registration:
+        | { Args: { _id: string }; Returns: undefined }
+        | {
+            Args: { _id: string; _note?: string; _reason?: string }
+            Returns: undefined
+          }
       confirm_registration_by_payment: {
         Args: { _payment_id: string; _registration_id: string }
         Returns: undefined

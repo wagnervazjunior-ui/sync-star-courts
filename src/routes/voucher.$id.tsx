@@ -1,13 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { getVoucherById } from "@/lib/voucher.functions";
+import { getVoucherById, resendVoucherEmail } from "@/lib/voucher.functions";
 import { PublicHeader } from "@/components/PublicHeader";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Printer, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
+import { Loader2, Printer, AlertTriangle, CheckCircle2, XCircle, Mail } from "lucide-react";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/voucher/$id")({
   head: () => ({ meta: [{ title: "Voucher — Open Sync" }] }),
@@ -17,11 +19,26 @@ export const Route = createFileRoute("/voucher/$id")({
 function VoucherDetailPage() {
   const { id } = Route.useParams();
   const fetchVoucher = useServerFn(getVoucherById);
+  const callResend = useServerFn(resendVoucherEmail);
+  const [resending, setResending] = useState(false);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["voucher-detail", id],
     queryFn: () => fetchVoucher({ data: { id } }),
   });
+
+  const handleResend = async () => {
+    setResending(true);
+    try {
+      const res = await callResend({ data: { id } });
+      toast.success(`E-mail reenviado para ${res.to}`);
+    } catch (err: any) {
+      toast.error(err?.message ?? "Falha ao reenviar e-mail");
+    } finally {
+      setResending(false);
+    }
+  };
+
 
   if (isLoading) {
     return (
@@ -67,12 +84,19 @@ function VoucherDetailPage() {
       <div className="no-print"><PublicHeader /></div>
 
       <main className="mx-auto max-w-xl px-4 py-8 space-y-4">
-        <div className="no-print flex justify-end">
+        <div className="no-print flex flex-wrap justify-end gap-2">
+          {isConfirmed && (
+            <Button variant="outline" onClick={handleResend} disabled={resending}>
+              <Mail className="size-4 mr-2" />
+              {resending ? "Enviando…" : "Reenviar e-mail"}
+            </Button>
+          )}
           <Button variant="outline" onClick={() => window.print()}>
             <Printer className="size-4 mr-2" />
-            Salvar em PDF / Imprimir
+            Baixar voucher (PDF)
           </Button>
         </div>
+
 
         <Card className="voucher-card p-8 bg-gradient-card border-border/50 shadow-elegant">
           <div className="text-center border-b border-border/50 pb-6">
