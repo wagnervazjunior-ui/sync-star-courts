@@ -51,17 +51,18 @@ function SuccessPage() {
   const callResend = useServerFn(resendVoucherEmail);
   const [resending, setResending] = useState(false);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error, refetch, isFetching } = useQuery({
     queryKey: ["voucher", voucher],
     queryFn: async () => {
       const { data, error } = await supabase.rpc("get_registration_by_voucher", { _code: voucher });
       if (error) throw error;
       return data as RegInfo | null;
     },
+    retry: 2,
     // Poll for status changes while payment is pending/processing.
     refetchInterval: (q) => {
       const d = q.state.data as RegInfo | null | undefined;
-      if (!d) return 5000;
+      if (!d) return false;
       return d.status === "confirmed" || d.status === "cancelled" ? false : 5000;
     },
   });
@@ -108,6 +109,29 @@ function SuccessPage() {
         <PublicHeader />
         <main className="mx-auto max-w-xl px-4 py-12 text-center">
           <Loader2 className="mx-auto size-8 animate-spin text-muted-foreground" />
+        </main>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen">
+        <PublicHeader />
+        <main className="mx-auto max-w-xl px-4 py-12">
+          <Card className="p-8 text-center space-y-4">
+            <AlertTriangle className="mx-auto size-10 text-destructive" />
+            <div>
+              <p className="font-semibold">Não foi possível carregar o voucher</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Verifique sua conexão e tente novamente.
+              </p>
+            </div>
+            <Button onClick={() => refetch()} disabled={isFetching} variant="hero">
+              {isFetching ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
+              Tentar novamente
+            </Button>
+          </Card>
         </main>
       </div>
     );
