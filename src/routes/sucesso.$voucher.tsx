@@ -26,6 +26,8 @@ type RegInfo = {
   pix_expires_at: string | null;
   amount_cents: number | null;
   payer_cpf: string | null;
+  contact_phone: string | null;
+  team_name: string | null;
   category?: { name?: string; price_cents?: number };
   championship?: { name?: string };
 };
