@@ -296,7 +296,6 @@ export const simulatePayment = createServerFn({ method: "POST" })
       _registration_id: reg.id,
     });
     if (rpcErr) throw new Error(rpcErr.message);
-    const { sendVoucherConfirmationEmail } = await import("./email/send-voucher.server");
     await sendVoucherConfirmationEmail(reg.id);
     return { status: "confirmed" as const };
   });
