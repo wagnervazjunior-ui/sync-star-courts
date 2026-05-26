@@ -1,44 +1,39 @@
-# Plano aprovado — Confirmação manual, voucher e e-mail
+## Termo de aceite na inscrição + campo de premiação
 
-## 1. Justificativa na confirmação manual (admin)
+### 1. Banco de dados
+Migration em `public.categories`:
+- `prize TEXT` (nullable) — campo dedicado de premiação
 
-Diálogo ao clicar em "Confirmar" em `/admin/inscricoes` com as opções:
+Migration em `public.registrations`:
+- `terms_accepted BOOLEAN NOT NULL DEFAULT false`
+- `terms_accepted_at TIMESTAMPTZ`
 
-- Pagamento em dinheiro → grava `payment_method = 'cash'` na inscrição
-- Patrocinador
-- Vaga cortesia
-- Outro (campo livre obrigatório)
+Atualizar a função `create_registration(payload)`:
+- Validar `(payload->>'terms_accepted')::boolean = true`, senão `RAISE EXCEPTION 'TERMS_NOT_ACCEPTED'`
+- Gravar `terms_accepted = true` e `terms_accepted_at = now()` no INSERT (timestamp server-side, garantia jurídica)
 
-A justificativa fica gravada e aparece como badge/tooltip no card de cada inscrição confirmada manualmente.
+### 2. Admin — cadastro de categoria (`src/routes/admin.campeonatos.$id.tsx`)
+- Adicionar campo **Premiação** (Textarea) no formulário de criação/edição de categoria, salvando em `categories.prize`
+- Manter o campo Descrição existente
 
-### Detalhes técnicos
-- **Migration**: colunas `manual_confirmation_reason TEXT`, `manual_confirmation_note TEXT`, `last_email_sent_at TIMESTAMPTZ` em `public.registrations`.
-- **Atualizar RPC** `confirm_registration(_id, _reason, _note)` para gravar a justificativa, manter check `has_role(...,'admin')` e setar `payment_method='cash'` quando reason='cash'.
-- **Server fn** `confirmRegistrationManually` aceita `{ registrationId, reason, note? }`, valida com Zod, chama a RPC e dispara `sendVoucherConfirmationEmail`.
-- **UI** em `admin.inscricoes.tsx`: `AlertDialog` + `RadioGroup` + textarea condicional. Exibir reason no card.
+### 3. Formulário de inscrição (`src/routes/inscricao.$categoryId.tsx`)
 
-## 2. Ações na página `/voucher/$id`
+Schema Zod:
+- `terms_accepted: z.literal(true, { errorMap: () => ({ message: "Você precisa aceitar o termo" }) })`
 
-Botões no topo:
-- **Reenviar e-mail** (só se `confirmed`)
-- **Baixar voucher** (`window.print()` — mantém)
+Novo bloco antes do botão final — **Termo de Responsabilidade, Uso de Imagem e Regulamento**:
 
-### Detalhes técnicos
-- Nova server fn pública `resendVoucherEmail({ id })` em `src/lib/voucher.functions.ts`. Só envia se `status === 'confirmed'`. Rate-limit por `last_email_sent_at` (mínimo 60s entre envios).
-- `sendVoucherConfirmationEmail` atualiza `last_email_sent_at` após envio bem-sucedido.
+- **Seção 1 — Regulamento & Premiação**
+  - Renderiza `ctx.championship.regulations`
+  - Destaca `ctx.prize` (premiação da categoria selecionada)
+- **Seção 2 — Direito de Imagem**
+  - Texto jurídico fixo: *"Ao confirmar esta inscrição, ambos os atletas da dupla declaram estar cientes e de pleno acordo com o regulamento do torneio. Adicionalmente, autorizam de forma gratuita, irrevogável e irretratável a cessão e o uso de imagem e som da dupla, capturados através de fotos e filmagens durante o torneio e cerimônias de premiação, para fins de divulgação, cobertura de mídia e publicidade oficial do Evento e seus organizadores."*
 
-## 3. Diagnóstico do e-mail não enviado
+Checkbox (shadcn) com label: *"Li e aceito o regulamento da categoria, a premiação estipulada e a liberação do uso de imagem da dupla para o torneio."*
 
-Provável causa: `from: onboarding@resend.dev` (sandbox Resend) só entrega para o e-mail dono da conta. Para outros destinatários a API retorna erro silencioso (apenas log).
+Botão **"Confirmar inscrição"** com `disabled={!form.watch("terms_accepted") || submitting}`.
 
-### Ações
-- Verificar logs do server fn confirmando o erro 403/422 da Resend.
-- Melhorar log de erro em `send-voucher.server.ts` (incluir status + body).
-- Recomendar verificação de domínio próprio no Resend (conduzido em loop futuro quando tiver acesso ao DNS).
+`onSubmit` envia `terms_accepted: true` no payload do RPC.
 
-## Ordem de execução
-
-1. Migration (3 colunas + atualização do RPC `confirm_registration`).
-2. Atualizar `confirmRegistrationManually` + UI do diálogo no admin.
-3. Criar `resendVoucherEmail` + botões na página do voucher.
-4. Diagnosticar logs do Resend e informar próximos passos para domínio próprio.
+### 4. Admin — trilha de auditoria
+Em `/admin/inscricoes`, exibir `terms_accepted_at` (data/hora formatada) no detalhe da inscrição como prova de aceite.

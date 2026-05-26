@@ -439,6 +439,7 @@ function CategoryDialog({ initial, onSave, uniformModels }: { initial: any; onSa
   const [form, setForm] = useState(() => ({
     name: initial?.name ?? "",
     description: initial?.description ?? "",
+    prize: initial?.prize ?? "",
     max_slots: initial?.max_slots ?? 16,
     price_reais: initial?.price_reais ?? "0",
     active: initial?.active ?? true,
@@ -452,7 +453,8 @@ function CategoryDialog({ initial, onSave, uniformModels }: { initial: any; onSa
       <DialogHeader><DialogTitle>{initial ? "Editar" : "Nova"} categoria</DialogTitle></DialogHeader>
       <div className="space-y-4">
         <div className="space-y-2"><Label>Nome</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex: Iniciante Masculino" /></div>
-        <div className="space-y-2"><Label>Descrição (premiação, regras, horário)</Label><Textarea rows={5} value={form.description ?? ""} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
+        <div className="space-y-2"><Label>Descrição (regras, horário)</Label><Textarea rows={4} value={form.description ?? ""} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
+        <div className="space-y-2"><Label>Premiação</Label><Textarea rows={3} value={form.prize ?? ""} onChange={(e) => setForm({ ...form, prize: e.target.value })} placeholder="Ex: 1º lugar R$ 1.000 + troféu, 2º lugar R$ 500..." /></div>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-2">
             <Label>Gênero</Label>

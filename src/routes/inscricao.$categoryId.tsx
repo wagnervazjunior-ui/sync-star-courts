@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Ruler, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { useState } from "react";
@@ -30,6 +31,7 @@ const schema = z.object({
   athlete2_shirt_size: z.enum(SHIRT_SIZES),
   athlete2_shorts_size: z.enum(SHIRT_SIZES),
   athlete2_birthdate: z.string().optional(),
+  terms_accepted: z.literal(true, { errorMap: () => ({ message: "Você precisa aceitar o termo" }) }),
 });
 type FormValues = z.infer<typeof schema>;
 
@@ -98,6 +100,7 @@ function RegisterPage() {
         if (error.message.includes("SLOTS_FULL")) toast.error("Vagas esgotadas para esta categoria");
         else if (error.message.includes("AGE_RULE_VIOLATION")) toast.error("As idades não atendem à regra desta categoria");
         else if (error.message.includes("BIRTHDATE_REQUIRED")) toast.error("Informe a data de nascimento de cada atleta");
+        else if (error.message.includes("TERMS_NOT_ACCEPTED")) toast.error("Você precisa aceitar o termo para continuar");
         else toast.error(error.message);
         return;
       }
@@ -201,7 +204,9 @@ function RegisterPage() {
               </div>
             ))}
 
-            <Button type="submit" variant="hero" size="lg" className="w-full" disabled={submitting}>
+            {ctx && <TermsBlock ctx={ctx} form={form} />}
+
+            <Button type="submit" variant="hero" size="lg" className="w-full" disabled={submitting || !form.watch("terms_accepted")}>
               {submitting ? "Enviando…" : "Confirmar inscrição"}
             </Button>
           </form>
@@ -249,5 +254,55 @@ function SizeChartLink({ urls }: { urls: string[] }) {
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function TermsBlock({ ctx, form }: { ctx: any; form: any }) {
+  const accepted = form.watch("terms_accepted");
+  return (
+    <div className="rounded-lg border border-primary/30 bg-background/40 p-4 space-y-4">
+      <h3 className="font-semibold text-primary">Termo de Responsabilidade, Uso de Imagem e Regulamento</h3>
+
+      <div className="space-y-2">
+        <p className="text-xs uppercase tracking-widest text-muted-foreground">1. Regulamento & Premiação</p>
+        {ctx.championship?.regulations ? (
+          <div className="text-sm whitespace-pre-line max-h-48 overflow-y-auto rounded-md border border-border/40 p-3 bg-background/40">
+            {ctx.championship.regulations}
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground italic">O organizador ainda não publicou o regulamento.</p>
+        )}
+        {ctx.prize && (
+          <div className="rounded-md border border-primary/40 bg-primary/5 p-3">
+            <p className="text-xs uppercase tracking-widest text-primary">Premiação da categoria</p>
+            <p className="text-sm whitespace-pre-line mt-1">{ctx.prize}</p>
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        <p className="text-xs uppercase tracking-widest text-muted-foreground">2. Direito de Imagem</p>
+        <p className="text-sm leading-relaxed">
+          Ao confirmar esta inscrição, ambos os atletas da dupla declaram estar cientes e de pleno acordo com o regulamento do torneio.
+          Adicionalmente, autorizam de forma gratuita, irrevogável e irretratável a cessão e o uso de imagem e som da dupla,
+          capturados através de fotos e filmagens durante o torneio e cerimônias de premiação, para fins de divulgação,
+          cobertura de mídia e publicidade oficial do Evento e seus organizadores.
+        </p>
+      </div>
+
+      <label className="flex items-start gap-3 cursor-pointer rounded-md border border-border/50 p-3 hover:bg-muted/40">
+        <Checkbox
+          checked={!!accepted}
+          onCheckedChange={(v) => form.setValue("terms_accepted", v === true, { shouldValidate: true })}
+          className="mt-0.5"
+        />
+        <span className="text-sm">
+          Li e aceito o regulamento da categoria, a premiação estipulada e a liberação do uso de imagem da dupla para o torneio.
+        </span>
+      </label>
+      {form.formState.errors.terms_accepted && (
+        <p className="text-xs text-destructive">{form.formState.errors.terms_accepted.message as string}</p>
+      )}
+    </div>
   );
 }
