@@ -48,6 +48,7 @@ export type Database = {
           max_slots: number
           name: string
           price_cents: number
+          prize: string | null
           uniform_model: string | null
           updated_at: string
         }
@@ -63,6 +64,7 @@ export type Database = {
           max_slots: number
           name: string
           price_cents?: number
+          prize?: string | null
           uniform_model?: string | null
           updated_at?: string
         }
@@ -78,6 +80,7 @@ export type Database = {
           max_slots?: number
           name?: string
           price_cents?: number
+          prize?: string | null
           uniform_model?: string | null
           updated_at?: string
         }
@@ -217,6 +220,8 @@ export type Database = {
           pix_qr_code_base64: string | null
           status: Database["public"]["Enums"]["registration_status"]
           team_name: string
+          terms_accepted: boolean
+          terms_accepted_at: string | null
           updated_at: string
           voucher_code: string
         }
@@ -250,6 +255,8 @@ export type Database = {
           pix_qr_code_base64?: string | null
           status?: Database["public"]["Enums"]["registration_status"]
           team_name?: string
+          terms_accepted?: boolean
+          terms_accepted_at?: string | null
           updated_at?: string
           voucher_code: string
         }
@@ -283,6 +290,8 @@ export type Database = {
           pix_qr_code_base64?: string | null
           status?: Database["public"]["Enums"]["registration_status"]
           team_name?: string
+          terms_accepted?: boolean
+          terms_accepted_at?: string | null
           updated_at?: string
           voucher_code?: string
         }
