@@ -84,10 +84,12 @@ export const createPixCharge = createServerFn({ method: "POST" })
     });
 
     const dueDate = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const siteUrl = (process.env.PUBLIC_SITE_URL ?? "https://sync-star-courts.lovable.app").replace(/\/$/, "");
+    const voucherUrl = `${siteUrl}/voucher/${reg.id}`;
     const charge = await asaasCreatePixCharge({
       customerId: customer.id,
       valueCents,
-      description: `${cat?.championship?.name ?? "Inscrição"} — ${cat?.name ?? ""} (voucher ${voucher})`,
+      description: `${cat?.championship?.name ?? "Inscrição"} — ${cat?.name ?? ""} (voucher ${voucher}). Acesse seu voucher: ${voucherUrl}`,
       externalReference: reg.id,
       dueDate,
     });
@@ -187,13 +189,15 @@ export const createCardCharge = createServerFn({ method: "POST" })
         return "0.0.0.0";
       }
     })();
+    const siteUrl = (process.env.PUBLIC_SITE_URL ?? "https://sync-star-courts.lovable.app").replace(/\/$/, "");
+    const voucherUrl = `${siteUrl}/voucher/${reg.id}`;
 
     let charge;
     try {
       charge = await asaasCreateCardCharge({
         customerId: customer.id,
         valueCents,
-        description: `${cat?.championship?.name ?? "Inscrição"} — ${cat?.name ?? ""} (voucher ${voucher})`,
+        description: `${cat?.championship?.name ?? "Inscrição"} — ${cat?.name ?? ""} (voucher ${voucher}). Acesse seu voucher: ${voucherUrl}`,
         externalReference: reg.id,
         dueDate,
         installmentCount: data.installments,
