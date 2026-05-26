@@ -9,7 +9,7 @@ const GATEWAY_URL = "https://connector-gateway.lovable.dev/resend";
 function getSiteUrl() {
   return (
     process.env.PUBLIC_SITE_URL?.replace(/\/$/, "") ??
-    "https://sync-star-courts.lovable.app"
+    "https://www.opensync.com.br"
   );
 }
 
@@ -19,12 +19,13 @@ export async function sendVoucherConfirmationEmail(registrationId: string) {
       .from("registrations")
       .select(
         `id, voucher_code, contact_email, team_name, amount_cents,
-         athlete1_name, athlete1_shirt_size,
-         athlete2_name, athlete2_shirt_size,
+         athlete1_name, athlete1_shirt_size, athlete1_shorts_size,
+         athlete2_name, athlete2_shirt_size, athlete2_shorts_size,
          category:categories(name, price_cents, championship:championships(name))`,
       )
       .eq("id", registrationId)
       .maybeSingle();
+
 
     if (error || !reg) {
       console.warn("[send-voucher] registration not found", registrationId, error?.message);
@@ -54,8 +55,11 @@ export async function sendVoucherConfirmationEmail(registrationId: string) {
       teamName: reg.team_name || null,
       athlete1Name: reg.athlete1_name,
       athlete1Shirt: reg.athlete1_shirt_size,
+      athlete1Shorts: reg.athlete1_shorts_size,
       athlete2Name: reg.athlete2_name,
       athlete2Shirt: reg.athlete2_shirt_size,
+      athlete2Shorts: reg.athlete2_shorts_size,
+
       voucherUrl,
       successUrl,
       amountCents: reg.amount_cents ?? cat?.price_cents ?? 0,
