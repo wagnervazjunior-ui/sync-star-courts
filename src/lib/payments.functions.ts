@@ -232,6 +232,8 @@ export const createCardCharge = createServerFn({ method: "POST" })
         _payment_id: charge.id,
         _registration_id: reg.id,
       });
+      const { sendVoucherConfirmationEmail } = await import("./email/send-voucher.server");
+      await sendVoucherConfirmationEmail(reg.id);
       return { status: "confirmed" as const, mock: isAsaasMock() };
     }
     if (status === "AWAITING_RISK_ANALYSIS") {
@@ -293,5 +295,7 @@ export const simulatePayment = createServerFn({ method: "POST" })
       _registration_id: reg.id,
     });
     if (rpcErr) throw new Error(rpcErr.message);
+    const { sendVoucherConfirmationEmail } = await import("./email/send-voucher.server");
+    await sendVoucherConfirmationEmail(reg.id);
     return { status: "confirmed" as const };
   });

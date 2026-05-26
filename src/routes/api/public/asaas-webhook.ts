@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { sendVoucherConfirmationEmail } from "@/lib/email/send-voucher.server";
 
 const Payload = z.object({
   event: z.string(),
@@ -58,6 +59,7 @@ export const Route = createFileRoute("/api/public/asaas-webhook")({
               _payment_id: payment.id,
               _registration_id: registrationId,
             });
+            await sendVoucherConfirmationEmail(registrationId);
           } else if (event === "PAYMENT_AWAITING_RISK_ANALYSIS") {
             await supabaseAdmin.rpc("set_registration_processing", {
               _payment_id: payment.id,
