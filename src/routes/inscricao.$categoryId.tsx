@@ -31,6 +31,7 @@ const schema = z.object({
   athlete2_shirt_size: z.enum(SHIRT_SIZES),
   athlete2_shorts_size: z.enum(SHIRT_SIZES),
   athlete2_birthdate: z.string().optional(),
+  terms_accepted: z.literal(true, { errorMap: () => ({ message: "Você precisa aceitar o termo" }) }),
 });
 type FormValues = z.infer<typeof schema>;
 
