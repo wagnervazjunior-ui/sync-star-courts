@@ -2,6 +2,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequestIP } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { sendVoucherConfirmationEmail } from "./email/send-voucher.server";
 import {
   findOrCreateCustomer,
   createPixCharge as asaasCreatePixCharge,
