@@ -1,0 +1,156 @@
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
+import { QRCodeSVG } from "qrcode.react";
+import { getVoucherById } from "@/lib/voucher.functions";
+import { PublicHeader } from "@/components/PublicHeader";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Loader2, Printer, AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
+
+export const Route = createFileRoute("/voucher/$id")({
+  head: () => ({ meta: [{ title: "Voucher — Open Sync" }] }),
+  component: VoucherDetailPage,
+});
+
+function VoucherDetailPage() {
+  const { id } = Route.useParams();
+  const fetchVoucher = useServerFn(getVoucherById);
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["voucher-detail", id],
+    queryFn: () => fetchVoucher({ data: { id } }),
+  });
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen">
+        <PublicHeader />
+        <main className="mx-auto max-w-xl px-4 py-12 text-center">
+          <Loader2 className="mx-auto size-8 animate-spin text-muted-foreground" />
+        </main>
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className="min-h-screen">
+        <PublicHeader />
+        <main className="mx-auto max-w-xl px-4 py-12">
+          <Card className="p-8 text-center">
+            <XCircle className="mx-auto size-10 text-destructive" />
+            <h1 className="mt-4 text-2xl font-bold">Voucher não encontrado</h1>
+            <p className="mt-2 text-sm text-muted-foreground">Verifique o link e tente novamente.</p>
+            <Button asChild variant="ghost" className="mt-4"><Link to="/">Voltar</Link></Button>
+          </Card>
+        </main>
+      </div>
+    );
+  }
+
+  const reg: any = data;
+  const isConfirmed = reg.status === "confirmed";
+  const isCancelled = reg.status === "cancelled";
+  const championship = reg.category?.championship;
+
+  return (
+    <div className="min-h-screen voucher-print-root">
+      <style>{`
+        @media print {
+          .no-print { display: none !important; }
+          .voucher-print-root { background: white !important; }
+          .voucher-card { box-shadow: none !important; border: 1px solid #ddd !important; }
+        }
+      `}</style>
+      <div className="no-print"><PublicHeader /></div>
+
+      <main className="mx-auto max-w-xl px-4 py-8 space-y-4">
+        <div className="no-print flex justify-end">
+          <Button variant="outline" onClick={() => window.print()}>
+            <Printer className="size-4 mr-2" />
+            Salvar em PDF / Imprimir
+          </Button>
+        </div>
+
+        <Card className="voucher-card p-8 bg-gradient-card border-border/50 shadow-elegant">
+          <div className="text-center border-b border-border/50 pb-6">
+            <p className="text-xs uppercase tracking-[0.3em] text-primary font-bold">Open Sync</p>
+            <h1 className="mt-2 text-2xl font-bold">{championship?.name ?? "Campeonato"}</h1>
+            {championship?.location && (
+              <p className="text-sm text-muted-foreground mt-1">{championship.location}</p>
+            )}
+            <div className="mt-4">
+              <Badge variant={isConfirmed ? "default" : isCancelled ? "destructive" : "secondary"}>
+                {isConfirmed ? <><CheckCircle2 className="size-3 mr-1" />Confirmado</> :
+                 isCancelled ? "Cancelado" : "Pagamento pendente"}
+              </Badge>
+            </div>
+          </div>
+
+          <div className="mt-6 space-y-1 text-sm">
+            <p className="text-xs uppercase tracking-widest text-muted-foreground">Categoria</p>
+            <p className="text-lg font-semibold">{reg.category?.name}</p>
+          </div>
+
+          {reg.team_name && (
+            <div className="mt-4 space-y-1 text-sm">
+              <p className="text-xs uppercase tracking-widest text-muted-foreground">Dupla</p>
+              <p className="text-lg font-semibold">{reg.team_name}</p>
+            </div>
+          )}
+
+          <div className="mt-6 grid gap-3">
+            <div className="rounded-lg border border-border/50 p-4">
+              <p className="text-xs uppercase tracking-widest text-muted-foreground">Atleta 1</p>
+              <p className="font-semibold mt-1">{reg.athlete1_name}</p>
+              <p className="text-sm text-muted-foreground">Camisa: <span className="text-foreground font-medium">{reg.athlete1_shirt_size}</span> · Shorts: <span className="text-foreground font-medium">{reg.athlete1_shorts_size}</span></p>
+            </div>
+            <div className="rounded-lg border border-border/50 p-4">
+              <p className="text-xs uppercase tracking-widest text-muted-foreground">Atleta 2</p>
+              <p className="font-semibold mt-1">{reg.athlete2_name}</p>
+              <p className="text-sm text-muted-foreground">Camisa: <span className="text-foreground font-medium">{reg.athlete2_shirt_size}</span> · Shorts: <span className="text-foreground font-medium">{reg.athlete2_shorts_size}</span></p>
+            </div>
+          </div>
+
+          <div className="mt-6 rounded-xl border border-primary/30 bg-primary/10 p-6 text-center">
+            <p className="text-xs uppercase tracking-widest text-muted-foreground">Voucher</p>
+            <p className="mt-2 text-2xl font-bold tracking-widest text-gradient font-mono">{reg.voucher_code}</p>
+          </div>
+
+          {isConfirmed ? (
+            <div className="mt-6 flex flex-col items-center">
+              <div className="rounded-xl bg-white p-4">
+                <QRCodeSVG value={reg.id} size={200} level="M" />
+              </div>
+              <p className="mt-3 text-xs text-muted-foreground text-center">
+                Apresente este QR Code na entrada do evento para check-in.
+              </p>
+            </div>
+          ) : isCancelled ? (
+            <div className="mt-6 rounded-lg border border-destructive/30 bg-destructive/10 p-4 flex items-start gap-3">
+              <XCircle className="size-5 text-destructive shrink-0 mt-0.5" />
+              <div className="text-sm">
+                <p className="font-semibold text-destructive">Inscrição cancelada</p>
+                <p className="text-muted-foreground mt-1">Esta inscrição foi cancelada. Procure a organização se houver dúvidas.</p>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-6 rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-4 flex items-start gap-3">
+              <AlertTriangle className="size-5 text-yellow-500 shrink-0 mt-0.5" />
+              <div className="text-sm">
+                <p className="font-semibold text-yellow-200">Pagamento ainda não confirmado</p>
+                <p className="text-muted-foreground mt-1">O QR Code de entrada fica disponível assim que o pagamento for processado.</p>
+              </div>
+            </div>
+          )}
+        </Card>
+
+        <div className="no-print text-center">
+          <Button variant="ghost" asChild><Link to="/">Voltar para o início</Link></Button>
+        </div>
+      </main>
+    </div>
+  );
+}

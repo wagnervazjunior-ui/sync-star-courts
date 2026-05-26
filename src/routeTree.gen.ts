@@ -15,6 +15,7 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as CampeonatosIndexRouteImport } from './routes/campeonatos.index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as VoucherIdRouteImport } from './routes/voucher.$id'
 import { Route as SucessoVoucherRouteImport } from './routes/sucesso.$voucher'
 import { Route as InscricaoCategoryIdRouteImport } from './routes/inscricao.$categoryId'
 import { Route as CampeonatosSlugRouteImport } from './routes/campeonatos.$slug'
@@ -54,6 +55,11 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AdminRoute,
+} as any)
+const VoucherIdRoute = VoucherIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => VoucherRoute,
 } as any)
 const SucessoVoucherRoute = SucessoVoucherRouteImport.update({
   id: '/sucesso/$voucher',
@@ -106,12 +112,13 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/login': typeof LoginRoute
-  '/voucher': typeof VoucherRoute
+  '/voucher': typeof VoucherRouteWithChildren
   '/admin/administradores': typeof AdminAdministradoresRoute
   '/admin/inscricoes': typeof AdminInscricoesRoute
   '/campeonatos/$slug': typeof CampeonatosSlugRoute
   '/inscricao/$categoryId': typeof InscricaoCategoryIdRoute
   '/sucesso/$voucher': typeof SucessoVoucherRoute
+  '/voucher/$id': typeof VoucherIdRoute
   '/admin/': typeof AdminIndexRoute
   '/campeonatos/': typeof CampeonatosIndexRoute
   '/admin/campeonatos/$id': typeof AdminCampeonatosIdRoute
@@ -122,12 +129,13 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
-  '/voucher': typeof VoucherRoute
+  '/voucher': typeof VoucherRouteWithChildren
   '/admin/administradores': typeof AdminAdministradoresRoute
   '/admin/inscricoes': typeof AdminInscricoesRoute
   '/campeonatos/$slug': typeof CampeonatosSlugRoute
   '/inscricao/$categoryId': typeof InscricaoCategoryIdRoute
   '/sucesso/$voucher': typeof SucessoVoucherRoute
+  '/voucher/$id': typeof VoucherIdRoute
   '/admin': typeof AdminIndexRoute
   '/campeonatos': typeof CampeonatosIndexRoute
   '/admin/campeonatos/$id': typeof AdminCampeonatosIdRoute
@@ -140,12 +148,13 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/login': typeof LoginRoute
-  '/voucher': typeof VoucherRoute
+  '/voucher': typeof VoucherRouteWithChildren
   '/admin/administradores': typeof AdminAdministradoresRoute
   '/admin/inscricoes': typeof AdminInscricoesRoute
   '/campeonatos/$slug': typeof CampeonatosSlugRoute
   '/inscricao/$categoryId': typeof InscricaoCategoryIdRoute
   '/sucesso/$voucher': typeof SucessoVoucherRoute
+  '/voucher/$id': typeof VoucherIdRoute
   '/admin/': typeof AdminIndexRoute
   '/campeonatos/': typeof CampeonatosIndexRoute
   '/admin/campeonatos/$id': typeof AdminCampeonatosIdRoute
@@ -165,6 +174,7 @@ export interface FileRouteTypes {
     | '/campeonatos/$slug'
     | '/inscricao/$categoryId'
     | '/sucesso/$voucher'
+    | '/voucher/$id'
     | '/admin/'
     | '/campeonatos/'
     | '/admin/campeonatos/$id'
@@ -181,6 +191,7 @@ export interface FileRouteTypes {
     | '/campeonatos/$slug'
     | '/inscricao/$categoryId'
     | '/sucesso/$voucher'
+    | '/voucher/$id'
     | '/admin'
     | '/campeonatos'
     | '/admin/campeonatos/$id'
@@ -198,6 +209,7 @@ export interface FileRouteTypes {
     | '/campeonatos/$slug'
     | '/inscricao/$categoryId'
     | '/sucesso/$voucher'
+    | '/voucher/$id'
     | '/admin/'
     | '/campeonatos/'
     | '/admin/campeonatos/$id'
@@ -210,7 +222,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRouteWithChildren
   LoginRoute: typeof LoginRoute
-  VoucherRoute: typeof VoucherRoute
+  VoucherRoute: typeof VoucherRouteWithChildren
   CampeonatosSlugRoute: typeof CampeonatosSlugRoute
   InscricaoCategoryIdRoute: typeof InscricaoCategoryIdRoute
   SucessoVoucherRoute: typeof SucessoVoucherRoute
@@ -261,6 +273,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/'
       preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof AdminRoute
+    }
+    '/voucher/$id': {
+      id: '/voucher/$id'
+      path: '/$id'
+      fullPath: '/voucher/$id'
+      preLoaderRoute: typeof VoucherIdRouteImport
+      parentRoute: typeof VoucherRoute
     }
     '/sucesso/$voucher': {
       id: '/sucesso/$voucher'
@@ -348,11 +367,22 @@ const AdminRouteChildren: AdminRouteChildren = {
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
+interface VoucherRouteChildren {
+  VoucherIdRoute: typeof VoucherIdRoute
+}
+
+const VoucherRouteChildren: VoucherRouteChildren = {
+  VoucherIdRoute: VoucherIdRoute,
+}
+
+const VoucherRouteWithChildren =
+  VoucherRoute._addFileChildren(VoucherRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRouteWithChildren,
   LoginRoute: LoginRoute,
-  VoucherRoute: VoucherRoute,
+  VoucherRoute: VoucherRouteWithChildren,
   CampeonatosSlugRoute: CampeonatosSlugRoute,
   InscricaoCategoryIdRoute: InscricaoCategoryIdRoute,
   SucessoVoucherRoute: SucessoVoucherRoute,

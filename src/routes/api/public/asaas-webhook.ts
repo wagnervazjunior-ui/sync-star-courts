@@ -74,6 +74,7 @@ export const Route = createFileRoute("/api/public/asaas-webhook")({
           } else if (
             event === "PAYMENT_REFUNDED" ||
             event === "PAYMENT_DELETED" ||
+            event === "PAYMENT_OVERDUE" ||
             event === "PAYMENT_CHARGEBACK_REQUESTED"
           ) {
             // Idempotent: only cancel if not already confirmed (avoid out-of-order events
