@@ -55,8 +55,11 @@ export async function sendVoucherConfirmationEmail(registrationId: string) {
       teamName: reg.team_name || null,
       athlete1Name: reg.athlete1_name,
       athlete1Shirt: reg.athlete1_shirt_size,
+      athlete1Shorts: reg.athlete1_shorts_size,
       athlete2Name: reg.athlete2_name,
       athlete2Shirt: reg.athlete2_shirt_size,
+      athlete2Shorts: reg.athlete2_shorts_size,
+
       voucherUrl,
       successUrl,
       amountCents: reg.amount_cents ?? cat?.price_cents ?? 0,
