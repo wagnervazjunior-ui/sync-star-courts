@@ -309,11 +309,19 @@ export const simulatePayment = createServerFn({ method: "POST" })
 export const confirmRegistrationManually = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
-    z.object({ registrationId: z.string().uuid() }).parse(input),
+    z
+      .object({
+        registrationId: z.string().uuid(),
+        reason: z.enum(["cash", "sponsor", "courtesy", "other"]),
+        note: z.string().max(500).optional(),
+      })
+      .parse(input),
   )
   .handler(async ({ data }) => {
     const { error } = await supabaseAdmin.rpc("confirm_registration", {
       _id: data.registrationId,
+      _reason: data.reason,
+      _note: data.note ?? null,
     });
     if (error) throw new Error(error.message);
     try {
