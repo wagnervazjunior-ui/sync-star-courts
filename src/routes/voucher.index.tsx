@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
-export const Route = createFileRoute("/voucher")({
+export const Route = createFileRoute("/voucher/")({
   head: () => ({ meta: [{ title: "Consultar voucher — Open Sync" }] }),
   component: VoucherPage,
 });
