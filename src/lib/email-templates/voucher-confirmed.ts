@@ -74,13 +74,14 @@ export function buildVoucherEmailHtml(d: VoucherEmailData) {
           </div>
 
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-            <tr><td align="center" style="padding:8px 0 16px">
-              <a href="${escape(d.voucherUrl)}" style="display:inline-block;background:linear-gradient(135deg,#f97316,#ea580c);color:#fff;text-decoration:none;font-weight:700;font-size:16px;padding:16px 32px;border-radius:12px;letter-spacing:0.5px">🎟️ ACESSAR MEU VOUCHER</a>
+            <tr><td align="center" style="padding:8px 0 12px">
+              <a href="${escape(d.voucherUrl)}" style="display:inline-block;background:linear-gradient(135deg,#f97316,#ea580c);color:#fff;text-decoration:none;font-weight:700;font-size:16px;padding:16px 32px;border-radius:12px;letter-spacing:0.5px">🎟️ ACESSAR VOUCHER (QR CODE)</a>
             </td></tr>
             <tr><td align="center" style="padding:0 0 16px">
-              <a href="${escape(d.successUrl)}" style="color:#9ca3af;font-size:13px;text-decoration:underline">Ou abrir página de comprovante</a>
+              <a href="${escape(d.voucherUrl)}?print=1" style="display:inline-block;background:#1a1a1a;color:#fff;text-decoration:none;font-weight:600;font-size:14px;padding:12px 24px;border-radius:10px;border:1px solid #404040">📄 Baixar voucher (PDF)</a>
             </td></tr>
           </table>
+
 
           <div style="background:#0a0a0a;border:1px solid #262626;border-radius:8px;padding:16px;margin-top:16px">
             <p style="margin:0;font-size:13px;color:#9ca3af;line-height:1.6">

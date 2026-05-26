@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { getVoucherById, resendVoucherEmail } from "@/lib/voucher.functions";
 import { PublicHeader } from "@/components/PublicHeader";
@@ -26,6 +26,17 @@ function VoucherDetailPage() {
     queryKey: ["voucher-detail", id],
     queryFn: () => fetchVoucher({ data: { id } }),
   });
+
+  useEffect(() => {
+    if (!data) return;
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("print") === "1") {
+      const t = setTimeout(() => window.print(), 400);
+      return () => clearTimeout(t);
+    }
+  }, [data]);
+
 
   const handleResend = async () => {
     setResending(true);

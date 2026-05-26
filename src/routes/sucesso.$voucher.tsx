@@ -11,8 +11,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { CardPaymentForm } from "@/components/CardPaymentForm";
-import { CheckCircle2, Copy, Loader2, AlertTriangle, QrCode, CreditCard, Clock, MessageCircle, Ticket, Mail } from "lucide-react";
+import { CheckCircle2, Copy, Loader2, AlertTriangle, QrCode, CreditCard, Clock, MessageCircle, Ticket, Mail, Printer } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { toast } from "sonner";
+
 
 export const Route = createFileRoute("/sucesso/$voucher")({
   head: () => ({ meta: [{ title: "Inscrição — Open Sync" }] }),
@@ -182,11 +184,25 @@ function SuccessPage() {
             </div>
           </div>
           {isConfirmed && (
-            <div className="mt-6 space-y-2">
+            <div className="mt-6 space-y-4">
+              <div className="flex flex-col items-center">
+                <div className="rounded-xl bg-white p-4">
+                  <QRCodeSVG value={data.id} size={200} level="M" />
+                </div>
+                <p className="mt-3 text-xs text-muted-foreground text-center">
+                  Apresente este QR Code na entrada do evento para check-in.
+                </p>
+              </div>
               <Button asChild variant="hero" className="w-full">
                 <Link to="/voucher/$id" params={{ id: data.id }}>
                   <Ticket className="size-4 mr-2" />
                   Acessar meu voucher
+                </Link>
+              </Button>
+              <Button asChild variant="outline" className="w-full">
+                <Link to="/voucher/$id" params={{ id: data.id }} search={{ print: 1 } as any}>
+                  <Printer className="size-4 mr-2" />
+                  Baixar voucher (PDF)
                 </Link>
               </Button>
               <Button
@@ -210,6 +226,7 @@ function SuccessPage() {
               </Button>
             </div>
           )}
+
           {isConfirmed && data.contact_phone && (() => {
             const digits = (data.contact_phone ?? "").replace(/\D/g, "");
             const e164 = digits.startsWith("55") ? digits : `55${digits}`;
