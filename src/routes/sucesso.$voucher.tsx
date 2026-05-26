@@ -51,17 +51,18 @@ function SuccessPage() {
   const callResend = useServerFn(resendVoucherEmail);
   const [resending, setResending] = useState(false);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error, refetch, isFetching } = useQuery({
     queryKey: ["voucher", voucher],
     queryFn: async () => {
       const { data, error } = await supabase.rpc("get_registration_by_voucher", { _code: voucher });
       if (error) throw error;
       return data as RegInfo | null;
     },
+    retry: 2,
     // Poll for status changes while payment is pending/processing.
     refetchInterval: (q) => {
       const d = q.state.data as RegInfo | null | undefined;
-      if (!d) return 5000;
+      if (!d) return false;
       return d.status === "confirmed" || d.status === "cancelled" ? false : 5000;
     },
   });
