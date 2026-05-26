@@ -21,6 +21,7 @@ import { Route as StaffPainelRouteImport } from './routes/staff.painel'
 import { Route as StaffLoginRouteImport } from './routes/staff.login'
 import { Route as InscricaoCategoryIdRouteImport } from './routes/inscricao.$categoryId'
 import { Route as CampeonatosSlugRouteImport } from './routes/campeonatos.$slug'
+import { Route as AdminStaffsRouteImport } from './routes/admin.staffs'
 import { Route as AdminInscricoesRouteImport } from './routes/admin.inscricoes'
 import { Route as AdminAdministradoresRouteImport } from './routes/admin.administradores'
 import { Route as AdminCampeonatosIndexRouteImport } from './routes/admin.campeonatos.index'
@@ -89,6 +90,11 @@ const CampeonatosSlugRoute = CampeonatosSlugRouteImport.update({
   path: '/campeonatos/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminStaffsRoute = AdminStaffsRouteImport.update({
+  id: '/staffs',
+  path: '/staffs',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminInscricoesRoute = AdminInscricoesRouteImport.update({
   id: '/inscricoes',
   path: '/inscricoes',
@@ -132,6 +138,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/admin/administradores': typeof AdminAdministradoresRoute
   '/admin/inscricoes': typeof AdminInscricoesRoute
+  '/admin/staffs': typeof AdminStaffsRoute
   '/campeonatos/$slug': typeof CampeonatosSlugRoute
   '/inscricao/$categoryId': typeof InscricaoCategoryIdRoute
   '/staff/login': typeof StaffLoginRoute
@@ -152,6 +159,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/admin/administradores': typeof AdminAdministradoresRoute
   '/admin/inscricoes': typeof AdminInscricoesRoute
+  '/admin/staffs': typeof AdminStaffsRoute
   '/campeonatos/$slug': typeof CampeonatosSlugRoute
   '/inscricao/$categoryId': typeof InscricaoCategoryIdRoute
   '/staff/login': typeof StaffLoginRoute
@@ -174,6 +182,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/admin/administradores': typeof AdminAdministradoresRoute
   '/admin/inscricoes': typeof AdminInscricoesRoute
+  '/admin/staffs': typeof AdminStaffsRoute
   '/campeonatos/$slug': typeof CampeonatosSlugRoute
   '/inscricao/$categoryId': typeof InscricaoCategoryIdRoute
   '/staff/login': typeof StaffLoginRoute
@@ -197,6 +206,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/admin/administradores'
     | '/admin/inscricoes'
+    | '/admin/staffs'
     | '/campeonatos/$slug'
     | '/inscricao/$categoryId'
     | '/staff/login'
@@ -217,6 +227,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/admin/administradores'
     | '/admin/inscricoes'
+    | '/admin/staffs'
     | '/campeonatos/$slug'
     | '/inscricao/$categoryId'
     | '/staff/login'
@@ -238,6 +249,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/admin/administradores'
     | '/admin/inscricoes'
+    | '/admin/staffs'
     | '/campeonatos/$slug'
     | '/inscricao/$categoryId'
     | '/staff/login'
@@ -356,6 +368,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CampeonatosSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/staffs': {
+      id: '/admin/staffs'
+      path: '/staffs'
+      fullPath: '/admin/staffs'
+      preLoaderRoute: typeof AdminStaffsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/inscricoes': {
       id: '/admin/inscricoes'
       path: '/inscricoes'
@@ -411,6 +430,7 @@ declare module '@tanstack/react-router' {
 interface AdminRouteChildren {
   AdminAdministradoresRoute: typeof AdminAdministradoresRoute
   AdminInscricoesRoute: typeof AdminInscricoesRoute
+  AdminStaffsRoute: typeof AdminStaffsRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminCampeonatosIdRoute: typeof AdminCampeonatosIdRoute
   AdminCategoriasCategoryIdRoute: typeof AdminCategoriasCategoryIdRoute
@@ -420,6 +440,7 @@ interface AdminRouteChildren {
 const AdminRouteChildren: AdminRouteChildren = {
   AdminAdministradoresRoute: AdminAdministradoresRoute,
   AdminInscricoesRoute: AdminInscricoesRoute,
+  AdminStaffsRoute: AdminStaffsRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminCampeonatosIdRoute: AdminCampeonatosIdRoute,
   AdminCategoriasCategoryIdRoute: AdminCategoriasCategoryIdRoute,
