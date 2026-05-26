@@ -4,13 +4,14 @@ import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { createPixCharge, simulatePayment } from "@/lib/payments.functions";
+import { resendVoucherEmail } from "@/lib/voucher.functions";
 import { PublicHeader } from "@/components/PublicHeader";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { CardPaymentForm } from "@/components/CardPaymentForm";
-import { CheckCircle2, Copy, Loader2, AlertTriangle, QrCode, CreditCard, Clock, MessageCircle } from "lucide-react";
+import { CheckCircle2, Copy, Loader2, AlertTriangle, QrCode, CreditCard, Clock, MessageCircle, Ticket, Mail } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/sucesso/$voucher")({
