@@ -257,7 +257,15 @@ function AdminStaffs() {
 
       {/* Staffs list */}
       <Card className="p-6 bg-gradient-card border-border/50">
-        <h2 className="font-semibold mb-3">Staffs cadastrados</h2>
+        <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
+          <h2 className="font-semibold">Staffs cadastrados</h2>
+          <Input
+            placeholder="Buscar por nome, CPF ou e-mail"
+            value={staffSearch}
+            onChange={(e) => setStaffSearch(e.target.value)}
+            className="max-w-xs"
+          />
+        </div>
         {staffs.isLoading ? (
           <p className="text-sm text-muted-foreground">Carregando…</p>
         ) : (staffs.data?.staffs ?? []).length === 0 ? (
@@ -275,9 +283,27 @@ function AdminStaffs() {
                 </tr>
               </thead>
               <tbody>
-                {staffs.data!.staffs.map((s: any) => (
+                {staffs.data!.staffs
+                  .filter((s: any) => {
+                    const q = staffSearch.trim().toLowerCase();
+                    if (!q) return true;
+                    return (
+                      (s.name ?? "").toLowerCase().includes(q) ||
+                      (s.cpf ?? "").toLowerCase().includes(q) ||
+                      (s.contact_email ?? "").toLowerCase().includes(q)
+                    );
+                  })
+                  .map((s: any) => (
                   <tr key={s.id} className="border-t border-border/40">
-                    <td className="py-2 pr-3 font-medium">{s.name}</td>
+                    <td className="py-2 pr-3 font-medium">
+                      <Link
+                        to="/admin/staffs/$staffId"
+                        params={{ staffId: s.id }}
+                        className="hover:text-primary hover:underline"
+                      >
+                        {s.name}
+                      </Link>
+                    </td>
                     <td className="py-2 pr-3">{s.cpf}</td>
                     <td className="py-2 pr-3 text-muted-foreground">
                       {s.contact_email || s.contact_phone || "—"}
