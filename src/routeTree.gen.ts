@@ -24,10 +24,12 @@ import { Route as CampeonatosSlugRouteImport } from './routes/campeonatos.$slug'
 import { Route as AdminStaffsRouteImport } from './routes/admin.staffs'
 import { Route as AdminInscricoesRouteImport } from './routes/admin.inscricoes'
 import { Route as AdminAdministradoresRouteImport } from './routes/admin.administradores'
+import { Route as AdminChavesIndexRouteImport } from './routes/admin.chaves.index'
 import { Route as AdminCampeonatosIndexRouteImport } from './routes/admin.campeonatos.index'
 import { Route as StaffCadastroTokenRouteImport } from './routes/staff.cadastro.$token'
 import { Route as ApiPublicAsaasWebhookRouteImport } from './routes/api/public/asaas-webhook'
 import { Route as AdminStaffsStaffIdRouteImport } from './routes/admin.staffs.$staffId'
+import { Route as AdminChavesBracketIdRouteImport } from './routes/admin.chaves.$bracketId'
 import { Route as AdminCategoriasCategoryIdRouteImport } from './routes/admin.categorias.$categoryId'
 import { Route as AdminCampeonatosIdRouteImport } from './routes/admin.campeonatos.$id'
 
@@ -106,6 +108,11 @@ const AdminAdministradoresRoute = AdminAdministradoresRouteImport.update({
   path: '/administradores',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminChavesIndexRoute = AdminChavesIndexRouteImport.update({
+  id: '/chaves/',
+  path: '/chaves/',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminCampeonatosIndexRoute = AdminCampeonatosIndexRouteImport.update({
   id: '/campeonatos/',
   path: '/campeonatos/',
@@ -125,6 +132,11 @@ const AdminStaffsStaffIdRoute = AdminStaffsStaffIdRouteImport.update({
   id: '/$staffId',
   path: '/$staffId',
   getParentRoute: () => AdminStaffsRoute,
+} as any)
+const AdminChavesBracketIdRoute = AdminChavesBracketIdRouteImport.update({
+  id: '/chaves/$bracketId',
+  path: '/chaves/$bracketId',
+  getParentRoute: () => AdminRoute,
 } as any)
 const AdminCategoriasCategoryIdRoute =
   AdminCategoriasCategoryIdRouteImport.update({
@@ -156,10 +168,12 @@ export interface FileRoutesByFullPath {
   '/voucher/': typeof VoucherIndexRoute
   '/admin/campeonatos/$id': typeof AdminCampeonatosIdRoute
   '/admin/categorias/$categoryId': typeof AdminCategoriasCategoryIdRoute
+  '/admin/chaves/$bracketId': typeof AdminChavesBracketIdRoute
   '/admin/staffs/$staffId': typeof AdminStaffsStaffIdRoute
   '/api/public/asaas-webhook': typeof ApiPublicAsaasWebhookRoute
   '/staff/cadastro/$token': typeof StaffCadastroTokenRoute
   '/admin/campeonatos/': typeof AdminCampeonatosIndexRoute
+  '/admin/chaves/': typeof AdminChavesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -178,10 +192,12 @@ export interface FileRoutesByTo {
   '/voucher': typeof VoucherIndexRoute
   '/admin/campeonatos/$id': typeof AdminCampeonatosIdRoute
   '/admin/categorias/$categoryId': typeof AdminCategoriasCategoryIdRoute
+  '/admin/chaves/$bracketId': typeof AdminChavesBracketIdRoute
   '/admin/staffs/$staffId': typeof AdminStaffsStaffIdRoute
   '/api/public/asaas-webhook': typeof ApiPublicAsaasWebhookRoute
   '/staff/cadastro/$token': typeof StaffCadastroTokenRoute
   '/admin/campeonatos': typeof AdminCampeonatosIndexRoute
+  '/admin/chaves': typeof AdminChavesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -202,10 +218,12 @@ export interface FileRoutesById {
   '/voucher/': typeof VoucherIndexRoute
   '/admin/campeonatos/$id': typeof AdminCampeonatosIdRoute
   '/admin/categorias/$categoryId': typeof AdminCategoriasCategoryIdRoute
+  '/admin/chaves/$bracketId': typeof AdminChavesBracketIdRoute
   '/admin/staffs/$staffId': typeof AdminStaffsStaffIdRoute
   '/api/public/asaas-webhook': typeof ApiPublicAsaasWebhookRoute
   '/staff/cadastro/$token': typeof StaffCadastroTokenRoute
   '/admin/campeonatos/': typeof AdminCampeonatosIndexRoute
+  '/admin/chaves/': typeof AdminChavesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -227,10 +245,12 @@ export interface FileRouteTypes {
     | '/voucher/'
     | '/admin/campeonatos/$id'
     | '/admin/categorias/$categoryId'
+    | '/admin/chaves/$bracketId'
     | '/admin/staffs/$staffId'
     | '/api/public/asaas-webhook'
     | '/staff/cadastro/$token'
     | '/admin/campeonatos/'
+    | '/admin/chaves/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -249,10 +269,12 @@ export interface FileRouteTypes {
     | '/voucher'
     | '/admin/campeonatos/$id'
     | '/admin/categorias/$categoryId'
+    | '/admin/chaves/$bracketId'
     | '/admin/staffs/$staffId'
     | '/api/public/asaas-webhook'
     | '/staff/cadastro/$token'
     | '/admin/campeonatos'
+    | '/admin/chaves'
   id:
     | '__root__'
     | '/'
@@ -272,10 +294,12 @@ export interface FileRouteTypes {
     | '/voucher/'
     | '/admin/campeonatos/$id'
     | '/admin/categorias/$categoryId'
+    | '/admin/chaves/$bracketId'
     | '/admin/staffs/$staffId'
     | '/api/public/asaas-webhook'
     | '/staff/cadastro/$token'
     | '/admin/campeonatos/'
+    | '/admin/chaves/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -401,6 +425,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAdministradoresRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/chaves/': {
+      id: '/admin/chaves/'
+      path: '/chaves'
+      fullPath: '/admin/chaves/'
+      preLoaderRoute: typeof AdminChavesIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/campeonatos/': {
       id: '/admin/campeonatos/'
       path: '/campeonatos'
@@ -428,6 +459,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/staffs/$staffId'
       preLoaderRoute: typeof AdminStaffsStaffIdRouteImport
       parentRoute: typeof AdminStaffsRoute
+    }
+    '/admin/chaves/$bracketId': {
+      id: '/admin/chaves/$bracketId'
+      path: '/chaves/$bracketId'
+      fullPath: '/admin/chaves/$bracketId'
+      preLoaderRoute: typeof AdminChavesBracketIdRouteImport
+      parentRoute: typeof AdminRoute
     }
     '/admin/categorias/$categoryId': {
       id: '/admin/categorias/$categoryId'
@@ -465,7 +503,9 @@ interface AdminRouteChildren {
   AdminIndexRoute: typeof AdminIndexRoute
   AdminCampeonatosIdRoute: typeof AdminCampeonatosIdRoute
   AdminCategoriasCategoryIdRoute: typeof AdminCategoriasCategoryIdRoute
+  AdminChavesBracketIdRoute: typeof AdminChavesBracketIdRoute
   AdminCampeonatosIndexRoute: typeof AdminCampeonatosIndexRoute
+  AdminChavesIndexRoute: typeof AdminChavesIndexRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
@@ -475,7 +515,9 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminIndexRoute: AdminIndexRoute,
   AdminCampeonatosIdRoute: AdminCampeonatosIdRoute,
   AdminCategoriasCategoryIdRoute: AdminCategoriasCategoryIdRoute,
+  AdminChavesBracketIdRoute: AdminChavesBracketIdRoute,
   AdminCampeonatosIndexRoute: AdminCampeonatosIndexRoute,
+  AdminChavesIndexRoute: AdminChavesIndexRoute,
 }
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
