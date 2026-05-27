@@ -747,3 +747,227 @@ function PermissoesTab({ id }: { id: string }) {
     </div>
   );
 }
+
+/* =================== STAFF (reembolsos & cachês por torneio) =================== */
+const REIMB_CATEGORY_LABEL: Record<string, string> = {
+  alimentacao: "Alimentação", transporte: "Transporte", passagem: "Passagem",
+  gasolina: "Gasolina", hospedagem: "Hospedagem", outro: "Outro",
+};
+function brl(c: number) { return `R$ ${(c / 100).toFixed(2).replace(".", ",")}`; }
+
+function StaffTab({ id }: { id: string }) {
+  const qc = useQueryClient();
+  const callList = useServerFn(adminListReimbursements);
+  const callStatus = useServerFn(setReimbursementStatus);
+  const callReceipt = useServerFn(getReceiptSignedUrl);
+  const callFees = useServerFn(adminListFees);
+  const callFeeStatus = useServerFn(setFeeStatus);
+  const callFeeReceipt = useServerFn(getFeeReceiptSignedUrl);
+  const callExport = useServerFn(exportStaffFinanceXlsx);
+  const [status, setStatus] = useState<string>("all");
+  const [exporting, setExporting] = useState(false);
+
+  const reimbs = useQuery({
+    queryKey: ["champ-staff-reimbs", id, status],
+    queryFn: () => callList({ data: { championship_id: id, status: status === "all" ? null : (status as any) } }),
+  });
+  const fees = useQuery({
+    queryKey: ["champ-staff-fees", id, status],
+    queryFn: () => callFees({ data: { championship_id: id, status: status === "all" ? null : (status as any) } }),
+  });
+
+  const rTotals = useMemo(() => {
+    const rs = reimbs.data?.reimbursements ?? [];
+    const total = rs.reduce((a: number, r: any) => a + r.amount_cents, 0);
+    const paid = rs.filter((r: any) => r.status === "paid").reduce((a: number, r: any) => a + r.amount_cents, 0);
+    return { total, paid, pending: total - paid };
+  }, [reimbs.data]);
+
+  const fTotals = useMemo(() => {
+    const fs = fees.data?.fees ?? [];
+    const total = fs.reduce((a: number, r: any) => a + r.amount_cents, 0);
+    const paid = fs.filter((r: any) => r.status === "paid").reduce((a: number, r: any) => a + r.amount_cents, 0);
+    return { total, paid, pending: total - paid };
+  }, [fees.data]);
+
+  const toggleReimb = async (rid: string, current: "pending" | "paid") => {
+    await callStatus({ data: { id: rid, status: current === "paid" ? "pending" : "paid" } });
+    qc.invalidateQueries({ queryKey: ["champ-staff-reimbs", id] });
+    toast.success(current === "paid" ? "Marcado como pendente" : "Marcado como pago");
+  };
+  const toggleFee = async (fid: string, current: "pending" | "paid") => {
+    await callFeeStatus({ data: { id: fid, status: current === "paid" ? "pending" : "paid" } });
+    qc.invalidateQueries({ queryKey: ["champ-staff-fees", id] });
+    toast.success(current === "paid" ? "Marcado como pendente" : "Marcado como pago");
+  };
+  const openReceipt = async (rid: string) => {
+    const { url } = await callReceipt({ data: { reimbursement_id: rid } });
+    if (url) window.open(url, "_blank"); else toast.error("Comprovante indisponível");
+  };
+  const openFeeReceipt = async (fid: string) => {
+    const { url } = await callFeeReceipt({ data: { fee_id: fid } });
+    if (url) window.open(url, "_blank"); else toast.error("Comprovante indisponível");
+  };
+
+  const handleExport = async () => {
+    try {
+      setExporting(true);
+      const res = await callExport({ data: { championship_id: id } });
+      const bin = atob(res.base64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const blob = new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = res.filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+      toast.success("Planilha gerada");
+    } catch (e: any) {
+      toast.error(e?.message || "Falha ao gerar planilha");
+    } finally { setExporting(false); }
+  };
+
+  const StatBox = ({ label, value, tone }: { label: string; value: string; tone?: "success" | "warn" }) => (
+    <Card className="p-3 bg-card/60">
+      <p className="text-xs uppercase tracking-widest text-muted-foreground">{label}</p>
+      <p className={`mt-1 text-xl font-bold ${tone === "success" ? "text-success" : tone === "warn" ? "text-primary" : ""}`}>{value}</p>
+    </Card>
+  );
+
+  return (
+    <div className="space-y-6">
+      <Card className="p-4 bg-gradient-card border-border/50 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Label className="text-xs uppercase tracking-wider text-muted-foreground">Status</Label>
+          <Select value={status} onValueChange={setStatus}>
+            <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="pending">Pendentes</SelectItem>
+              <SelectItem value="paid">Pagos</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <Button variant="secondary" onClick={handleExport} disabled={exporting}>
+          {exporting ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
+          Baixar Excel
+        </Button>
+      </Card>
+
+      <Card className="p-6 bg-gradient-card border-border/50">
+        <h2 className="font-semibold mb-4 flex items-center gap-2"><Wallet className="size-5 text-primary" /> Cachês combinados</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+          <StatBox label="Total" value={brl(fTotals.total)} />
+          <StatBox label="Pago" value={brl(fTotals.paid)} tone="success" />
+          <StatBox label="Pendente" value={brl(fTotals.pending)} tone="warn" />
+        </div>
+        {fees.isLoading ? <p className="text-sm text-muted-foreground">Carregando…</p>
+          : (fees.data?.fees ?? []).length === 0 ? <p className="text-sm text-muted-foreground">Nenhum cachê lançado.</p>
+          : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-left text-xs uppercase tracking-wider text-muted-foreground">
+                <tr>
+                  <th className="py-2 pr-3">Staff</th>
+                  <th className="py-2 pr-3">Descrição</th>
+                  <th className="py-2 pr-3">PIX</th>
+                  <th className="py-2 pr-3 text-right">Valor</th>
+                  <th className="py-2 pr-3">Status</th>
+                  <th className="py-2 pr-3"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {(fees.data!.fees as any[]).map((r) => (
+                  <tr key={r.id} className="border-t border-border/40">
+                    <td className="py-2 pr-3 font-medium">{r.staff?.name}</td>
+                    <td className="py-2 pr-3 max-w-xs truncate" title={r.description}>{r.description || "—"}</td>
+                    <td className="py-2 pr-3">
+                      <button className="inline-flex items-center gap-1 hover:text-primary text-xs"
+                        onClick={() => { navigator.clipboard.writeText(r.staff?.pix_key ?? ""); toast.success("PIX copiado"); }}>
+                        <Copy className="size-3" /> {r.staff?.pix_key}
+                      </button>
+                    </td>
+                    <td className="py-2 pr-3 text-right font-semibold">{brl(r.amount_cents)}</td>
+                    <td className="py-2 pr-3"><Badge variant={r.status === "paid" ? "default" : "secondary"}>{r.status === "paid" ? "Pago" : "Pendente"}</Badge></td>
+                    <td className="py-2 pr-3">
+                      <div className="flex gap-1 justify-end">
+                        {r.receipt_path && (
+                          <Button size="sm" variant="ghost" onClick={() => openFeeReceipt(r.id)} title="Ver anexo">
+                            <FileText className="size-4" />
+                          </Button>
+                        )}
+                        <Button size="sm" variant={r.status === "paid" ? "outline" : "hero"} onClick={() => toggleFee(r.id, r.status)}>
+                          {r.status === "paid" ? "Desfazer" : "Marcar pago"}
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+
+      <Card className="p-6 bg-gradient-card border-border/50">
+        <h2 className="font-semibold mb-4">Reembolsos</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+          <StatBox label="Total" value={brl(rTotals.total)} />
+          <StatBox label="Pago" value={brl(rTotals.paid)} tone="success" />
+          <StatBox label="Pendente" value={brl(rTotals.pending)} tone="warn" />
+        </div>
+        {reimbs.isLoading ? <p className="text-sm text-muted-foreground">Carregando…</p>
+          : (reimbs.data?.reimbursements ?? []).length === 0 ? <p className="text-sm text-muted-foreground">Nenhum reembolso encontrado.</p>
+          : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-left text-xs uppercase tracking-wider text-muted-foreground">
+                <tr>
+                  <th className="py-2 pr-3">Staff</th>
+                  <th className="py-2 pr-3">Categoria</th>
+                  <th className="py-2 pr-3">Descrição</th>
+                  <th className="py-2 pr-3">Data</th>
+                  <th className="py-2 pr-3">PIX</th>
+                  <th className="py-2 pr-3 text-right">Valor</th>
+                  <th className="py-2 pr-3">Status</th>
+                  <th className="py-2 pr-3"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {(reimbs.data!.reimbursements as any[]).map((r) => (
+                  <tr key={r.id} className="border-t border-border/40">
+                    <td className="py-2 pr-3 font-medium">{r.staff?.name}</td>
+                    <td className="py-2 pr-3"><Badge variant="outline">{REIMB_CATEGORY_LABEL[r.category] ?? r.category}</Badge></td>
+                    <td className="py-2 pr-3 max-w-xs truncate" title={r.description}>{r.description}</td>
+                    <td className="py-2 pr-3">{new Date(r.expense_date).toLocaleDateString("pt-BR")}</td>
+                    <td className="py-2 pr-3">
+                      <button className="inline-flex items-center gap-1 hover:text-primary text-xs"
+                        onClick={() => { navigator.clipboard.writeText(r.staff?.pix_key ?? ""); toast.success("PIX copiado"); }}>
+                        <Copy className="size-3" /> {r.staff?.pix_key}
+                      </button>
+                    </td>
+                    <td className="py-2 pr-3 text-right font-semibold">{brl(r.amount_cents)}</td>
+                    <td className="py-2 pr-3"><Badge variant={r.status === "paid" ? "default" : "secondary"}>{r.status === "paid" ? "Pago" : "Pendente"}</Badge></td>
+                    <td className="py-2 pr-3">
+                      <div className="flex gap-1 justify-end">
+                        {r.receipt_path && (
+                          <Button size="sm" variant="ghost" onClick={() => openReceipt(r.id)} title="Ver comprovante">
+                            <FileText className="size-4" />
+                          </Button>
+                        )}
+                        <Button size="sm" variant={r.status === "paid" ? "outline" : "hero"} onClick={() => toggleReimb(r.id, r.status)}>
+                          {r.status === "paid" ? "Desfazer" : "Marcar pago"}
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
