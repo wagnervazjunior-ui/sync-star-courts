@@ -324,7 +324,22 @@ export type Database = {
           id?: string
           staff_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "staff_championships_championship_id_fkey"
+            columns: ["championship_id"]
+            isOneToOne: false
+            referencedRelation: "championships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_championships_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staffs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       staff_fees: {
         Row: {
@@ -372,7 +387,22 @@ export type Database = {
           status?: Database["public"]["Enums"]["fee_status"]
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "staff_fees_championship_id_fkey"
+            columns: ["championship_id"]
+            isOneToOne: false
+            referencedRelation: "championships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_fees_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staffs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       staff_invites: {
         Row: {
@@ -399,7 +429,15 @@ export type Database = {
           owner_admin_id?: string
           token?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "staff_invites_championship_id_fkey"
+            columns: ["championship_id"]
+            isOneToOne: false
+            referencedRelation: "championships"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       staff_reimbursements: {
         Row: {
