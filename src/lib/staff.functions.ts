@@ -702,3 +702,149 @@ export const createAdminReceiptUploadUrl = createServerFn({ method: "POST" })
     if (error || !signed) throw new Error(error?.message || "Falha ao gerar URL de upload");
     return { path, token: signed.token, signedUrl: signed.signedUrl };
   });
+
+// ---------- Admin: export consolidated Excel ----------
+const ExportInput = z.object({
+  championship_id: z.string().uuid().optional().nullable(),
+});
+
+export const exportStaffFinanceXlsx = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => ExportInput.parse(input ?? {}))
+  .handler(async ({ data, context }) => {
+    const ExcelJS = (await import("exceljs")).default;
+
+    // Reimbursements
+    let rq = supabaseAdmin
+      .from("staff_reimbursements")
+      .select(
+        "amount_cents, status, staff_id, championship_id, " +
+          "staff:staffs!inner(id, name, cpf, pix_key_type, pix_key, owner_admin_id), " +
+          "championship:championships!inner(id, name, created_by)",
+      )
+      .eq("staff.owner_admin_id", context.userId)
+      .eq("championship.created_by", context.userId);
+    if (data.championship_id) rq = rq.eq("championship_id", data.championship_id);
+    const { data: reimbs, error: e1 } = await rq;
+    if (e1) throw new Error(e1.message);
+
+    // Fees
+    let fq = supabaseAdmin
+      .from("staff_fees")
+      .select(
+        "amount_cents, status, staff_id, championship_id, " +
+          "staff:staffs!inner(id, name, cpf, pix_key_type, pix_key, owner_admin_id), " +
+          "championship:championships!inner(id, name, created_by)",
+      )
+      .eq("staff.owner_admin_id", context.userId)
+      .eq("championship.created_by", context.userId);
+    if (data.championship_id) fq = fq.eq("championship_id", data.championship_id);
+    const { data: fees, error: e2 } = await fq;
+    if (e2) throw new Error(e2.message);
+
+    type Row = {
+      staff_id: string;
+      name: string;
+      cpf: string;
+      pix_key_type: string;
+      pix_key: string;
+      championships: Set<string>;
+      reimb_paid: number;
+      reimb_pending: number;
+      fee: number;
+      fee_status: string | null;
+    };
+    const map = new Map<string, Row>();
+    const ensure = (s: any, ch: any): Row => {
+      const id = s.id;
+      let r = map.get(id);
+      if (!r) {
+        r = {
+          staff_id: id,
+          name: s.name,
+          cpf: s.cpf,
+          pix_key_type: s.pix_key_type,
+          pix_key: s.pix_key,
+          championships: new Set(),
+          reimb_paid: 0,
+          reimb_pending: 0,
+          fee: 0,
+          fee_status: null,
+        };
+        map.set(id, r);
+      }
+      if (ch?.name) r.championships.add(ch.name);
+      return r;
+    };
+
+    for (const r of reimbs ?? []) {
+      const row = ensure((r as any).staff, (r as any).championship);
+      if (r.status === "paid") row.reimb_paid += r.amount_cents;
+      else row.reimb_pending += r.amount_cents;
+    }
+    for (const f of fees ?? []) {
+      const row = ensure((f as any).staff, (f as any).championship);
+      row.fee += f.amount_cents;
+      // If any paid, mark paid; else pending
+      if (f.status === "paid") row.fee_status = "paid";
+      else if (!row.fee_status) row.fee_status = "pending";
+    }
+
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("Financeiro");
+    ws.columns = [
+      { header: "Staff", key: "name", width: 28 },
+      { header: "CPF", key: "cpf", width: 16 },
+      { header: "Tipo PIX", key: "pix_key_type", width: 12 },
+      { header: "Chave PIX", key: "pix_key", width: 32 },
+      { header: "Campeonato(s)", key: "champs", width: 30 },
+      { header: "Reembolsos pagos", key: "reimb_paid", width: 18 },
+      { header: "Reembolsos pendentes", key: "reimb_pending", width: 20 },
+      { header: "Cachê", key: "fee", width: 14 },
+      { header: "Status cachê", key: "fee_status", width: 14 },
+      { header: "Total a pagar (pendentes + cachê)", key: "total_pay", width: 30 },
+      { header: "Total geral", key: "total_all", width: 16 },
+    ];
+    ws.getRow(1).font = { bold: true };
+
+    const rows = Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+    rows.forEach((r) => {
+      ws.addRow({
+        name: r.name,
+        cpf: r.cpf,
+        pix_key_type: r.pix_key_type,
+        pix_key: r.pix_key,
+        champs: Array.from(r.championships).join(", "),
+        reimb_paid: r.reimb_paid / 100,
+        reimb_pending: r.reimb_pending / 100,
+        fee: r.fee / 100,
+        fee_status: r.fee_status === "paid" ? "Pago" : r.fee ? "Pendente" : "—",
+        total_pay: (r.reimb_pending + (r.fee_status === "paid" ? 0 : r.fee)) / 100,
+        total_all: (r.reimb_paid + r.reimb_pending + r.fee) / 100,
+      });
+    });
+
+    const moneyFmt = '"R$" #,##0.00;[Red]("R$" #,##0.00);-';
+    ["F", "G", "H", "J", "K"].forEach((col) => {
+      ws.getColumn(col).numFmt = moneyFmt;
+    });
+
+    // Totals row
+    const last = ws.rowCount;
+    if (last >= 2) {
+      const totalRow = ws.addRow({
+        name: "TOTAL",
+        reimb_paid: { formula: `SUM(F2:F${last})` },
+        reimb_pending: { formula: `SUM(G2:G${last})` },
+        fee: { formula: `SUM(H2:H${last})` },
+        total_pay: { formula: `SUM(J2:J${last})` },
+        total_all: { formula: `SUM(K2:K${last})` },
+      });
+      totalRow.font = { bold: true };
+    }
+
+    const buf = await wb.xlsx.writeBuffer();
+    const base64 = Buffer.from(buf as ArrayBuffer).toString("base64");
+    const date = new Date().toISOString().slice(0, 10);
+    return { filename: `financeiro-staff-${date}.xlsx`, base64 };
+  });
