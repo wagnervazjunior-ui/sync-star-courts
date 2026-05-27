@@ -335,6 +335,10 @@ function AdminStaffs() {
               </SelectContent>
             </Select>
           </div>
+          <Button onClick={handleExport} disabled={exporting} variant="secondary">
+            {exporting ? <Loader2 className="size-4 animate-spin" /> : <FileText className="size-4" />}
+            Baixar Excel
+          </Button>
         </div>
       </Card>
 
