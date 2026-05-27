@@ -17,7 +17,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import {
   Plus, Pencil, Trash2, ArrowLeft, ExternalLink, AlertTriangle, Users, ClipboardList, Shield,
-  Upload, X, Loader2, Settings, BarChart3, FileSpreadsheet, ListChecks, Download, CheckCircle2, XCircle, UserPlus,
+  Upload, X, Loader2, Settings, BarChart3, FileSpreadsheet, ListChecks, Download, CheckCircle2, XCircle, UserPlus, Wallet, FileText, Copy,
 } from "lucide-react";
 import { generateGateListWorkbook } from "@/lib/gate-list-export";
 import { generateUniformWorkbook } from "@/lib/uniform-export";
