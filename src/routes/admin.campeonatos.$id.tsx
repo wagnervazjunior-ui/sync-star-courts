@@ -22,6 +22,11 @@ import {
 import { generateGateListWorkbook } from "@/lib/gate-list-export";
 import { generateUniformWorkbook } from "@/lib/uniform-export";
 import { useAuth } from "@/hooks/useAuth";
+import { useServerFn } from "@tanstack/react-start";
+import {
+  adminListReimbursements, setReimbursementStatus, getReceiptSignedUrl,
+  adminListFees, setFeeStatus, getFeeReceiptSignedUrl, exportStaffFinanceXlsx,
+} from "@/lib/staff.functions";
 
 type TabKey = "configuracoes" | "dashboard" | "categorias" | "inscricoes" | "planilhas" | "staff" | "permissoes";
 
