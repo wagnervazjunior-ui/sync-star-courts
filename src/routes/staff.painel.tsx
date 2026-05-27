@@ -182,6 +182,32 @@ function StaffPanel() {
             </div>
           )}
         </Card>
+
+        {/* Fees / Cachês */}
+        <Card className="p-6 bg-gradient-card border-border/50">
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <Wallet className="size-5 text-primary" /> Cachês combinados
+            </h2>
+            <NewFeeDialog
+              championships={champs.data?.championships ?? []}
+              onSaved={() => qc.invalidateQueries({ queryKey: ["staff-fees"] })}
+            />
+          </div>
+          {fees.isLoading ? (
+            <p className="py-8 text-center text-muted-foreground"><Loader2 className="size-5 mx-auto animate-spin" /></p>
+          ) : (fees.data?.fees ?? []).length === 0 ? (
+            <p className="py-10 text-center text-sm text-muted-foreground">
+              Nenhum cachê lançado ainda.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {(fees.data!.fees as any[]).map((r) => (
+                <FeeRow key={r.id} r={r} />
+              ))}
+            </div>
+          )}
+        </Card>
       </main>
     </div>
   );
