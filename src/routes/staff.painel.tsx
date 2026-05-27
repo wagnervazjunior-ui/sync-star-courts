@@ -77,6 +77,12 @@ function StaffPanel() {
     queryFn: () => callChamp(),
     enabled: !!me.data?.staff,
   });
+  const callListFees = useServerFn(listMyFees);
+  const fees = useQuery({
+    queryKey: ["staff-fees"],
+    queryFn: () => callListFees(),
+    enabled: !!me.data?.staff,
+  });
   const reimbs = useQuery({
     queryKey: ["staff-reimbursements"],
     queryFn: () => callList(),
