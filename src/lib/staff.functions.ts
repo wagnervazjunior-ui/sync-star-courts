@@ -426,8 +426,8 @@ export const getMyReceiptSignedUrl = createServerFn({ method: "POST" })
 // ---------- Admin ----------
 export const listManageableChampionships = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .handler(async () => {
-    const { data, error } = await supabaseAdmin.rpc("list_manageable_championships");
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase.rpc("list_manageable_championships");
     if (error) throw new Error(error.message);
     return { championships: (data ?? []) as Array<{ id: string; name: string; start_date: string | null }> };
   });
