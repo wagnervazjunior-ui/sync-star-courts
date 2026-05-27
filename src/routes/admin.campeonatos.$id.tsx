@@ -17,7 +17,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import {
   Plus, Pencil, Trash2, ArrowLeft, ExternalLink, AlertTriangle, Users, ClipboardList, Shield,
-  Upload, X, Loader2, Settings, BarChart3, FileSpreadsheet, ListChecks, Download, CheckCircle2, XCircle, UserPlus, Wallet, FileText, Copy,
+  Upload, X, Loader2, Settings, BarChart3, FileSpreadsheet, ListChecks, Download, CheckCircle2, XCircle, UserPlus, Wallet, FileText, Copy, Network,
 } from "lucide-react";
 import { generateGateListWorkbook } from "@/lib/gate-list-export";
 import { generateUniformWorkbook } from "@/lib/uniform-export";
@@ -28,10 +28,10 @@ import {
   adminListFees, setFeeStatus, getFeeReceiptSignedUrl, exportStaffFinanceXlsx,
 } from "@/lib/staff.functions";
 
-type TabKey = "configuracoes" | "dashboard" | "categorias" | "inscricoes" | "planilhas" | "staff" | "permissoes";
+type TabKey = "configuracoes" | "dashboard" | "categorias" | "inscricoes" | "planilhas" | "staff" | "chaves" | "permissoes";
 
 const tabSchema = z.object({
-  tab: fallback(z.enum(["configuracoes", "dashboard", "categorias", "inscricoes", "planilhas", "staff", "permissoes"]), "configuracoes").default("configuracoes"),
+  tab: fallback(z.enum(["configuracoes", "dashboard", "categorias", "inscricoes", "planilhas", "staff", "chaves", "permissoes"]), "configuracoes").default("configuracoes"),
 });
 
 export const Route = createFileRoute("/admin/campeonatos/$id")({
@@ -92,6 +92,7 @@ function ChampionshipDetail() {
           <TabsTrigger value="inscricoes"><Users className="size-4 mr-1" /> Inscrições</TabsTrigger>
           <TabsTrigger value="planilhas"><FileSpreadsheet className="size-4 mr-1" /> Planilhas</TabsTrigger>
           <TabsTrigger value="staff"><Wallet className="size-4 mr-1" /> Staff</TabsTrigger>
+          <TabsTrigger value="chaves"><Network className="size-4 mr-1" /> Chaves</TabsTrigger>
           {isMaster && <TabsTrigger value="permissoes"><Shield className="size-4 mr-1" /> Permissões</TabsTrigger>}
         </TabsList>
 
@@ -103,6 +104,7 @@ function ChampionshipDetail() {
         <TabsContent value="inscricoes" className="mt-6"><InscricoesTab id={id} /></TabsContent>
         <TabsContent value="planilhas" className="mt-6"><PlanilhasTab id={id} championship={ch} /></TabsContent>
         <TabsContent value="staff" className="mt-6"><StaffTab id={id} /></TabsContent>
+        <TabsContent value="chaves" className="mt-6"><ChavesTab id={id} /></TabsContent>
         {isMaster && <TabsContent value="permissoes" className="mt-6"><PermissoesTab id={id} /></TabsContent>}
       </Tabs>
     </div>
