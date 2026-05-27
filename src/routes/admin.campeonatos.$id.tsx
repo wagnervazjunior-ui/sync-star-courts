@@ -23,10 +23,10 @@ import { generateGateListWorkbook } from "@/lib/gate-list-export";
 import { generateUniformWorkbook } from "@/lib/uniform-export";
 import { useAuth } from "@/hooks/useAuth";
 
-type TabKey = "configuracoes" | "dashboard" | "categorias" | "inscricoes" | "planilhas" | "permissoes";
+type TabKey = "configuracoes" | "dashboard" | "categorias" | "inscricoes" | "planilhas" | "staff" | "permissoes";
 
 const tabSchema = z.object({
-  tab: fallback(z.enum(["configuracoes", "dashboard", "categorias", "inscricoes", "planilhas", "permissoes"]), "configuracoes").default("configuracoes"),
+  tab: fallback(z.enum(["configuracoes", "dashboard", "categorias", "inscricoes", "planilhas", "staff", "permissoes"]), "configuracoes").default("configuracoes"),
 });
 
 export const Route = createFileRoute("/admin/campeonatos/$id")({
