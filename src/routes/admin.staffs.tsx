@@ -109,6 +109,7 @@ function AdminStaffs() {
 
   const [championship_id, setChampionshipId] = useState<string>("all");
   const [status, setStatus] = useState<string>("all");
+  const [staffSearch, setStaffSearch] = useState<string>("");
 
   const champs = useQuery({ queryKey: ["admin-manageable-champs"], queryFn: () => callChamps() });
   const invites = useQuery({ queryKey: ["admin-staff-invites"], queryFn: () => callInvites() });
