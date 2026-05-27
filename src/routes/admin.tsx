@@ -5,7 +5,7 @@ import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/integrations/supabase/client";
-import { LayoutDashboard, Trophy, ListChecks, LogOut, ArrowLeft, Shield, Users } from "lucide-react";
+import { LayoutDashboard, Trophy, ListChecks, LogOut, ArrowLeft, Shield, Users, Network } from "lucide-react";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({ meta: [{ title: "Admin — Open Sync" }] }),
@@ -47,6 +47,7 @@ function AdminLayout() {
           <NavItem to="/admin/inscricoes" icon={ListChecks} label="Inscrições" />
           {isMaster && <NavItem to="/admin/administradores" icon={Shield} label="Administradores" />}
           <NavItem to="/admin/staffs" icon={Users} label="Staffs" />
+          <NavItem to="/admin/chaves" icon={Network} label="Chaves" />
         </nav>
         <div className="mt-auto">
           <Separator className="mb-3" />
@@ -65,6 +66,7 @@ function AdminLayout() {
             <MobileNav to="/admin/inscricoes" icon={ListChecks} label="Insc." />
             {isMaster && <MobileNav to="/admin/administradores" icon={Shield} label="Admins" />}
             <MobileNav to="/admin/staffs" icon={Users} label="Staffs" />
+            <MobileNav to="/admin/chaves" icon={Network} label="Chaves" />
           </div>
         </div>
         <div className="p-6 md:p-8"><Outlet /></div>
