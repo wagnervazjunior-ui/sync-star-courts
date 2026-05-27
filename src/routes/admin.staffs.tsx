@@ -8,6 +8,7 @@ import {
   adminUpsertFee,
   createAdminReceiptUploadUrl,
   createOrRotateStaffInviteForChampionship,
+  exportStaffFinanceXlsx,
   getFeeReceiptSignedUrl,
   getReceiptSignedUrl,
   listManageableChampionships,
