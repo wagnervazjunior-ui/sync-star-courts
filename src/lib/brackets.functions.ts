@@ -446,3 +446,96 @@ export const deleteBracket = createServerFn({ method: "POST" })
     await supabaseAdmin.from("brackets").delete().eq("id", data.id);
     return { ok: true };
   });
+
+// ---------- UPDATE TEAM (substituir dados de uma dupla existente) ----------
+export const updateTeam = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z.object({
+      team_id: z.string().uuid(),
+      team_name: z.string().trim().max(120).optional().default(""),
+      athlete1_name: z.string().trim().min(1).max(120),
+      athlete2_name: z.string().trim().min(1).max(120),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: team } = await supabaseAdmin
+      .from("bracket_teams")
+      .select("*, bracket:brackets(championship_id)")
+      .eq("id", data.team_id)
+      .maybeSingle();
+    if (!team) throw new Error("NOT_FOUND");
+    await assertCanManage(context.userId, (team as any).bracket.championship_id);
+    const { error } = await supabaseAdmin
+      .from("bracket_teams")
+      .update({
+        team_name: data.team_name,
+        athlete1_name: data.athlete1_name,
+        athlete2_name: data.athlete2_name,
+      })
+      .eq("id", data.team_id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+// ---------- SWAP A ↔ B dentro da mesma partida ----------
+export const swapWithinMatch = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ match_id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { data: match } = await supabaseAdmin
+      .from("bracket_matches")
+      .select("*, bracket:brackets(championship_id)")
+      .eq("id", data.match_id)
+      .maybeSingle();
+    if (!match) throw new Error("NOT_FOUND");
+    await assertCanManage(context.userId, (match as any).bracket.championship_id);
+    if (match.winner_team_id) throw new Error("MATCH_ALREADY_PLAYED");
+    const { error } = await supabaseAdmin
+      .from("bracket_matches")
+      .update({ team_a_id: match.team_b_id, team_b_id: match.team_a_id })
+      .eq("id", match.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+// ---------- SWAP entre dois slots de partidas diferentes ----------
+// Só permitido em partidas sem resultado, e apenas em slots originados por seed
+// (não por winner_of/loser_of), para não corromper a propagação.
+export const swapMatchSlots = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z.object({
+      match_a_id: z.string().uuid(),
+      slot_a: z.enum(["a", "b"]),
+      match_b_id: z.string().uuid(),
+      slot_b: z.enum(["a", "b"]),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    if (data.match_a_id === data.match_b_id && data.slot_a === data.slot_b)
+      throw new Error("SAME_SLOT");
+    const { data: rows } = await supabaseAdmin
+      .from("bracket_matches")
+      .select("*, bracket:brackets(championship_id)")
+      .in("id", [data.match_a_id, data.match_b_id]);
+    const mA = rows?.find((r) => r.id === data.match_a_id);
+    const mB = rows?.find((r) => r.id === data.match_b_id);
+    if (!mA || !mB) throw new Error("NOT_FOUND");
+    await assertCanManage(context.userId, (mA as any).bracket.championship_id);
+    if (mA.winner_team_id || mB.winner_team_id) throw new Error("MATCH_ALREADY_PLAYED");
+    const srcA = data.slot_a === "a" ? (mA.source_a as any) : (mA.source_b as any);
+    const srcB = data.slot_b === "a" ? (mB.source_a as any) : (mB.source_b as any);
+    const isSeedOrigin = (s: any) => !s || s.type === "seed" || s.type === "bye";
+    if (!isSeedOrigin(srcA) || !isSeedOrigin(srcB))
+      throw new Error("SLOT_FROM_PROPAGATION");
+    const teamA = data.slot_a === "a" ? mA.team_a_id : mA.team_b_id;
+    const teamB = data.slot_b === "a" ? mB.team_a_id : mB.team_b_id;
+    const upd = async (m: any, slot: "a" | "b", newTeam: string | null) => {
+      const patch: any = slot === "a" ? { team_a_id: newTeam } : { team_b_id: newTeam };
+      await supabaseAdmin.from("bracket_matches").update(patch).eq("id", m.id);
+    };
+    await upd(mA, data.slot_a, teamB);
+    await upd(mB, data.slot_b, teamA);
+    return { ok: true };
+  });
