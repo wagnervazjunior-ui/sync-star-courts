@@ -5,10 +5,11 @@ import { useState } from "react";
 import { ArrowLeft, Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { getBracket, deleteBracket } from "@/lib/brackets.functions";
 import { BracketView } from "@/components/brackets/BracketView";
+import { StandingsTab } from "@/components/brackets/StandingsTab";
 import type { MatchCardData, TeamRef } from "@/components/brackets/MatchCard";
 
 export const Route = createFileRoute("/admin/chaves/$bracketId")({
@@ -78,31 +79,34 @@ function BracketDetail() {
         </Button>
       </div>
 
-      <Card className="p-4">
-        <h3 className="text-sm font-semibold mb-2">Duplas (seeds)</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-          {teams.map((t) => (
-            <div
-              key={t.id}
-              className="text-xs rounded border border-border/60 bg-background/40 px-2 py-1.5 flex items-center gap-2"
-            >
-              <Badge variant="outline" className="shrink-0">
-                #{t.seed}
-              </Badge>
-              <span className="truncate">
-                {t.team_name || `${t.athlete1_name} / ${t.athlete2_name}`}
-              </span>
-            </div>
-          ))}
-        </div>
-      </Card>
-
-      <BracketView
-        matches={matches}
-        teams={teams}
-        format={data.bracket.match_format as any}
-        onRefresh={refetch}
-      />
+      <Tabs defaultValue="initial" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="initial">Fase Inicial</TabsTrigger>
+          <TabsTrigger value="final">Fase Final</TabsTrigger>
+          <TabsTrigger value="standings">Classificação</TabsTrigger>
+        </TabsList>
+        <TabsContent value="initial">
+          <BracketView
+            matches={matches}
+            teams={teams}
+            format={data.bracket.match_format as any}
+            phase="initial"
+            onRefresh={refetch}
+          />
+        </TabsContent>
+        <TabsContent value="final">
+          <BracketView
+            matches={matches}
+            teams={teams}
+            format={data.bracket.match_format as any}
+            phase="final"
+            onRefresh={refetch}
+          />
+        </TabsContent>
+        <TabsContent value="standings">
+          <StandingsTab teams={teams} matches={matches} onSaved={refetch} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
