@@ -54,10 +54,11 @@ export function StandingsTab({
           else losses++;
         }
         let status: Row["status"] = "ativa";
-        if (team.final_rank === 1) status = "campea";
-        else if (team.final_rank === 2) status = "vice";
-        else if (team.final_rank === 3) status = "terceira";
-        else if (team.final_rank === 4) status = "quarta";
+        const rank = (team as any).final_rank;
+        if (rank === 1) status = "campea";
+        else if (rank === 2) status = "vice";
+        else if (rank === 3) status = "terceira";
+        else if (rank === 4) status = "quarta";
         else if (losses >= 2) status = "eliminada";
         return { team, wins, losses, status } as Row;
       })
