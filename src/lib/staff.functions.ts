@@ -29,6 +29,16 @@ const requireStaffAuth = createMiddleware({ type: "function" }).server(
   },
 );
 
+// Helper: assert admin can manage a championship (master OR creator OR co-admin)
+async function assertAdminCanManageChampionship(adminUserId: string, championshipId: string) {
+  const { data, error } = await supabaseAdmin.rpc("can_view_championship", {
+    _user_id: adminUserId,
+    _championship_id: championshipId,
+  });
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("CHAMPIONSHIP_NOT_ALLOWED");
+}
+
 // ---------- Schemas ----------
 const PixKeyType = z.enum(["cpf", "email", "phone", "random"]);
 
@@ -74,6 +84,7 @@ const RegisterSchema = z
 const LoginSchema = z.object({
   cpf: z.string().min(11).max(14),
   birthdate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  token: z.string().min(1).optional().nullable(),
 });
 
 const CreateReimbSchema = z.object({
@@ -85,28 +96,52 @@ const CreateReimbSchema = z.object({
   receipt_path: z.string().max(500).optional().nullable(),
 });
 
+const UpsertFeeSchema = z.object({
+  championship_id: z.string().uuid(),
+  amount_cents: z.number().int().positive().max(100_000_000),
+  description: z.string().trim().max(500).optional().nullable(),
+  receipt_path: z.string().max(500).optional().nullable(),
+});
+
+const AdminUpsertFeeSchema = UpsertFeeSchema.extend({
+  staff_id: z.string().uuid(),
+});
+
 // ---------- Public: invites ----------
 export const getInvite = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => z.object({ token: z.string().min(1) }).parse(input))
   .handler(async ({ data }) => {
     const { data: invite } = await supabaseAdmin
       .from("staff_invites")
-      .select("token, active, owner_admin_id")
+      .select("token, active, owner_admin_id, championship_id, championship:championships(id, name)")
       .eq("token", data.token)
       .maybeSingle();
-    if (!invite || !invite.active) return { ok: false as const };
-    return { ok: true as const };
+    if (!invite || !invite.active || !invite.championship_id) return { ok: false as const };
+    return {
+      ok: true as const,
+      championship: (invite as any).championship as { id: string; name: string } | null,
+    };
   });
+
+async function linkStaffChampionship(staffId: string, championshipId: string) {
+  await supabaseAdmin
+    .from("staff_championships")
+    .insert({ staff_id: staffId, championship_id: championshipId })
+    .select("id")
+    .maybeSingle()
+    .then(() => undefined)
+    .catch(() => undefined);
+}
 
 export const registerStaff = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => RegisterSchema.parse(input))
   .handler(async ({ data }) => {
     const { data: invite } = await supabaseAdmin
       .from("staff_invites")
-      .select("owner_admin_id, active")
+      .select("owner_admin_id, active, championship_id")
       .eq("token", data.token)
       .maybeSingle();
-    if (!invite || !invite.active) throw new Error("INVITE_INVALID");
+    if (!invite || !invite.active || !invite.championship_id) throw new Error("INVITE_INVALID");
 
     const cpf = normalizeCpf(data.cpf);
 
@@ -135,6 +170,8 @@ export const registerStaff = createServerFn({ method: "POST" })
       .single();
     if (error) throw new Error(error.message);
 
+    await linkStaffChampionship(inserted.id, invite.championship_id);
+
     // Create session immediately
     const token = newSessionToken();
     const expiresAt = sessionExpiry();
@@ -154,11 +191,28 @@ export const staffLogin = createServerFn({ method: "POST" })
     const cpf = normalizeCpf(data.cpf);
     const { data: staff } = await supabaseAdmin
       .from("staffs")
-      .select("id, birthdate")
+      .select("id, birthdate, owner_admin_id")
       .eq("cpf", cpf)
       .eq("birthdate", data.birthdate)
       .maybeSingle();
     if (!staff) throw new Error("INVALID_CREDENTIALS");
+
+    // If logging in via invite link, link this staff to the championship
+    if (data.token) {
+      const { data: invite } = await supabaseAdmin
+        .from("staff_invites")
+        .select("owner_admin_id, active, championship_id")
+        .eq("token", data.token)
+        .maybeSingle();
+      if (
+        invite &&
+        invite.active &&
+        invite.championship_id &&
+        invite.owner_admin_id === staff.owner_admin_id
+      ) {
+        await linkStaffChampionship(staff.id, invite.championship_id);
+      }
+    }
 
     const token = newSessionToken();
     const expiresAt = sessionExpiry();
@@ -205,12 +259,15 @@ export const listStaffChampionships = createServerFn({ method: "POST" })
   .middleware([requireStaffAuth])
   .handler(async ({ context }) => {
     const { data, error } = await supabaseAdmin
-      .from("championships")
-      .select("id, name, start_date, end_date")
-      .eq("created_by", context.staff.owner_admin_id)
-      .order("start_date", { ascending: false });
+      .from("staff_championships")
+      .select("championship:championships(id, name, start_date, end_date)")
+      .eq("staff_id", context.staff.id);
     if (error) throw new Error(error.message);
-    return { championships: data ?? [] };
+    const list = (data ?? [])
+      .map((r: any) => r.championship)
+      .filter(Boolean)
+      .sort((a: any, b: any) => (b.start_date ?? "").localeCompare(a.start_date ?? ""));
+    return { championships: list };
   });
 
 export const listMyReimbursements = createServerFn({ method: "POST" })
@@ -231,15 +288,14 @@ export const createReimbursement = createServerFn({ method: "POST" })
   .middleware([requireStaffAuth])
   .inputValidator((input: unknown) => CreateReimbSchema.parse(input))
   .handler(async ({ data, context }) => {
-    // Ensure championship belongs to staff's admin
-    const { data: ch } = await supabaseAdmin
-      .from("championships")
-      .select("id, created_by")
-      .eq("id", data.championship_id)
+    // Ensure the staff is linked to this championship
+    const { data: link } = await supabaseAdmin
+      .from("staff_championships")
+      .select("id")
+      .eq("staff_id", context.staff.id)
+      .eq("championship_id", data.championship_id)
       .maybeSingle();
-    if (!ch || ch.created_by !== context.staff.owner_admin_id) {
-      throw new Error("CHAMPIONSHIP_NOT_ALLOWED");
-    }
+    if (!link) throw new Error("CHAMPIONSHIP_NOT_ALLOWED");
 
     const { error } = await supabaseAdmin.from("staff_reimbursements").insert({
       staff_id: context.staff.id,
@@ -269,19 +325,135 @@ export const createReceiptUploadUrl = createServerFn({ method: "POST" })
     return { path, token: signed.token, signedUrl: signed.signedUrl };
   });
 
-// ---------- Admin ----------
-export const createOrRotateStaffInvite = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+// ---------- Staff fees (cachê) ----------
+export const listMyFees = createServerFn({ method: "POST" })
+  .middleware([requireStaffAuth])
   .handler(async ({ context }) => {
-    // Deactivate existing invites
+    const { data, error } = await supabaseAdmin
+      .from("staff_fees")
+      .select(
+        "id, amount_cents, description, receipt_path, status, paid_at, created_at, created_by_role, championship:championships(id, name)",
+      )
+      .eq("staff_id", context.staff.id)
+      .order("created_at", { ascending: false });
+    if (error) throw new Error(error.message);
+    return { fees: data ?? [] };
+  });
+
+export const upsertMyFee = createServerFn({ method: "POST" })
+  .middleware([requireStaffAuth])
+  .inputValidator((input: unknown) => UpsertFeeSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    const { data: link } = await supabaseAdmin
+      .from("staff_championships")
+      .select("id")
+      .eq("staff_id", context.staff.id)
+      .eq("championship_id", data.championship_id)
+      .maybeSingle();
+    if (!link) throw new Error("CHAMPIONSHIP_NOT_ALLOWED");
+
+    // If fee exists and is paid, refuse edits from staff
+    const { data: existing } = await supabaseAdmin
+      .from("staff_fees")
+      .select("id, status")
+      .eq("staff_id", context.staff.id)
+      .eq("championship_id", data.championship_id)
+      .maybeSingle();
+    if (existing && existing.status === "paid") throw new Error("FEE_LOCKED_PAID");
+
+    if (existing) {
+      const { error } = await supabaseAdmin
+        .from("staff_fees")
+        .update({
+          amount_cents: data.amount_cents,
+          description: data.description?.trim() ?? "",
+          receipt_path: data.receipt_path ?? null,
+        })
+        .eq("id", existing.id);
+      if (error) throw new Error(error.message);
+    } else {
+      const { error } = await supabaseAdmin.from("staff_fees").insert({
+        staff_id: context.staff.id,
+        championship_id: data.championship_id,
+        amount_cents: data.amount_cents,
+        description: data.description?.trim() ?? "",
+        receipt_path: data.receipt_path ?? null,
+        created_by_role: "staff",
+        created_by: context.staff.id,
+      });
+      if (error) {
+        if (String(error.message).includes("staff_fees_staff_id_championship_id_key"))
+          throw new Error("FEE_ALREADY_EXISTS");
+        throw new Error(error.message);
+      }
+    }
+    return { ok: true as const };
+  });
+
+export const getMyFeeReceiptSignedUrl = createServerFn({ method: "POST" })
+  .middleware([requireStaffAuth])
+  .inputValidator((input: unknown) => z.object({ fee_id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { data: row } = await supabaseAdmin
+      .from("staff_fees")
+      .select("receipt_path, staff_id")
+      .eq("id", data.fee_id)
+      .maybeSingle();
+    if (!row || row.staff_id !== context.staff.id) throw new Error("FORBIDDEN");
+    if (!row.receipt_path) return { url: null as string | null };
+    const { data: signed, error } = await supabaseAdmin.storage
+      .from("staff-receipts")
+      .createSignedUrl(row.receipt_path, 300);
+    if (error) throw new Error(error.message);
+    return { url: signed?.signedUrl ?? null };
+  });
+
+export const getMyReceiptSignedUrl = createServerFn({ method: "POST" })
+  .middleware([requireStaffAuth])
+  .inputValidator((input: unknown) => z.object({ reimbursement_id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { data: row } = await supabaseAdmin
+      .from("staff_reimbursements")
+      .select("receipt_path, staff_id")
+      .eq("id", data.reimbursement_id)
+      .maybeSingle();
+    if (!row || row.staff_id !== context.staff.id) throw new Error("FORBIDDEN");
+    if (!row.receipt_path) return { url: null as string | null };
+    const { data: signed, error } = await supabaseAdmin.storage
+      .from("staff-receipts")
+      .createSignedUrl(row.receipt_path, 300);
+    if (error) throw new Error(error.message);
+    return { url: signed?.signedUrl ?? null };
+  });
+
+// ---------- Admin ----------
+export const listManageableChampionships = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async () => {
+    const { data, error } = await supabaseAdmin.rpc("list_manageable_championships");
+    if (error) throw new Error(error.message);
+    return { championships: (data ?? []) as Array<{ id: string; name: string; start_date: string | null }> };
+  });
+
+export const createOrRotateStaffInviteForChampionship = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ championship_id: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdminCanManageChampionship(context.userId, data.championship_id);
+
+    // Deactivate existing invites for this admin+championship
     await supabaseAdmin
       .from("staff_invites")
       .update({ active: false })
-      .eq("owner_admin_id", context.userId);
+      .eq("owner_admin_id", context.userId)
+      .eq("championship_id", data.championship_id);
 
     const slug = newSessionToken().slice(0, 20);
     const { error } = await supabaseAdmin.from("staff_invites").insert({
       owner_admin_id: context.userId,
+      championship_id: data.championship_id,
       token: slug,
       active: true,
     });
@@ -289,18 +461,18 @@ export const createOrRotateStaffInvite = createServerFn({ method: "POST" })
     return { token: slug };
   });
 
-export const getStaffInvite = createServerFn({ method: "POST" })
+export const listStaffInvites = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { data } = await supabaseAdmin
+    const { data, error } = await supabaseAdmin
       .from("staff_invites")
-      .select("token, created_at")
+      .select("token, championship_id, created_at")
       .eq("owner_admin_id", context.userId)
       .eq("active", true)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    return { invite: data };
+      .not("championship_id", "is", null)
+      .order("created_at", { ascending: false });
+    if (error) throw new Error(error.message);
+    return { invites: data ?? [] };
   });
 
 export const listMyStaffs = createServerFn({ method: "POST" })
@@ -324,7 +496,6 @@ export const adminListReimbursements = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => ListReimbInput.parse(input ?? {}))
   .handler(async ({ data, context }) => {
-    // Build subquery: only championships of this admin
     let query = supabaseAdmin
       .from("staff_reimbursements")
       .select(
@@ -352,7 +523,6 @@ export const setReimbursementStatus = createServerFn({ method: "POST" })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
-    // Verify ownership: staff must belong to this admin
     const { data: row } = await supabaseAdmin
       .from("staff_reimbursements")
       .select("id, staff:staffs!inner(owner_admin_id)")
@@ -392,20 +562,146 @@ export const getReceiptSignedUrl = createServerFn({ method: "POST" })
     return { url: signed?.signedUrl ?? null };
   });
 
-export const getMyReceiptSignedUrl = createServerFn({ method: "POST" })
-  .middleware([requireStaffAuth])
-  .inputValidator((input: unknown) => z.object({ reimbursement_id: z.string().uuid() }).parse(input))
+// ---------- Admin: fees ----------
+const AdminListFeesInput = z.object({
+  championship_id: z.string().uuid().optional().nullable(),
+  status: z.enum(["pending", "paid"]).optional().nullable(),
+});
+
+export const adminListFees = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => AdminListFeesInput.parse(input ?? {}))
+  .handler(async ({ data, context }) => {
+    let query = supabaseAdmin
+      .from("staff_fees")
+      .select(
+        "id, amount_cents, description, receipt_path, status, paid_at, created_at, created_by_role, " +
+          "staff:staffs!inner(id, name, cpf, pix_key_type, pix_key, owner_admin_id), " +
+          "championship:championships!inner(id, name, created_by)",
+      )
+      .eq("staff.owner_admin_id", context.userId)
+      .order("created_at", { ascending: false });
+
+    if (data.championship_id) query = query.eq("championship_id", data.championship_id);
+    if (data.status) query = query.eq("status", data.status);
+
+    const { data: rows, error } = await query;
+    if (error) throw new Error(error.message);
+    return { fees: rows ?? [] };
+  });
+
+export const adminUpsertFee = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => AdminUpsertFeeSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    await assertAdminCanManageChampionship(context.userId, data.championship_id);
+
+    // Ensure staff belongs to this admin
+    const { data: staff } = await supabaseAdmin
+      .from("staffs")
+      .select("id, owner_admin_id")
+      .eq("id", data.staff_id)
+      .maybeSingle();
+    if (!staff || staff.owner_admin_id !== context.userId) throw new Error("FORBIDDEN");
+
+    // Auto-link staff to championship
+    await linkStaffChampionship(staff.id, data.championship_id);
+
+    const { data: existing } = await supabaseAdmin
+      .from("staff_fees")
+      .select("id")
+      .eq("staff_id", data.staff_id)
+      .eq("championship_id", data.championship_id)
+      .maybeSingle();
+
+    if (existing) {
+      const { error } = await supabaseAdmin
+        .from("staff_fees")
+        .update({
+          amount_cents: data.amount_cents,
+          description: data.description?.trim() ?? "",
+          receipt_path: data.receipt_path ?? null,
+        })
+        .eq("id", existing.id);
+      if (error) throw new Error(error.message);
+    } else {
+      const { error } = await supabaseAdmin.from("staff_fees").insert({
+        staff_id: data.staff_id,
+        championship_id: data.championship_id,
+        amount_cents: data.amount_cents,
+        description: data.description?.trim() ?? "",
+        receipt_path: data.receipt_path ?? null,
+        created_by_role: "admin",
+        created_by: context.userId,
+      });
+      if (error) throw new Error(error.message);
+    }
+    return { ok: true as const };
+  });
+
+export const setFeeStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ id: z.string().uuid(), status: z.enum(["pending", "paid"]) }).parse(input),
+  )
   .handler(async ({ data, context }) => {
     const { data: row } = await supabaseAdmin
-      .from("staff_reimbursements")
-      .select("receipt_path, staff_id")
-      .eq("id", data.reimbursement_id)
+      .from("staff_fees")
+      .select("id, staff:staffs!inner(owner_admin_id)")
+      .eq("id", data.id)
       .maybeSingle();
-    if (!row || row.staff_id !== context.staff.id) throw new Error("FORBIDDEN");
+    const owner = (row as any)?.staff?.owner_admin_id;
+    if (!row || owner !== context.userId) throw new Error("FORBIDDEN");
+
+    const { error } = await supabaseAdmin
+      .from("staff_fees")
+      .update({
+        status: data.status,
+        paid_at: data.status === "paid" ? new Date().toISOString() : null,
+        paid_by: data.status === "paid" ? context.userId : null,
+      })
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true as const };
+  });
+
+export const getFeeReceiptSignedUrl = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ fee_id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { data: row } = await supabaseAdmin
+      .from("staff_fees")
+      .select("receipt_path, staff:staffs!inner(owner_admin_id)")
+      .eq("id", data.fee_id)
+      .maybeSingle();
+    const owner = (row as any)?.staff?.owner_admin_id;
+    if (!row || owner !== context.userId) throw new Error("FORBIDDEN");
     if (!row.receipt_path) return { url: null as string | null };
     const { data: signed, error } = await supabaseAdmin.storage
       .from("staff-receipts")
       .createSignedUrl(row.receipt_path, 300);
     if (error) throw new Error(error.message);
     return { url: signed?.signedUrl ?? null };
+  });
+
+export const createAdminReceiptUploadUrl = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ filename: z.string().min(1).max(200), staff_id: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: staff } = await supabaseAdmin
+      .from("staffs")
+      .select("id, owner_admin_id")
+      .eq("id", data.staff_id)
+      .maybeSingle();
+    if (!staff || staff.owner_admin_id !== context.userId) throw new Error("FORBIDDEN");
+
+    const safe = data.filename.replace(/[^\w.\-]/g, "_").slice(-100);
+    const path = `${context.userId}/${staff.id}/${crypto.randomUUID()}_${safe}`;
+    const { data: signed, error } = await supabaseAdmin.storage
+      .from("staff-receipts")
+      .createSignedUploadUrl(path);
+    if (error || !signed) throw new Error(error?.message || "Falha ao gerar URL de upload");
+    return { path, token: signed.token, signedUrl: signed.signedUrl };
   });
