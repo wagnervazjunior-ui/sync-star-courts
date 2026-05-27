@@ -8,6 +8,7 @@ import {
   adminUpsertFee,
   createAdminReceiptUploadUrl,
   createOrRotateStaffInviteForChampionship,
+  exportStaffFinanceXlsx,
   getFeeReceiptSignedUrl,
   getReceiptSignedUrl,
   listManageableChampionships,
@@ -75,6 +76,36 @@ function AdminStaffs() {
   const callFees = useServerFn(adminListFees);
   const callFeeStatus = useServerFn(setFeeStatus);
   const callFeeReceipt = useServerFn(getFeeReceiptSignedUrl);
+  const callExport = useServerFn(exportStaffFinanceXlsx);
+  const [exporting, setExporting] = useState(false);
+
+  async function handleExport() {
+    try {
+      setExporting(true);
+      const res = await callExport({
+        data: { championship_id: championship_id === "all" ? null : championship_id },
+      });
+      const bin = atob(res.base64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const blob = new Blob([bytes], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = res.filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast.success("Planilha gerada");
+    } catch (e: any) {
+      toast.error(e?.message || "Falha ao gerar planilha");
+    } finally {
+      setExporting(false);
+    }
+  }
 
   const [championship_id, setChampionshipId] = useState<string>("all");
   const [status, setStatus] = useState<string>("all");
@@ -304,6 +335,10 @@ function AdminStaffs() {
               </SelectContent>
             </Select>
           </div>
+          <Button onClick={handleExport} disabled={exporting} variant="secondary">
+            {exporting ? <Loader2 className="size-4 animate-spin" /> : <FileText className="size-4" />}
+            Baixar Excel
+          </Button>
         </div>
       </Card>
 
