@@ -232,7 +232,7 @@ function AdminStaffDetail() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os campeonatos</SelectItem>
-                {(champs.data?.championships ?? champs.data ?? []).map((c: any) => (
+                {(((champs.data as any)?.championships ?? (champs.data as any) ?? []) as any[]).map((c: any) => (
                   <SelectItem key={c.id} value={c.id}>
                     {c.name}
                   </SelectItem>
