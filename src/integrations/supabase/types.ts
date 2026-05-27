@@ -35,6 +35,181 @@ export type Database = {
         }
         Relationships: []
       }
+      bracket_matches: {
+        Row: {
+          bracket_id: string
+          bye: boolean
+          created_at: string
+          id: string
+          phase: Database["public"]["Enums"]["bracket_match_phase"]
+          played_at: string | null
+          position: number
+          round: number
+          sets: Json
+          source_a: Json | null
+          source_b: Json | null
+          team_a_id: string | null
+          team_b_id: string | null
+          updated_at: string
+          winner_team_id: string | null
+        }
+        Insert: {
+          bracket_id: string
+          bye?: boolean
+          created_at?: string
+          id?: string
+          phase: Database["public"]["Enums"]["bracket_match_phase"]
+          played_at?: string | null
+          position: number
+          round: number
+          sets?: Json
+          source_a?: Json | null
+          source_b?: Json | null
+          team_a_id?: string | null
+          team_b_id?: string | null
+          updated_at?: string
+          winner_team_id?: string | null
+        }
+        Update: {
+          bracket_id?: string
+          bye?: boolean
+          created_at?: string
+          id?: string
+          phase?: Database["public"]["Enums"]["bracket_match_phase"]
+          played_at?: string | null
+          position?: number
+          round?: number
+          sets?: Json
+          source_a?: Json | null
+          source_b?: Json | null
+          team_a_id?: string | null
+          team_b_id?: string | null
+          updated_at?: string
+          winner_team_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bracket_matches_bracket_id_fkey"
+            columns: ["bracket_id"]
+            isOneToOne: false
+            referencedRelation: "brackets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bracket_matches_team_a_id_fkey"
+            columns: ["team_a_id"]
+            isOneToOne: false
+            referencedRelation: "bracket_teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bracket_matches_team_b_id_fkey"
+            columns: ["team_b_id"]
+            isOneToOne: false
+            referencedRelation: "bracket_teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bracket_matches_winner_team_id_fkey"
+            columns: ["winner_team_id"]
+            isOneToOne: false
+            referencedRelation: "bracket_teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bracket_teams: {
+        Row: {
+          athlete1_name: string
+          athlete2_name: string
+          bracket_id: string
+          created_at: string
+          eliminated: boolean
+          final_rank: number | null
+          id: string
+          registration_id: string | null
+          seed: number
+          team_name: string
+        }
+        Insert: {
+          athlete1_name?: string
+          athlete2_name?: string
+          bracket_id: string
+          created_at?: string
+          eliminated?: boolean
+          final_rank?: number | null
+          id?: string
+          registration_id?: string | null
+          seed: number
+          team_name?: string
+        }
+        Update: {
+          athlete1_name?: string
+          athlete2_name?: string
+          bracket_id?: string
+          created_at?: string
+          eliminated?: boolean
+          final_rank?: number | null
+          id?: string
+          registration_id?: string | null
+          seed?: number
+          team_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bracket_teams_bracket_id_fkey"
+            columns: ["bracket_id"]
+            isOneToOne: false
+            referencedRelation: "brackets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      brackets: {
+        Row: {
+          category_id: string
+          championship_id: string
+          created_at: string
+          created_by: string | null
+          current_phase: Database["public"]["Enums"]["bracket_phase"]
+          id: string
+          match_format: Database["public"]["Enums"]["bracket_match_format"]
+          name: string
+          status: Database["public"]["Enums"]["bracket_status"]
+          target_score: number
+          tiebreak_points: number
+          updated_at: string
+        }
+        Insert: {
+          category_id: string
+          championship_id: string
+          created_at?: string
+          created_by?: string | null
+          current_phase?: Database["public"]["Enums"]["bracket_phase"]
+          id?: string
+          match_format?: Database["public"]["Enums"]["bracket_match_format"]
+          name?: string
+          status?: Database["public"]["Enums"]["bracket_status"]
+          target_score?: number
+          tiebreak_points?: number
+          updated_at?: string
+        }
+        Update: {
+          category_id?: string
+          championship_id?: string
+          created_at?: string
+          created_by?: string | null
+          current_phase?: Database["public"]["Enums"]["bracket_phase"]
+          id?: string
+          match_format?: Database["public"]["Enums"]["bracket_match_format"]
+          name?: string
+          status?: Database["public"]["Enums"]["bracket_status"]
+          target_score?: number
+          tiebreak_points?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       categories: {
         Row: {
           active: boolean
@@ -735,6 +910,10 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "master"
+      bracket_match_format: "single_set" | "best_of_3_tiebreak"
+      bracket_match_phase: "WB" | "LB" | "SEMI" | "FINAL" | "THIRD"
+      bracket_phase: "double_elim" | "final_four"
+      bracket_status: "draft" | "live" | "finished"
       category_gender: "male" | "female" | "mixed"
       fee_creator_role: "staff" | "admin"
       fee_status: "pending" | "paid"
@@ -877,6 +1056,10 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "master"],
+      bracket_match_format: ["single_set", "best_of_3_tiebreak"],
+      bracket_match_phase: ["WB", "LB", "SEMI", "FINAL", "THIRD"],
+      bracket_phase: ["double_elim", "final_four"],
+      bracket_status: ["draft", "live", "finished"],
       category_gender: ["male", "female", "mixed"],
       fee_creator_role: ["staff", "admin"],
       fee_status: ["pending", "paid"],
