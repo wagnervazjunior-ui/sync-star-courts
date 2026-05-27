@@ -86,6 +86,7 @@ function ChampionshipDetail() {
           <TabsTrigger value="categorias"><ListChecks className="size-4 mr-1" /> Categorias</TabsTrigger>
           <TabsTrigger value="inscricoes"><Users className="size-4 mr-1" /> Inscrições</TabsTrigger>
           <TabsTrigger value="planilhas"><FileSpreadsheet className="size-4 mr-1" /> Planilhas</TabsTrigger>
+          <TabsTrigger value="staff"><Wallet className="size-4 mr-1" /> Staff</TabsTrigger>
           {isMaster && <TabsTrigger value="permissoes"><Shield className="size-4 mr-1" /> Permissões</TabsTrigger>}
         </TabsList>
 
@@ -96,6 +97,7 @@ function ChampionshipDetail() {
         <TabsContent value="categorias" className="mt-6"><CategoriesTab id={id} championship={ch} /></TabsContent>
         <TabsContent value="inscricoes" className="mt-6"><InscricoesTab id={id} /></TabsContent>
         <TabsContent value="planilhas" className="mt-6"><PlanilhasTab id={id} championship={ch} /></TabsContent>
+        <TabsContent value="staff" className="mt-6"><StaffTab id={id} /></TabsContent>
         {isMaster && <TabsContent value="permissoes" className="mt-6"><PermissoesTab id={id} /></TabsContent>}
       </Tabs>
     </div>
