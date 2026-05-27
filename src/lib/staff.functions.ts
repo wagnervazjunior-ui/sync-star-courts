@@ -720,10 +720,9 @@ export const exportStaffFinanceXlsx = createServerFn({ method: "POST" })
       .select(
         "amount_cents, status, staff_id, championship_id, " +
           "staff:staffs!inner(id, name, cpf, pix_key_type, pix_key, owner_admin_id), " +
-          "championship:championships!inner(id, name, created_by)",
+          "championship:championships(id, name)",
       )
-      .eq("staff.owner_admin_id", context.userId)
-      .eq("championship.created_by", context.userId);
+      .eq("staff.owner_admin_id", context.userId);
     if (data.championship_id) rq = rq.eq("championship_id", data.championship_id);
     const { data: reimbs, error: e1 } = await rq;
     if (e1) throw new Error(e1.message);
@@ -734,13 +733,13 @@ export const exportStaffFinanceXlsx = createServerFn({ method: "POST" })
       .select(
         "amount_cents, status, staff_id, championship_id, " +
           "staff:staffs!inner(id, name, cpf, pix_key_type, pix_key, owner_admin_id), " +
-          "championship:championships!inner(id, name, created_by)",
+          "championship:championships(id, name)",
       )
-      .eq("staff.owner_admin_id", context.userId)
-      .eq("championship.created_by", context.userId);
+      .eq("staff.owner_admin_id", context.userId);
     if (data.championship_id) fq = fq.eq("championship_id", data.championship_id);
     const { data: fees, error: e2 } = await fq;
     if (e2) throw new Error(e2.message);
+
 
     type Row = {
       staff_id: string;
