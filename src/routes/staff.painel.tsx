@@ -6,11 +6,14 @@ import {
   createReceiptUploadUrl,
   createReimbursement,
   getStaffMe,
+  listMyFees,
   listMyReimbursements,
   listStaffChampionships,
   staffLogout,
   updateStaffPix,
+  upsertMyFee,
   getMyReceiptSignedUrl,
+  getMyFeeReceiptSignedUrl,
 } from "@/lib/staff.functions";
 import { Logo } from "@/components/Logo";
 import { Card } from "@/components/ui/card";
@@ -72,6 +75,12 @@ function StaffPanel() {
   const champs = useQuery({
     queryKey: ["staff-championships"],
     queryFn: () => callChamp(),
+    enabled: !!me.data?.staff,
+  });
+  const callListFees = useServerFn(listMyFees);
+  const fees = useQuery({
+    queryKey: ["staff-fees"],
+    queryFn: () => callListFees(),
     enabled: !!me.data?.staff,
   });
   const reimbs = useQuery({
@@ -169,6 +178,32 @@ function StaffPanel() {
             <div className="space-y-2">
               {(reimbs.data!.reimbursements as any[]).map((r) => (
                 <ReimbursementRow key={r.id} r={r} />
+              ))}
+            </div>
+          )}
+        </Card>
+
+        {/* Fees / Cachês */}
+        <Card className="p-6 bg-gradient-card border-border/50">
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <Wallet className="size-5 text-primary" /> Cachês combinados
+            </h2>
+            <NewFeeDialog
+              championships={champs.data?.championships ?? []}
+              onSaved={() => qc.invalidateQueries({ queryKey: ["staff-fees"] })}
+            />
+          </div>
+          {fees.isLoading ? (
+            <p className="py-8 text-center text-muted-foreground"><Loader2 className="size-5 mx-auto animate-spin" /></p>
+          ) : (fees.data?.fees ?? []).length === 0 ? (
+            <p className="py-10 text-center text-sm text-muted-foreground">
+              Nenhum cachê lançado ainda.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {(fees.data!.fees as any[]).map((r) => (
+                <FeeRow key={r.id} r={r} />
               ))}
             </div>
           )}
@@ -407,6 +442,128 @@ function NewReimbursementDialog({
           <Button variant="hero" className="w-full" onClick={submit} disabled={saving}>
             {saving ? <Loader2 className="size-4 animate-spin mr-2" /> : <Wallet className="size-4 mr-2" />}
             Lançar reembolso
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function FeeRow({ r }: { r: any }) {
+  const callReceipt = useServerFn(getMyFeeReceiptSignedUrl);
+  const openReceipt = async () => {
+    const { url } = await callReceipt({ data: { fee_id: r.id } });
+    if (url) window.open(url, "_blank");
+    else toast.error("Anexo indisponível");
+  };
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-border/50 p-3">
+      <div className="min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Badge variant={r.status === "paid" ? "default" : "secondary"}>
+            {r.status === "paid" ? "Pago" : "Pendente"}
+          </Badge>
+          <span className="text-xs text-muted-foreground">{r.championship?.name}</span>
+        </div>
+        {r.description && <p className="mt-1 text-sm truncate">{r.description}</p>}
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        {r.receipt_path && (
+          <Button size="sm" variant="ghost" onClick={openReceipt} title="Ver anexo">
+            <FileText className="size-4" />
+          </Button>
+        )}
+        <p className="font-semibold">{brl(r.amount_cents)}</p>
+      </div>
+    </div>
+  );
+}
+
+function NewFeeDialog({
+  championships,
+  onSaved,
+}: {
+  championships: { id: string; name: string }[];
+  onSaved: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [championship_id, setChampionshipId] = useState("");
+  const [amount, setAmount] = useState("");
+  const [description, setDescription] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const callUpload = useServerFn(createReceiptUploadUrl);
+  const callUpsert = useServerFn(upsertMyFee);
+
+  const submit = async () => {
+    if (!championship_id) { toast.error("Selecione o campeonato"); return; }
+    const cents = Math.round(parseFloat(amount.replace(",", ".")) * 100);
+    if (!cents || cents <= 0) { toast.error("Valor inválido"); return; }
+    setSaving(true);
+    try {
+      let receipt_path: string | null = null;
+      if (file) {
+        const up = await callUpload({ data: { filename: file.name } });
+        const putRes = await fetch(up.signedUrl, {
+          method: "PUT",
+          headers: { "Content-Type": file.type || "application/octet-stream" },
+          body: file,
+        });
+        if (!putRes.ok) throw new Error("Falha no upload");
+        receipt_path = up.path;
+      }
+      await callUpsert({
+        data: { championship_id, amount_cents: cents, description, receipt_path },
+      });
+      toast.success("Cachê registrado");
+      setChampionshipId(""); setAmount(""); setDescription(""); setFile(null);
+      setOpen(false);
+      onSaved();
+    } catch (e: any) {
+      const m = e?.message ?? "";
+      if (m.includes("FEE_LOCKED_PAID")) toast.error("Cachê já marcado como pago — peça ao admin para reabrir.");
+      else if (m.includes("CHAMPIONSHIP_NOT_ALLOWED")) toast.error("Campeonato não autorizado para você.");
+      else toast.error("Erro ao salvar");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="hero" size="sm"><Plus className="size-4" /> Registrar cachê</Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Cachê combinado para a etapa</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label>Campeonato</Label>
+            <Select value={championship_id} onValueChange={setChampionshipId}>
+              <SelectTrigger><SelectValue placeholder="Selecione o campeonato" /></SelectTrigger>
+              <SelectContent>
+                {championships.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Valor combinado (R$)</Label>
+            <Input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0,00" inputMode="decimal" />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Descrição/observação (opcional)</Label>
+            <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Ex.: cachê de arbitragem combinado com o organizador" />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Anexo — comprovante/contrato (opcional)</Label>
+            <Input type="file" accept="image/*,application/pdf" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+          </div>
+          <Button variant="hero" className="w-full" onClick={submit} disabled={saving}>
+            {saving ? <Loader2 className="size-4 animate-spin mr-2" /> : <Wallet className="size-4 mr-2" />}
+            Salvar cachê
           </Button>
         </div>
       </DialogContent>

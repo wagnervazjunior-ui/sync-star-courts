@@ -305,9 +305,79 @@ export type Database = {
           },
         ]
       }
+      staff_championships: {
+        Row: {
+          championship_id: string
+          created_at: string
+          id: string
+          staff_id: string
+        }
+        Insert: {
+          championship_id: string
+          created_at?: string
+          id?: string
+          staff_id: string
+        }
+        Update: {
+          championship_id?: string
+          created_at?: string
+          id?: string
+          staff_id?: string
+        }
+        Relationships: []
+      }
+      staff_fees: {
+        Row: {
+          amount_cents: number
+          championship_id: string
+          created_at: string
+          created_by: string | null
+          created_by_role: Database["public"]["Enums"]["fee_creator_role"]
+          description: string
+          id: string
+          paid_at: string | null
+          paid_by: string | null
+          receipt_path: string | null
+          staff_id: string
+          status: Database["public"]["Enums"]["fee_status"]
+          updated_at: string
+        }
+        Insert: {
+          amount_cents: number
+          championship_id: string
+          created_at?: string
+          created_by?: string | null
+          created_by_role: Database["public"]["Enums"]["fee_creator_role"]
+          description?: string
+          id?: string
+          paid_at?: string | null
+          paid_by?: string | null
+          receipt_path?: string | null
+          staff_id: string
+          status?: Database["public"]["Enums"]["fee_status"]
+          updated_at?: string
+        }
+        Update: {
+          amount_cents?: number
+          championship_id?: string
+          created_at?: string
+          created_by?: string | null
+          created_by_role?: Database["public"]["Enums"]["fee_creator_role"]
+          description?: string
+          id?: string
+          paid_at?: string | null
+          paid_by?: string | null
+          receipt_path?: string | null
+          staff_id?: string
+          status?: Database["public"]["Enums"]["fee_status"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       staff_invites: {
         Row: {
           active: boolean
+          championship_id: string | null
           created_at: string
           id: string
           owner_admin_id: string
@@ -315,6 +385,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          championship_id?: string | null
           created_at?: string
           id?: string
           owner_admin_id: string
@@ -322,6 +393,7 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          championship_id?: string | null
           created_at?: string
           id?: string
           owner_admin_id?: string
@@ -626,6 +698,8 @@ export type Database = {
     Enums: {
       app_role: "admin" | "master"
       category_gender: "male" | "female" | "mixed"
+      fee_creator_role: "staff" | "admin"
+      fee_status: "pending" | "paid"
       pix_key_type: "cpf" | "email" | "phone" | "random"
       registration_status: "pending" | "confirmed" | "cancelled" | "processing"
       reimbursement_category:
@@ -766,6 +840,8 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "master"],
       category_gender: ["male", "female", "mixed"],
+      fee_creator_role: ["staff", "admin"],
+      fee_status: ["pending", "paid"],
       pix_key_type: ["cpf", "email", "phone", "random"],
       registration_status: ["pending", "confirmed", "cancelled", "processing"],
       reimbursement_category: [
