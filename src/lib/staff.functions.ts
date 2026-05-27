@@ -90,7 +90,7 @@ const LoginSchema = z.object({
 const CreateReimbSchema = z.object({
   championship_id: z.string().uuid(),
   category: z.enum(["alimentacao", "transporte", "passagem", "gasolina", "hospedagem", "outro"]),
-  description: z.string().trim().min(1).max(500),
+  description: z.string().trim().max(500).optional().nullable(),
   amount_cents: z.number().int().positive().max(100_000_000),
   expense_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   receipt_path: z.string().max(500).optional().nullable(),
