@@ -124,13 +124,10 @@ export const getInvite = createServerFn({ method: "POST" })
   });
 
 async function linkStaffChampionship(staffId: string, championshipId: string) {
+  // Ignore unique-violation errors; vínculo é idempotente
   await supabaseAdmin
     .from("staff_championships")
-    .insert({ staff_id: staffId, championship_id: championshipId })
-    .select("id")
-    .maybeSingle()
-    .then(() => undefined)
-    .catch(() => undefined);
+    .insert({ staff_id: staffId, championship_id: championshipId });
 }
 
 export const registerStaff = createServerFn({ method: "POST" })
