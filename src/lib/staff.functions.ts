@@ -578,6 +578,7 @@ export const getReceiptSignedUrl = createServerFn({ method: "POST" })
 const AdminListFeesInput = z.object({
   championship_id: z.string().uuid().optional().nullable(),
   status: z.enum(["pending", "paid"]).optional().nullable(),
+  staff_id: z.string().uuid().optional().nullable(),
 });
 
 export const adminListFees = createServerFn({ method: "POST" })
@@ -596,6 +597,7 @@ export const adminListFees = createServerFn({ method: "POST" })
 
     if (data.championship_id) query = query.eq("championship_id", data.championship_id);
     if (data.status) query = query.eq("status", data.status);
+    if (data.staff_id) query = query.eq("staff_id", data.staff_id);
 
     const { data: rows, error } = await query;
     if (error) throw new Error(error.message);
