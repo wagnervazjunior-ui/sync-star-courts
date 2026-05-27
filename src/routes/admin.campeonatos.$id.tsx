@@ -27,6 +27,8 @@ import {
   adminListReimbursements, setReimbursementStatus, getReceiptSignedUrl,
   adminListFees, setFeeStatus, getFeeReceiptSignedUrl, exportStaffFinanceXlsx,
 } from "@/lib/staff.functions";
+import { listBrackets } from "@/lib/brackets.functions";
+import { CreateBracketDialog } from "@/components/brackets/CreateBracketDialog";
 
 type TabKey = "configuracoes" | "dashboard" | "categorias" | "inscricoes" | "planilhas" | "staff" | "chaves" | "permissoes";
 
@@ -975,6 +977,46 @@ function StaffTab({ id }: { id: string }) {
           </div>
         )}
       </Card>
+    </div>
+  );
+}
+
+
+/* =================== CHAVES =================== */
+function ChavesTab({ id }: { id: string }) {
+  const callList = useServerFn(listBrackets);
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ["brackets-list-champ", id],
+    queryFn: () => callList({ data: { championship_id: id } }),
+  });
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-xl font-semibold">Chaves deste campeonato</h2>
+        <CreateBracketDialog defaultChampionshipId={id} onCreated={refetch} />
+      </div>
+      {isLoading ? (
+        <div className="flex items-center gap-2 text-muted-foreground"><Loader2 className="size-4 animate-spin" /> Carregando…</div>
+      ) : !data?.brackets.length ? (
+        <Card className="p-8 text-center text-muted-foreground">Nenhuma chave gerada. Clique em "Nova chave" acima.</Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {data.brackets.map((b: any) => {
+            const cat = data.categories.find((c: any) => c.id === b.category_id);
+            return (
+              <Link key={b.id} to="/admin/chaves/$bracketId" params={{ bracketId: b.id }} className="block">
+                <Card className="p-4 hover:border-primary/60 transition">
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className="font-semibold truncate">{b.name}</h3>
+                    <Badge variant={b.status === "finished" ? "default" : "secondary"}>{b.status === "finished" ? "Final" : "Live"}</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1 truncate">{cat?.name ?? "—"}</p>
+                </Card>
+              </Link>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
