@@ -6,11 +6,14 @@ import {
   createReceiptUploadUrl,
   createReimbursement,
   getStaffMe,
+  listMyFees,
   listMyReimbursements,
   listStaffChampionships,
   staffLogout,
   updateStaffPix,
+  upsertMyFee,
   getMyReceiptSignedUrl,
+  getMyFeeReceiptSignedUrl,
 } from "@/lib/staff.functions";
 import { Logo } from "@/components/Logo";
 import { Card } from "@/components/ui/card";
