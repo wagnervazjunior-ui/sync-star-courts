@@ -487,7 +487,22 @@ export const listMyStaffs = createServerFn({ method: "POST" })
 const ListReimbInput = z.object({
   championship_id: z.string().uuid().optional().nullable(),
   status: z.enum(["pending", "paid"]).optional().nullable(),
+  staff_id: z.string().uuid().optional().nullable(),
 });
+
+export const adminGetStaff = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ staff_id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { data: row, error } = await supabaseAdmin
+      .from("staffs")
+      .select("id, name, cpf, rg, birthdate, contact_email, contact_phone, pix_key_type, pix_key, owner_admin_id, created_at")
+      .eq("id", data.staff_id)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!row || row.owner_admin_id !== context.userId) throw new Error("FORBIDDEN");
+    return { staff: row };
+  });
 
 export const adminListReimbursements = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -498,14 +513,14 @@ export const adminListReimbursements = createServerFn({ method: "POST" })
       .select(
         "id, category, description, amount_cents, expense_date, receipt_path, status, paid_at, created_at, " +
           "staff:staffs!inner(id, name, cpf, pix_key_type, pix_key, owner_admin_id), " +
-          "championship:championships!inner(id, name, created_by)",
+          "championship:championships!inner(id, name)",
       )
       .eq("staff.owner_admin_id", context.userId)
-      .eq("championship.created_by", context.userId)
       .order("created_at", { ascending: false });
 
     if (data.championship_id) query = query.eq("championship_id", data.championship_id);
     if (data.status) query = query.eq("status", data.status);
+    if (data.staff_id) query = query.eq("staff_id", data.staff_id);
 
     const { data: rows, error } = await query;
     if (error) throw new Error(error.message);
