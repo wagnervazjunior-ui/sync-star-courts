@@ -777,15 +777,14 @@ export const exportStaffFinanceXlsx = createServerFn({ method: "POST" })
       return r;
     };
 
-    for (const r of reimbs ?? []) {
-      const row = ensure((r as any).staff, (r as any).championship);
+    for (const r of (reimbs ?? []) as any[]) {
+      const row = ensure(r.staff, r.championship);
       if (r.status === "paid") row.reimb_paid += r.amount_cents;
       else row.reimb_pending += r.amount_cents;
     }
-    for (const f of fees ?? []) {
-      const row = ensure((f as any).staff, (f as any).championship);
+    for (const f of (fees ?? []) as any[]) {
+      const row = ensure(f.staff, f.championship);
       row.fee += f.amount_cents;
-      // If any paid, mark paid; else pending
       if (f.status === "paid") row.fee_status = "paid";
       else if (!row.fee_status) row.fee_status = "pending";
     }
