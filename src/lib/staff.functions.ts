@@ -298,7 +298,7 @@ export const createReimbursement = createServerFn({ method: "POST" })
       staff_id: context.staff.id,
       championship_id: data.championship_id,
       category: data.category,
-      description: data.description.trim(),
+      description: data.description?.trim() ?? "",
       amount_cents: data.amount_cents,
       expense_date: data.expense_date,
       receipt_path: data.receipt_path || null,
