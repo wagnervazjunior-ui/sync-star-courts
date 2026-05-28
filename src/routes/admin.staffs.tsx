@@ -11,11 +11,13 @@ import {
   exportStaffFinanceXlsx,
   getFeeReceiptSignedUrl,
   getReceiptSignedUrl,
+  linkStaffToChampionship,
   listManageableChampionships,
   listMyStaffs,
   listStaffInvites,
   setFeeStatus,
   setReimbursementStatus,
+  unlinkStaffFromChampionship,
 } from "@/lib/staff.functions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -37,7 +39,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Copy, FileText, Link as LinkIcon, Loader2, Plus, RefreshCw, Trophy, Users, Wallet } from "lucide-react";
+import { Copy, FileText, Link as LinkIcon, Link2, Loader2, Plus, RefreshCw, Trash2, Trophy, Users, Wallet } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/staffs")({
@@ -113,7 +115,23 @@ function AdminStaffs() {
 
   const champs = useQuery({ queryKey: ["admin-manageable-champs"], queryFn: () => callChamps() });
   const invites = useQuery({ queryKey: ["admin-staff-invites"], queryFn: () => callInvites() });
-  const staffs = useQuery({ queryKey: ["admin-staffs"], queryFn: () => callStaffs() });
+  const callLink = useServerFn(linkStaffToChampionship);
+  const callUnlink = useServerFn(unlinkStaffFromChampionship);
+  const staffs = useQuery({
+    queryKey: ["admin-staffs", championship_id],
+    queryFn: () =>
+      callStaffs({
+        data: { championship_id: championship_id === "all" ? null : championship_id },
+      }),
+  });
+  const availableStaffs = useQuery({
+    queryKey: ["admin-staffs-available", championship_id],
+    enabled: championship_id !== "all",
+    queryFn: () =>
+      callStaffs({
+        data: { not_in_championship_id: championship_id },
+      }),
+  });
   const reimbs = useQuery({
     queryKey: ["admin-reimbursements", championship_id, status],
     queryFn: () =>
@@ -179,6 +197,33 @@ function AdminStaffs() {
     const { url } = await callReceipt({ data: { reimbursement_id: id } });
     if (url) window.open(url, "_blank");
     else toast.error("Comprovante indisponível");
+  };
+
+  const linkStaff = async (staffId: string, champId: string) => {
+    try {
+      await callLink({ data: { staff_id: staffId, championship_id: champId } });
+      qc.invalidateQueries({ queryKey: ["admin-staffs"] });
+      qc.invalidateQueries({ queryKey: ["admin-staffs-available"] });
+      toast.success("Staff vinculado ao torneio");
+    } catch (e: any) {
+      toast.error(e?.message || "Falha ao vincular");
+    }
+  };
+
+  const unlinkStaff = async (staffId: string, champId: string) => {
+    if (!confirm("Desvincular este staff do torneio?")) return;
+    try {
+      await callUnlink({ data: { staff_id: staffId, championship_id: champId } });
+      qc.invalidateQueries({ queryKey: ["admin-staffs"] });
+      qc.invalidateQueries({ queryKey: ["admin-staffs-available"] });
+      toast.success("Staff desvinculado");
+    } catch (e: any) {
+      if (e?.message === "HAS_FINANCIAL_RECORDS") {
+        toast.error("Não é possível desvincular: há cachês ou reembolsos vinculados.");
+      } else {
+        toast.error(e?.message || "Falha ao desvincular");
+      }
+    }
   };
 
   const openFeeReceipt = async (id: string) => {
@@ -257,8 +302,12 @@ function AdminStaffs() {
 
       {/* Staffs list */}
       <Card className="p-6 bg-gradient-card border-border/50">
-        <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
-          <h2 className="font-semibold">Staffs cadastrados</h2>
+        <div className="flex items-center justify-between gap-3 flex-wrap mb-1">
+          <h2 className="font-semibold">
+            {championship_id === "all"
+              ? "Staffs cadastrados"
+              : `Staffs deste torneio`}
+          </h2>
           <Input
             placeholder="Buscar por nome, CPF ou e-mail"
             value={staffSearch}
@@ -266,10 +315,21 @@ function AdminStaffs() {
             className="max-w-xs"
           />
         </div>
+        <p className="text-xs text-muted-foreground mb-3">
+          {championship_id === "all"
+            ? "Mostrando todos os staffs que você já cadastrou. Use o filtro de campeonato abaixo para vincular/desvincular staffs a um torneio específico."
+            : `Filtrando por: ${
+                champs.data?.championships.find((c) => c.id === championship_id)?.name ?? "—"
+              }`}
+        </p>
         {staffs.isLoading ? (
           <p className="text-sm text-muted-foreground">Carregando…</p>
         ) : (staffs.data?.staffs ?? []).length === 0 ? (
-          <p className="text-sm text-muted-foreground">Nenhum staff cadastrado.</p>
+          <p className="text-sm text-muted-foreground">
+            {championship_id === "all"
+              ? "Nenhum staff cadastrado."
+              : "Nenhum staff vinculado a este torneio."}
+          </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -321,16 +381,74 @@ function AdminStaffs() {
                       </button>
                     </td>
                     <td className="py-2 pr-3 text-right">
-                      <AdminFeeDialog
-                        staff={s}
-                        championships={champs.data?.championships ?? []}
-                        onSaved={() => qc.invalidateQueries({ queryKey: ["admin-fees"] })}
-                      />
+                      <div className="flex gap-1 justify-end flex-wrap">
+                        <LinkToChampionshipDialog
+                          staff={s}
+                          championships={(champs.data?.championships ?? []).filter(
+                            (c) => !(s.championship_ids ?? []).includes(c.id),
+                          )}
+                          onLinked={(champId: string) => linkStaff(s.id, champId)}
+                        />
+                        {championship_id !== "all" && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => unlinkStaff(s.id, championship_id)}
+                            title="Desvincular deste torneio"
+                          >
+                            <Trash2 className="size-3" />
+                          </Button>
+                        )}
+                        <AdminFeeDialog
+                          staff={s}
+                          championships={champs.data?.championships ?? []}
+                          onSaved={() => qc.invalidateQueries({ queryKey: ["admin-fees"] })}
+                        />
+                      </div>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {championship_id !== "all" && (
+          <div className="mt-6 pt-6 border-t border-border/40">
+            <h3 className="font-semibold text-sm mb-1 flex items-center gap-2">
+              <Link2 className="size-4 text-primary" /> Disponíveis para vincular
+            </h3>
+            <p className="text-xs text-muted-foreground mb-3">
+              Seus staffs já cadastrados que ainda não estão neste torneio.
+            </p>
+            {availableStaffs.isLoading ? (
+              <p className="text-sm text-muted-foreground">Carregando…</p>
+            ) : (availableStaffs.data?.staffs ?? []).length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Todos os seus staffs já estão neste torneio.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {(availableStaffs.data!.staffs as any[]).map((s) => (
+                  <div
+                    key={s.id}
+                    className="flex items-center justify-between gap-3 rounded-lg border border-border/40 p-2"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm">{s.name}</p>
+                      <p className="text-xs text-muted-foreground">{s.cpf}</p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="hero"
+                      onClick={() => linkStaff(s.id, championship_id)}
+                    >
+                      <Link2 className="size-3" /> Vincular
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </Card>
@@ -663,6 +781,59 @@ function AdminFeeDialog({
           <Button variant="hero" className="w-full" onClick={submit} disabled={saving}>
             {saving ? <Loader2 className="size-4 animate-spin mr-2" /> : <Wallet className="size-4 mr-2" />}
             Salvar cachê
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function LinkToChampionshipDialog({
+  staff,
+  championships,
+  onLinked,
+}: {
+  staff: { id: string; name: string };
+  championships: { id: string; name: string }[];
+  onLinked: (championshipId: string) => void | Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [selected, setSelected] = useState("");
+
+  if (championships.length === 0) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setSelected(""); }}>
+      <DialogTrigger asChild>
+        <Button size="sm" variant="outline" title="Vincular a outro torneio">
+          <Link2 className="size-3" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Vincular {staff.name} a um torneio</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <Label>Torneio</Label>
+          <Select value={selected} onValueChange={setSelected}>
+            <SelectTrigger><SelectValue placeholder="Selecione o torneio" /></SelectTrigger>
+            <SelectContent>
+              {championships.map((c) => (
+                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            variant="hero"
+            className="w-full"
+            disabled={!selected}
+            onClick={async () => {
+              await onLinked(selected);
+              setSelected("");
+              setOpen(false);
+            }}
+          >
+            <Link2 className="size-4 mr-2" /> Vincular
           </Button>
         </div>
       </DialogContent>
