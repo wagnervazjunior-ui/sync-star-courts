@@ -199,6 +199,33 @@ function AdminStaffs() {
     else toast.error("Comprovante indisponível");
   };
 
+  const linkStaff = async (staffId: string, champId: string) => {
+    try {
+      await callLink({ data: { staff_id: staffId, championship_id: champId } });
+      qc.invalidateQueries({ queryKey: ["admin-staffs"] });
+      qc.invalidateQueries({ queryKey: ["admin-staffs-available"] });
+      toast.success("Staff vinculado ao torneio");
+    } catch (e: any) {
+      toast.error(e?.message || "Falha ao vincular");
+    }
+  };
+
+  const unlinkStaff = async (staffId: string, champId: string) => {
+    if (!confirm("Desvincular este staff do torneio?")) return;
+    try {
+      await callUnlink({ data: { staff_id: staffId, championship_id: champId } });
+      qc.invalidateQueries({ queryKey: ["admin-staffs"] });
+      qc.invalidateQueries({ queryKey: ["admin-staffs-available"] });
+      toast.success("Staff desvinculado");
+    } catch (e: any) {
+      if (e?.message === "HAS_FINANCIAL_RECORDS") {
+        toast.error("Não é possível desvincular: há cachês ou reembolsos vinculados.");
+      } else {
+        toast.error(e?.message || "Falha ao desvincular");
+      }
+    }
+  };
+
   const openFeeReceipt = async (id: string) => {
     const { url } = await callFeeReceipt({ data: { fee_id: id } });
     if (url) window.open(url, "_blank");
