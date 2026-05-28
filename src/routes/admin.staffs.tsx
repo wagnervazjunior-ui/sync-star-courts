@@ -787,3 +787,56 @@ function AdminFeeDialog({
     </Dialog>
   );
 }
+
+function LinkToChampionshipDialog({
+  staff,
+  championships,
+  onLinked,
+}: {
+  staff: { id: string; name: string };
+  championships: { id: string; name: string }[];
+  onLinked: (championshipId: string) => void | Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [selected, setSelected] = useState("");
+
+  if (championships.length === 0) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setSelected(""); }}>
+      <DialogTrigger asChild>
+        <Button size="sm" variant="outline" title="Vincular a outro torneio">
+          <Link2 className="size-3" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Vincular {staff.name} a um torneio</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <Label>Torneio</Label>
+          <Select value={selected} onValueChange={setSelected}>
+            <SelectTrigger><SelectValue placeholder="Selecione o torneio" /></SelectTrigger>
+            <SelectContent>
+              {championships.map((c) => (
+                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            variant="hero"
+            className="w-full"
+            disabled={!selected}
+            onClick={async () => {
+              await onLinked(selected);
+              setSelected("");
+              setOpen(false);
+            }}
+          >
+            <Link2 className="size-4 mr-2" /> Vincular
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
