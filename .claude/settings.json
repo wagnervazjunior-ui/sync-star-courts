@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"C:\\Users\\Wagner Junior\\OneDrive\\OPENSYNC\\sync-star-courts-main\\sync-star-courts-main\" && git add . && git diff --cached --quiet || git commit -m \"Auto-commit by Claude\" && git push origin main",
+            "shell": "powershell",
+            "timeout": 60,
+            "statusMessage": "Enviando alterações para o GitHub..."
+          }
+        ]
+      }
+    ]
+  }
+}
