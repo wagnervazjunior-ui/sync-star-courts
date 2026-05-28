@@ -39,7 +39,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Copy, FileText, Link as LinkIcon, Loader2, Plus, RefreshCw, Trophy, Users, Wallet } from "lucide-react";
+import { Copy, FileText, Link as LinkIcon, Link2, Loader2, Plus, RefreshCw, Trash2, Trophy, Users, Wallet } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/staffs")({
