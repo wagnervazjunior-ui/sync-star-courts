@@ -115,7 +115,23 @@ function AdminStaffs() {
 
   const champs = useQuery({ queryKey: ["admin-manageable-champs"], queryFn: () => callChamps() });
   const invites = useQuery({ queryKey: ["admin-staff-invites"], queryFn: () => callInvites() });
-  const staffs = useQuery({ queryKey: ["admin-staffs"], queryFn: () => callStaffs() });
+  const callLink = useServerFn(linkStaffToChampionship);
+  const callUnlink = useServerFn(unlinkStaffFromChampionship);
+  const staffs = useQuery({
+    queryKey: ["admin-staffs", championship_id],
+    queryFn: () =>
+      callStaffs({
+        data: { championship_id: championship_id === "all" ? null : championship_id },
+      }),
+  });
+  const availableStaffs = useQuery({
+    queryKey: ["admin-staffs-available", championship_id],
+    enabled: championship_id !== "all",
+    queryFn: () =>
+      callStaffs({
+        data: { not_in_championship_id: championship_id },
+      }),
+  });
   const reimbs = useQuery({
     queryKey: ["admin-reimbursements", championship_id, status],
     queryFn: () =>
