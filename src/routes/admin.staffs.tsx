@@ -387,7 +387,7 @@ function AdminStaffs() {
                           championships={(champs.data?.championships ?? []).filter(
                             (c) => !(s.championship_ids ?? []).includes(c.id),
                           )}
-                          onLinked={(champId) => linkStaff(s.id, champId)}
+                          onLinked={(champId: string) => linkStaff(s.id, champId)}
                         />
                         {championship_id !== "all" && (
                           <Button
