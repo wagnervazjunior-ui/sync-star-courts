@@ -302,8 +302,12 @@ function AdminStaffs() {
 
       {/* Staffs list */}
       <Card className="p-6 bg-gradient-card border-border/50">
-        <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
-          <h2 className="font-semibold">Staffs cadastrados</h2>
+        <div className="flex items-center justify-between gap-3 flex-wrap mb-1">
+          <h2 className="font-semibold">
+            {championship_id === "all"
+              ? "Staffs cadastrados"
+              : `Staffs deste torneio`}
+          </h2>
           <Input
             placeholder="Buscar por nome, CPF ou e-mail"
             value={staffSearch}
@@ -311,10 +315,21 @@ function AdminStaffs() {
             className="max-w-xs"
           />
         </div>
+        <p className="text-xs text-muted-foreground mb-3">
+          {championship_id === "all"
+            ? "Mostrando todos os staffs que você já cadastrou. Use o filtro de campeonato abaixo para vincular/desvincular staffs a um torneio específico."
+            : `Filtrando por: ${
+                champs.data?.championships.find((c) => c.id === championship_id)?.name ?? "—"
+              }`}
+        </p>
         {staffs.isLoading ? (
           <p className="text-sm text-muted-foreground">Carregando…</p>
         ) : (staffs.data?.staffs ?? []).length === 0 ? (
-          <p className="text-sm text-muted-foreground">Nenhum staff cadastrado.</p>
+          <p className="text-sm text-muted-foreground">
+            {championship_id === "all"
+              ? "Nenhum staff cadastrado."
+              : "Nenhum staff vinculado a este torneio."}
+          </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -366,16 +381,74 @@ function AdminStaffs() {
                       </button>
                     </td>
                     <td className="py-2 pr-3 text-right">
-                      <AdminFeeDialog
-                        staff={s}
-                        championships={champs.data?.championships ?? []}
-                        onSaved={() => qc.invalidateQueries({ queryKey: ["admin-fees"] })}
-                      />
+                      <div className="flex gap-1 justify-end flex-wrap">
+                        <LinkToChampionshipDialog
+                          staff={s}
+                          championships={(champs.data?.championships ?? []).filter(
+                            (c) => !(s.championship_ids ?? []).includes(c.id),
+                          )}
+                          onLinked={(champId) => linkStaff(s.id, champId)}
+                        />
+                        {championship_id !== "all" && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => unlinkStaff(s.id, championship_id)}
+                            title="Desvincular deste torneio"
+                          >
+                            <Trash2 className="size-3" />
+                          </Button>
+                        )}
+                        <AdminFeeDialog
+                          staff={s}
+                          championships={champs.data?.championships ?? []}
+                          onSaved={() => qc.invalidateQueries({ queryKey: ["admin-fees"] })}
+                        />
+                      </div>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {championship_id !== "all" && (
+          <div className="mt-6 pt-6 border-t border-border/40">
+            <h3 className="font-semibold text-sm mb-1 flex items-center gap-2">
+              <Link2 className="size-4 text-primary" /> Disponíveis para vincular
+            </h3>
+            <p className="text-xs text-muted-foreground mb-3">
+              Seus staffs já cadastrados que ainda não estão neste torneio.
+            </p>
+            {availableStaffs.isLoading ? (
+              <p className="text-sm text-muted-foreground">Carregando…</p>
+            ) : (availableStaffs.data?.staffs ?? []).length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Todos os seus staffs já estão neste torneio.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {(availableStaffs.data!.staffs as any[]).map((s) => (
+                  <div
+                    key={s.id}
+                    className="flex items-center justify-between gap-3 rounded-lg border border-border/40 p-2"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm">{s.name}</p>
+                      <p className="text-xs text-muted-foreground">{s.cpf}</p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="hero"
+                      onClick={() => linkStaff(s.id, championship_id)}
+                    >
+                      <Link2 className="size-3" /> Vincular
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </Card>
