@@ -474,14 +474,97 @@ export const listStaffInvites = createServerFn({ method: "POST" })
 
 export const listMyStaffs = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    const { data, error } = await supabaseAdmin
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        championship_id: z.string().uuid().optional().nullable(),
+        not_in_championship_id: z.string().uuid().optional().nullable(),
+      })
+      .optional()
+      .parse(input ?? {}),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: rows, error } = await supabaseAdmin
       .from("staffs")
-      .select("id, name, cpf, rg, birthdate, contact_email, contact_phone, pix_key_type, pix_key, created_at")
+      .select(
+        "id, name, cpf, rg, birthdate, contact_email, contact_phone, pix_key_type, pix_key, created_at, staff_championships(championship_id)",
+      )
       .eq("owner_admin_id", context.userId)
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
-    return { staffs: data ?? [] };
+    let list = (rows ?? []).map((s: any) => ({
+      ...s,
+      championship_ids: (s.staff_championships ?? []).map((l: any) => l.championship_id),
+    }));
+    if (data?.championship_id) {
+      list = list.filter((s: any) => s.championship_ids.includes(data.championship_id));
+    }
+    if (data?.not_in_championship_id) {
+      list = list.filter((s: any) => !s.championship_ids.includes(data.not_in_championship_id));
+    }
+    return { staffs: list };
+  });
+
+export const linkStaffToChampionship = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({ staff_id: z.string().uuid(), championship_id: z.string().uuid() })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdminCanManageChampionship(context.userId, data.championship_id);
+    const { data: staff } = await supabaseAdmin
+      .from("staffs")
+      .select("id, owner_admin_id")
+      .eq("id", data.staff_id)
+      .maybeSingle();
+    if (!staff || staff.owner_admin_id !== context.userId) throw new Error("FORBIDDEN");
+    const { error } = await supabaseAdmin
+      .from("staff_championships")
+      .insert({ staff_id: data.staff_id, championship_id: data.championship_id });
+    if (error && !String(error.message).toLowerCase().includes("duplicate"))
+      throw new Error(error.message);
+    return { ok: true as const };
+  });
+
+export const unlinkStaffFromChampionship = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({ staff_id: z.string().uuid(), championship_id: z.string().uuid() })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdminCanManageChampionship(context.userId, data.championship_id);
+    const { data: staff } = await supabaseAdmin
+      .from("staffs")
+      .select("id, owner_admin_id")
+      .eq("id", data.staff_id)
+      .maybeSingle();
+    if (!staff || staff.owner_admin_id !== context.userId) throw new Error("FORBIDDEN");
+
+    const { count: feeCount } = await supabaseAdmin
+      .from("staff_fees")
+      .select("id", { count: "exact", head: true })
+      .eq("staff_id", data.staff_id)
+      .eq("championship_id", data.championship_id);
+    const { count: reimbCount } = await supabaseAdmin
+      .from("staff_reimbursements")
+      .select("id", { count: "exact", head: true })
+      .eq("staff_id", data.staff_id)
+      .eq("championship_id", data.championship_id);
+    if ((feeCount ?? 0) > 0 || (reimbCount ?? 0) > 0) {
+      throw new Error("HAS_FINANCIAL_RECORDS");
+    }
+
+    const { error } = await supabaseAdmin
+      .from("staff_championships")
+      .delete()
+      .eq("staff_id", data.staff_id)
+      .eq("championship_id", data.championship_id);
+    if (error) throw new Error(error.message);
+    return { ok: true as const };
   });
 
 const ListReimbInput = z.object({
