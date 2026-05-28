@@ -1,75 +1,45 @@
-## Objetivo
+# Reaproveitar staff entre torneios + trocar admin master
 
-Reformular a página de detalhe da chave (`/admin/chaves/$bracketId`) para visual estilo Challonge/Pódio, com 3 sub-abas, edição manual de duplas e movimentação de duplas entre confrontos. Todos os termos em português.
+## Parte 1 — Vincular staff existente a outros torneios
 
-## 1. Sub-abas na página da chave
+### Objetivo
+Hoje cada staff entra em um campeonato apenas pelo link de convite específico daquele campeonato. Vamos permitir que o admin (dono do staff) vincule manualmente um staff já cadastrado a qualquer outro torneio que ele gerencia — sem novo convite nem novo cadastro.
 
-Substituir o layout atual por `Tabs` com:
+### Experiência do usuário
+- Em `/admin/staffs`, quando há um campeonato selecionado no filtro, a lista passa a ter duas seções: **Staffs deste torneio** e **Disponíveis para vincular** (staffs do admin que ainda não estão nesse torneio), com botão **Vincular a este torneio**.
+- No card de cada staff, novo botão **Vincular a outro torneio** abre um diálogo listando os torneios gerenciáveis pelo admin onde o staff ainda não está.
+- Ação **Desvincular deste torneio** com confirmação (não apaga o cadastro nem o histórico em outros torneios).
 
-- **Fase Inicial** — chave de eliminatória dupla (Winners + Losers) renderizada em formato de chaveamento horizontal com linhas conectoras (SVG), igual ao modelo da imagem. Separação visual clara: bloco "Chave dos Ganhadores" em cima, "Chave dos Perdedores" embaixo (ou colunas adjacentes), cada coluna = uma rodada, com linhas tracejadas/curvas ligando o vencedor de um par à próxima caixa.
-- **Fase Final** — apenas SEMI, FINAL e DISPUTA DE 3º, em formato mata-mata clássico (3 colunas com conectores).
-- **Classificação** — tabela com posição (seed inicial), nome da dupla, vitórias, derrotas, status (ativa / eliminada / campeã / vice / 3º / 4º). Quando o torneio finaliza, mostra pódio destacado no topo.
+### Mudanças técnicas
+**Backend (`src/lib/staff.functions.ts`)**
+- `listAdminStaffs`: aceitar `not_in_championship_id` para listar staffs do admin ainda não vinculados a um torneio.
+- Nova serverFn `linkStaffToChampionship({ staff_id, championship_id })`: valida `assertAdminCanManageChampionship`, valida `staffs.owner_admin_id = userId`, insere em `staff_championships` com `on conflict do nothing`.
+- Nova serverFn `unlinkStaffFromChampionship({ staff_id, championship_id })`: mesmas validações; bloqueia desvincular se houver `staff_fees`/`staff_reimbursements` ativos naquele torneio.
 
-A aba "Duplas (seeds)" atual vira parte da aba Classificação.
+**Frontend (`src/routes/admin.staffs.tsx`)**
+- Renderizar as duas seções quando filtro de campeonato estiver ativo.
+- Novo `LinkStaffDialog` no card do staff.
+- Item "Desvincular deste torneio" no menu, com confirmação.
+- Invalidar `admin-staffs`, `admin-fees`, `admin-reimbursements` após cada ação.
 
-## 2. Visual de chave (estilo campeonato)
+**Banco**
+- Sem nova tabela; garantir `UNIQUE (staff_id, championship_id)` em `staff_championships` se ainda não existir (migração curta).
 
-Reescrever `BracketView` para renderizar cada rodada como coluna fixa (`MatchCard` de altura uniforme), com um overlay SVG que desenha as linhas conectoras horizontais+verticais entre o lado direito de cada par e o lado esquerdo da caixa filha. Cada caixa de partida segue o padrão:
+## Parte 2 — Trocar o admin master para `estacao.open23@gmail.com`
 
-```text
-┌──────────────────────┐
-│ 1  Kau e Luan    19  │
-│ 32 Cainã e menó  21  │
-└──────────────────────┘
-```
+### Comportamento desejado
+O papel `master` deve passar a pertencer apenas ao usuário com e-mail `estacao.open23@gmail.com`. O master atual perde o papel `master` (e volta a ser admin comum, se já era admin).
 
-Seed à esquerda, nome no meio, placar à direita; vencedor destacado.
+### Pré-requisito
+O e-mail `estacao.open23@gmail.com` precisa **já ter feito cadastro/login** no sistema pelo menos uma vez (para existir em `auth.users`). Se ainda não existir, peço para criar a conta antes de rodar a troca.
 
-## 3. Adicionar dupla manualmente
+### Execução
+Migração curta que, em uma transação:
+1. Localiza `new_id = auth.users.id` onde `lower(email) = 'estacao.open23@gmail.com'`. Se não achar, aborta com mensagem clara.
+2. `INSERT INTO public.user_roles (user_id, role) VALUES (new_id, 'master') ON CONFLICT DO NOTHING`.
+3. `DELETE FROM public.user_roles WHERE role = 'master' AND user_id <> new_id`.
+4. Garante `admin_permissions.can_create_championships = true` para o novo master.
 
-Botão "Adicionar dupla" na aba Classificação. Abre dialog com nome/atleta1/atleta2. Cria registro em `bracket_teams` com próximo seed disponível. **Importante:** só permitido enquanto `status='live'` e nenhuma partida tiver resultado ainda — caso contrário regenerar a chave romperia o histórico. Mostrar aviso explicando.
-
-Para chaves já em andamento, oferecer apenas "Substituir dupla" (trocar nome/atletas de um seed existente, sem mexer em confrontos).
-
-## 4. Mover dupla entre confrontos
-
-Cada `MatchCard` ganha menu de contexto (ícone "⋯") com:
-
-- **Mover dupla A / dupla B para outro confronto** → abre dialog listando partidas elegíveis (mesmo phase, ainda sem resultado, com slot vazio ou outro time a trocar). Operação: swap entre dois slots de partidas distintas.
-- **Trocar A↔B desta partida**.
-
-Restrições: só permitido em partidas ainda **sem `winner_team_id`** e cujos slots estejam preenchidos por seed inicial (não por `winner_of`/`loser_of` de outra). Mover uma dupla que veio de propagação automática é bloqueado para não quebrar a árvore.
-
-## 5. Termos em PT-BR
-
-Renomear em toda a UI:
-
-- WB → "Ganhadores"
-- LB → "Perdedores"
-- "Rodada N" mantém
-- SEMI → "Semifinal", FINAL → "Final", THIRD → "Disputa de 3º"
-- "Set único" / "Melhor de 3"
-
-## Arquivos a alterar
-
-**Backend** (`src/lib/brackets.functions.ts`):
-- `addManualTeam({ bracket_id, team_name, athlete1_name, athlete2_name })` — valida que nenhum match tem resultado; insere com próximo seed; **não regenera estrutura** (a estrutura é fixa no momento da geração, então adicionar dupla só faz sentido antes de gerar; aviso na UI).
-  - Alternativa adotada: limitar a "Substituir dupla" (`updateTeam`) quando já houver chave gerada.
-- `updateTeam({ team_id, team_name, athlete1_name, athlete2_name })`.
-- `swapMatchSlots({ match_a_id, slot_a: 'a'|'b', match_b_id, slot_b: 'a'|'b' })` — valida ambas as partidas sem winner e slots não-propagados; faz swap atômico.
-- `swapWithinMatch({ match_id })` — troca team_a ↔ team_b da mesma partida.
-
-**Frontend**:
-- `src/routes/admin.chaves.$bracketId.tsx` — adicionar `Tabs` (Fase Inicial / Fase Final / Classificação).
-- `src/components/brackets/BracketView.tsx` — reescrever para render tipo chave com SVG connectors; aceitar prop `phaseFilter: 'initial' | 'final'`.
-- `src/components/brackets/MatchCard.tsx` — novo layout (seed | nome | placar), DropdownMenu com ações "Mover", "Trocar A↔B", "Lançar resultado".
-- `src/components/brackets/MoveTeamDialog.tsx` (novo) — escolher partida destino.
-- `src/components/brackets/ManualTeamDialog.tsx` (novo) — adicionar/editar dupla.
-- `src/components/brackets/StandingsTab.tsx` (novo) — tabela de classificação + pódio + botão adicionar/editar dupla.
-
-## Detalhes técnicos
-
-- SVG connectors: container `relative`; cada coluna `flex flex-col justify-around`; após render, calcular posições com `useLayoutEffect` + `getBoundingClientRect` e desenhar `<path>` cúbicas entre `rightOf(parentA)+rightOf(parentB) → leftOf(child)`. Fallback simples: desenhar `<div>`s com borders L-shape entre colunas (mais barato e suficiente para visual de chave).
-- Para Fase Inicial, render duas seções empilhadas: "Chave dos Ganhadores" (matches phase=WB) e "Chave dos Perdedores" (matches phase=LB), cada uma com suas próprias colunas/rodadas.
-- Classificação: vitórias = count de matches com `winner_team_id = team.id`; derrotas = count de matches concluídos onde a dupla jogou e não venceu; status derivado (2+ derrotas = eliminada antes da fase final).
-- Sem alterações no schema do banco; tudo via campos já existentes.
+### Confirmações que preciso antes de implementar
+1. O e-mail `estacao.open23@gmail.com` já se cadastrou no sistema? (sim/não)
+2. Posso **remover** o papel master do usuário master atual (ele continua existindo como conta, só perde o privilégio), ou prefere manter os dois como master?
