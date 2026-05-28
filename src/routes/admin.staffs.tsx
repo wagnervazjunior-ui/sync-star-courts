@@ -11,11 +11,13 @@ import {
   exportStaffFinanceXlsx,
   getFeeReceiptSignedUrl,
   getReceiptSignedUrl,
+  linkStaffToChampionship,
   listManageableChampionships,
   listMyStaffs,
   listStaffInvites,
   setFeeStatus,
   setReimbursementStatus,
+  unlinkStaffFromChampionship,
 } from "@/lib/staff.functions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
