@@ -114,6 +114,8 @@ function RegisterPage() {
 
   const isMixed = ctx?.gender === "mixed";
   const athleteLabels = isMixed ? ["Atleta masculino", "Atleta feminina"] : ["Atleta 1", "Atleta 2"];
+  const opensAt = (ctx as any)?.opens_at ? new Date((ctx as any).opens_at) : null;
+  const notOpenYet = opensAt && opensAt > new Date();
 
   return (
     <div className="min-h-screen">
@@ -127,6 +129,21 @@ function RegisterPage() {
           </div>
         )}
 
+        {notOpenYet ? (
+          <Card className="p-8 bg-gradient-card border-border/50 text-center space-y-3">
+            <AlertTriangle className="mx-auto size-10 text-amber-400" />
+            <p className="text-lg font-semibold">Inscrições ainda não abertas</p>
+            <p className="text-sm text-muted-foreground">
+              As inscrições para esta categoria abrem em{" "}
+              <strong>{opensAt.toLocaleDateString("pt-BR")} às {opensAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</strong>.
+            </p>
+            {ctx && (
+              <Link to="/campeonatos/$slug" params={{ slug: (ctx as any).championship.slug }} className="inline-block text-sm text-primary hover:underline">
+                ← Voltar para o campeonato
+              </Link>
+            )}
+          </Card>
+        ) : (
         <Card className="p-6 bg-gradient-card border-border/50">
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <div className="space-y-2">
@@ -211,6 +228,7 @@ function RegisterPage() {
             </Button>
           </form>
         </Card>
+        )}
       </main>
     </div>
   );

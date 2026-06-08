@@ -222,10 +222,12 @@ export type Database = {
           id: string
           max_slots: number
           name: string
+          opens_at: string | null
           price_cents: number
           prize: string | null
           uniform_model: string | null
           updated_at: string
+          visible: boolean
         }
         Insert: {
           active?: boolean
@@ -238,10 +240,12 @@ export type Database = {
           id?: string
           max_slots: number
           name: string
+          opens_at?: string | null
           price_cents?: number
           prize?: string | null
           uniform_model?: string | null
           updated_at?: string
+          visible?: boolean
         }
         Update: {
           active?: boolean
@@ -254,10 +258,12 @@ export type Database = {
           id?: string
           max_slots?: number
           name?: string
+          opens_at?: string | null
           price_cents?: number
           prize?: string | null
           uniform_model?: string | null
           updated_at?: string
+          visible?: boolean
         }
         Relationships: [
           {

@@ -17,7 +17,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import {
   Plus, Pencil, Trash2, ArrowLeft, ExternalLink, AlertTriangle, Users, ClipboardList, Shield,
-  Upload, X, Loader2, Settings, BarChart3, FileSpreadsheet, ListChecks, Download, CheckCircle2, XCircle, UserPlus, Wallet, FileText, Copy, Network,
+  Upload, X, Loader2, Settings, BarChart3, FileSpreadsheet, ListChecks, Download, CheckCircle2, XCircle, UserPlus, Wallet, FileText, Copy, Network, RefreshCw,
 } from "lucide-react";
 import { generateGateListWorkbook } from "@/lib/gate-list-export";
 import { generateUniformWorkbook } from "@/lib/uniform-export";
@@ -28,12 +28,16 @@ import {
   adminListFees, setFeeStatus, getFeeReceiptSignedUrl, exportStaffFinanceXlsx,
 } from "@/lib/staff.functions";
 import { listBrackets } from "@/lib/brackets.functions";
+import {
+  createOrRotateRefereeInvite, listRefereeInvites, listChampionshipReferees, revokeRefereeFromChampionship,
+} from "@/lib/referee.functions";
 import { CreateBracketDialog } from "@/components/brackets/CreateBracketDialog";
+import { SimulateBracketDialog } from "@/components/brackets/SimulateBracketDialog";
 
-type TabKey = "configuracoes" | "dashboard" | "categorias" | "inscricoes" | "planilhas" | "staff" | "chaves" | "permissoes";
+type TabKey = "configuracoes" | "dashboard" | "categorias" | "inscricoes" | "planilhas" | "staff" | "chaves" | "arbitros" | "permissoes";
 
 const tabSchema = z.object({
-  tab: fallback(z.enum(["configuracoes", "dashboard", "categorias", "inscricoes", "planilhas", "staff", "chaves", "permissoes"]), "configuracoes").default("configuracoes"),
+  tab: fallback(z.enum(["configuracoes", "dashboard", "categorias", "inscricoes", "planilhas", "staff", "chaves", "arbitros", "permissoes"]), "configuracoes").default("configuracoes"),
 });
 
 export const Route = createFileRoute("/admin/campeonatos/$id")({
@@ -95,6 +99,7 @@ function ChampionshipDetail() {
           <TabsTrigger value="planilhas"><FileSpreadsheet className="size-4 mr-1" /> Planilhas</TabsTrigger>
           <TabsTrigger value="staff"><Wallet className="size-4 mr-1" /> Staff</TabsTrigger>
           <TabsTrigger value="chaves"><Network className="size-4 mr-1" /> Chaves</TabsTrigger>
+          <TabsTrigger value="arbitros"><Users className="size-4 mr-1" /> Árbitros</TabsTrigger>
           {isMaster && <TabsTrigger value="permissoes"><Shield className="size-4 mr-1" /> Permissões</TabsTrigger>}
         </TabsList>
 
@@ -107,6 +112,7 @@ function ChampionshipDetail() {
         <TabsContent value="planilhas" className="mt-6"><PlanilhasTab id={id} championship={ch} /></TabsContent>
         <TabsContent value="staff" className="mt-6"><StaffTab id={id} /></TabsContent>
         <TabsContent value="chaves" className="mt-6"><ChavesTab id={id} /></TabsContent>
+        <TabsContent value="arbitros" className="mt-6"><ArbitrosTab id={id} /></TabsContent>
         {isMaster && <TabsContent value="permissoes" className="mt-6"><PermissoesTab id={id} /></TabsContent>}
       </Tabs>
     </div>
@@ -114,15 +120,45 @@ function ChampionshipDetail() {
 }
 
 /* =================== CONFIGURAÇÕES =================== */
+function extractMapSrc(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const match = value.match(/src="([^"]+)"/);
+  return match ? match[1] : value.startsWith("http") ? value : null;
+}
+
 function ConfigTab({ championship }: { championship: any }) {
   const qc = useQueryClient();
-  const [form, setForm] = useState<any>(() => ({ ...championship }));
+  const [form, setForm] = useState<any>(() => ({
+    ...championship,
+    location_embed_url: extractMapSrc(championship.location_embed_url) ?? "",
+  }));
   const [newModel, setNewModel] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
   const [uploadingChart, setUploadingChart] = useState(false);
+  const [uploadingPdf, setUploadingPdf] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const slugify = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+
+  const handleRegulationsPdf = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingPdf(true);
+    try {
+      const path = `regulations/${crypto.randomUUID()}.pdf`;
+      const { error } = await supabase.storage.from("championship-covers").upload(path, file, { upsert: false, contentType: "application/pdf" });
+      if (error) throw error;
+      const { data } = supabase.storage.from("championship-covers").getPublicUrl(path);
+      setForm({ ...form, regulations_pdf_url: data.publicUrl });
+      toast.success("PDF enviado!");
+    } catch (err: any) {
+      toast.error(err.message ?? "Falha no upload do PDF");
+    } finally {
+      setUploadingPdf(false);
+      e.target.value = "";
+    }
+  };
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -138,6 +174,22 @@ function ConfigTab({ championship }: { championship: any }) {
       toast.success("Imagem enviada!");
     } catch (err: any) { toast.error(err.message ?? "Falha no upload"); }
     finally { setUploading(false); e.target.value = ""; }
+  };
+
+  const handleBannerFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingBanner(true);
+    try {
+      const ext = file.name.split(".").pop() ?? "jpg";
+      const path = `banners/${crypto.randomUUID()}.${ext}`;
+      const { error } = await supabase.storage.from("championship-covers").upload(path, file, { upsert: false, contentType: file.type });
+      if (error) throw error;
+      const { data } = supabase.storage.from("championship-covers").getPublicUrl(path);
+      setForm({ ...form, banner_image_url: data.publicUrl });
+      toast.success("Banner enviado!");
+    } catch (err: any) { toast.error(err.message ?? "Falha no upload"); }
+    finally { setUploadingBanner(false); e.target.value = ""; }
   };
 
   const handleChartFiles = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -172,9 +224,13 @@ function ConfigTab({ championship }: { championship: any }) {
       end_date: form.end_date || null,
       location: form.location ?? null,
       location_url: form.location_url || null,
+      location_embed_url: form.location_embed_url || null,
       cover_image_url: form.cover_image_url || null,
+      banner_image_url: form.banner_image_url || null,
       active: form.active,
+      prize: form.prize || null,
       regulations: form.regulations || null,
+      regulations_pdf_url: form.regulations_pdf_url || null,
       policies: form.policies || null,
       cancellation_policy: form.cancellation_policy || null,
       shirt_size_chart_urls: form.shirt_size_chart_urls ?? [],
@@ -190,11 +246,12 @@ function ConfigTab({ championship }: { championship: any }) {
   return (
     <div className="space-y-5 max-w-3xl">
       <div className="flex justify-end">
-        <Button variant="hero" onClick={save} disabled={saving || uploading || uploadingChart}>{saving ? "Salvando…" : "Salvar alterações"}</Button>
+        <Button variant="hero" onClick={save} disabled={saving || uploading || uploadingBanner || uploadingChart || uploadingPdf}>{saving ? "Salvando…" : "Salvar alterações"}</Button>
       </div>
       <div className="space-y-2"><Label>Nome</Label><Input value={form.name ?? ""} onChange={(e) => setForm({ ...form, name: e.target.value })} /></div>
       <div className="space-y-2"><Label>Slug (URL)</Label><Input placeholder="auto-gerado" value={form.slug ?? ""} onChange={(e) => setForm({ ...form, slug: e.target.value })} /></div>
       <div className="space-y-2"><Label>Descrição</Label><Textarea rows={4} value={form.description ?? ""} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
+      <div className="space-y-2"><Label>Premiação geral</Label><Textarea rows={3} value={form.prize ?? ""} onChange={(e) => setForm({ ...form, prize: e.target.value })} placeholder="Ex: 1º lugar R$ 5.000 + troféu, 2º lugar R$ 2.500..." /></div>
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-2"><Label>Início</Label><Input type="date" value={form.start_date ?? ""} onChange={(e) => setForm({ ...form, start_date: e.target.value })} /></div>
         <div className="space-y-2"><Label>Fim</Label><Input type="date" value={form.end_date ?? ""} onChange={(e) => setForm({ ...form, end_date: e.target.value })} /></div>
@@ -203,14 +260,35 @@ function ConfigTab({ championship }: { championship: any }) {
       <div className="rounded-lg border border-border/50 p-4 space-y-3">
         <h4 className="font-semibold text-sm">Local</h4>
         <div className="space-y-2"><Label>Local</Label><Input value={form.location ?? ""} onChange={(e) => setForm({ ...form, location: e.target.value })} /></div>
-        <div className="space-y-2"><Label>Link Google Maps</Label><Input type="url" value={form.location_url ?? ""} onChange={(e) => setForm({ ...form, location_url: e.target.value })} /></div>
+        <div className="space-y-2"><Label>Link Google Maps (botão "Como chegar")</Label><Input type="url" value={form.location_url ?? ""} onChange={(e) => setForm({ ...form, location_url: e.target.value })} /></div>
+        <div className="space-y-2">
+          <Label>Mapa incorporado (Google Maps)</Label>
+          <Textarea
+            rows={3}
+            value={form.location_embed_url ?? ""}
+            onChange={(e) => {
+              const val = e.target.value.trim();
+              const match = val.match(/src="([^"]+)"/);
+              setForm({ ...form, location_embed_url: match ? match[1] : val });
+            }}
+            placeholder="Cole aqui o código iframe OU só a URL — qualquer formato funciona"
+          />
+          <p className="text-xs text-muted-foreground">Google Maps → Compartilhar → Incorporar um mapa → copie o código inteiro do iframe.</p>
+          {form.location_embed_url && (
+            <div className="rounded-lg overflow-hidden border border-border/50 mt-2">
+              <iframe src={form.location_embed_url} width="100%" height="220" style={{ border: 0 }} loading="lazy" referrerPolicy="no-referrer-when-downgrade" />
+            </div>
+          )}
+        </div>
       </div>
 
+      {/* Foto do card (quadrada) */}
       <div className="space-y-2">
-        <Label>Imagem de capa</Label>
+        <Label>Foto do campeonato <span className="text-xs font-normal text-muted-foreground">(aparece nos cards de listagem)</span></Label>
+        <p className="text-xs text-muted-foreground">Tamanho ideal: <strong>1080 × 1080 px</strong> — quadrado, padrão Instagram</p>
         {form.cover_image_url && (
-          <div className="relative rounded-lg overflow-hidden border border-border/50">
-            <img src={form.cover_image_url} alt="Capa" className="w-full h-40 object-cover" />
+          <div className="relative rounded-lg overflow-hidden border border-border/50 max-w-[200px]">
+            <img src={form.cover_image_url} alt="Capa" className="w-full h-auto block" />
             <Button type="button" size="sm" variant="ghost" className="absolute top-2 right-2 bg-background/80 backdrop-blur" onClick={() => setForm({ ...form, cover_image_url: "" })}>
               <X className="size-4" />
             </Button>
@@ -218,15 +296,35 @@ function ConfigTab({ championship }: { championship: any }) {
         )}
         <label className="flex items-center justify-center gap-2 px-4 py-3 border border-dashed border-border rounded-lg cursor-pointer hover:bg-accent/30 transition-colors text-sm text-muted-foreground">
           {uploading ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
-          {uploading ? "Enviando..." : form.cover_image_url ? "Trocar imagem" : "Selecionar imagem"}
+          {uploading ? "Enviando..." : form.cover_image_url ? "Trocar foto" : "Selecionar foto"}
           <input type="file" accept="image/*" className="hidden" onChange={handleFile} disabled={uploading} />
+        </label>
+      </div>
+
+      {/* Banner do cabeçalho (wide) */}
+      <div className="space-y-2">
+        <Label>Banner do cabeçalho <span className="text-xs font-normal text-muted-foreground">(aparece no topo da página do campeonato)</span></Label>
+        <p className="text-xs text-muted-foreground">Tamanho ideal: <strong>1200 × 400 px</strong> — paisagem, proporção 3:1. Se não preencher, usa a foto do card.</p>
+        {form.banner_image_url && (
+          <div className="relative rounded-lg overflow-hidden border border-border/50">
+            <img src={form.banner_image_url} alt="Banner" className="w-full h-auto block" />
+            <Button type="button" size="sm" variant="ghost" className="absolute top-2 right-2 bg-background/80 backdrop-blur" onClick={() => setForm({ ...form, banner_image_url: "" })}>
+              <X className="size-4" />
+            </Button>
+          </div>
+        )}
+        <label className="flex items-center justify-center gap-2 px-4 py-3 border border-dashed border-border rounded-lg cursor-pointer hover:bg-accent/30 transition-colors text-sm text-muted-foreground">
+          {uploadingBanner ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
+          {uploadingBanner ? "Enviando..." : form.banner_image_url ? "Trocar banner" : "Selecionar banner"}
+          <input type="file" accept="image/*" className="hidden" onChange={handleBannerFile} disabled={uploadingBanner} />
         </label>
       </div>
 
       <div className="rounded-lg border border-border/50 p-4 space-y-3">
         <h4 className="font-semibold text-sm">Uniforme</h4>
         <div className="space-y-2">
-          <Label>Tabela de medidas (uma ou mais imagens)</Label>
+          <Label>Tabela de medidas <span className="text-xs font-normal text-muted-foreground">(uma ou mais imagens)</span></Label>
+          <p className="text-xs text-muted-foreground">Tamanho sugerido: <strong>800 × 600 px ou maior</strong> — qualquer proporção, será exibida no tamanho real</p>
           {(form.shirt_size_chart_urls ?? []).length > 0 && (
             <div className="grid grid-cols-3 gap-2">
               {form.shirt_size_chart_urls.map((url: string) => (
@@ -286,7 +384,25 @@ function ConfigTab({ championship }: { championship: any }) {
 
       <div className="rounded-lg border border-border/50 p-4 space-y-3">
         <h4 className="font-semibold text-sm">Textos legais</h4>
-        <div className="space-y-2"><Label>Regulamento</Label><Textarea rows={4} value={form.regulations ?? ""} onChange={(e) => setForm({ ...form, regulations: e.target.value })} /></div>
+        <div className="space-y-2">
+          <Label>Regulamento (texto)</Label>
+          <Textarea rows={4} value={form.regulations ?? ""} onChange={(e) => setForm({ ...form, regulations: e.target.value })} />
+        </div>
+        <div className="space-y-2">
+          <Label>Regulamento em PDF (opcional)</Label>
+          {form.regulations_pdf_url && (
+            <div className="flex items-center gap-2 rounded-md border border-border/50 bg-muted/30 px-3 py-2 text-sm">
+              <span className="flex-1 truncate">PDF carregado</span>
+              <a href={form.regulations_pdf_url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline text-xs">Ver</a>
+              <Button type="button" size="sm" variant="ghost" onClick={() => setForm({ ...form, regulations_pdf_url: "" })}><X className="size-3" /></Button>
+            </div>
+          )}
+          <label className="flex items-center justify-center gap-2 px-4 py-3 border border-dashed border-border rounded-lg cursor-pointer hover:bg-accent/30 transition-colors text-sm text-muted-foreground">
+            {uploadingPdf ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
+            {uploadingPdf ? "Enviando..." : form.regulations_pdf_url ? "Trocar PDF" : "Selecionar PDF"}
+            <input type="file" accept="application/pdf" className="hidden" onChange={handleRegulationsPdf} disabled={uploadingPdf} />
+          </label>
+        </div>
         <div className="space-y-2"><Label>Políticas do evento</Label><Textarea rows={4} value={form.policies ?? ""} onChange={(e) => setForm({ ...form, policies: e.target.value })} /></div>
         <div className="space-y-2"><Label>Política de cancelamento e reembolso</Label><Textarea rows={4} value={form.cancellation_policy ?? ""} onChange={(e) => setForm({ ...form, cancellation_policy: e.target.value })} /></div>
       </div>
@@ -294,7 +410,7 @@ function ConfigTab({ championship }: { championship: any }) {
       <div className="flex items-center gap-2"><Switch checked={!!form.active} onCheckedChange={(v) => setForm({ ...form, active: v })} /><Label>Ativo</Label></div>
 
       <div className="flex justify-end pt-4 border-t border-border/40">
-        <Button variant="hero" onClick={save} disabled={saving || uploading || uploadingChart}>{saving ? "Salvando…" : "Salvar alterações"}</Button>
+        <Button variant="hero" onClick={save} disabled={saving || uploading || uploadingBanner || uploadingChart || uploadingPdf}>{saving ? "Salvando…" : "Salvar alterações"}</Button>
       </div>
     </div>
   );
@@ -380,6 +496,7 @@ function CategoriesTab({ id, championship }: { id: string; championship: any }) 
       uniform_model: form.uniform_model || null,
       age_rule_mode: form.age_rule_mode || "none",
       age_min: form.age_rule_mode && form.age_rule_mode !== "none" ? Number(form.age_min) : null,
+      opens_at: form.opens_at ? new Date(form.opens_at).toISOString() : null,
     };
     delete payload.price_reais;
     const op = editing?.id
@@ -422,12 +539,14 @@ function CategoriesTab({ id, championship }: { id: string; championship: any }) 
                   <div className="flex items-center gap-2 flex-wrap">
                     <Link to="/admin/categorias/$categoryId" params={{ categoryId: c.id }} className="font-bold hover:text-primary hover:underline">{c.name}</Link>
                     <Badge variant={c.active ? "default" : "secondary"}>{c.active ? "Ativa" : "Inativa"}</Badge>
+                    <Badge variant={c.visible ? "outline" : "secondary"}>{c.visible ? "Visível" : "Oculta"}</Badge>
                     <Badge variant="outline">{GENDER_LABEL[c.gender] ?? c.gender}</Badge>
                     {c.uniform_model && <Badge variant="outline">{c.uniform_model}</Badge>}
                   </div>
                   <p className="text-sm text-muted-foreground mt-1 flex items-center gap-3 flex-wrap">
                     <span className="inline-flex items-center gap-1"><Users className="size-3" /> {inscritos}/{c.max_slots} inscritos · {restantes} vaga(s)</span>
                     <span>R$ {(c.price_cents / 100).toFixed(2).replace(".", ",")}</span>
+                    {c.opens_at && <span className="inline-flex items-center gap-1">🕒 Abre {new Date(c.opens_at).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}</span>}
                   </p>
                   {c.description && <p className="text-sm text-muted-foreground mt-1 whitespace-pre-line line-clamp-2">{c.description}</p>}
                 </div>
@@ -451,20 +570,25 @@ function CategoryDialog({ initial, onSave, uniformModels }: { initial: any; onSa
     name: initial?.name ?? "",
     description: initial?.description ?? "",
     prize: initial?.prize ?? "",
+    rules: initial?.rules ?? "",
     max_slots: initial?.max_slots ?? 16,
     price_reais: initial?.price_reais ?? "0",
     active: initial?.active ?? true,
+    visible: initial?.visible ?? true,
+    opens_at: initial?.opens_at ? new Date(initial.opens_at).toISOString().slice(0, 16) : "",
     gender: initial?.gender ?? "mixed",
     uniform_model: initial?.uniform_model ?? "",
     age_rule_mode: initial?.age_rule_mode ?? "none",
     age_min: initial?.age_min ?? "",
+    has_prize: initial?.has_prize ?? false,
   }));
   return (
     <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
       <DialogHeader><DialogTitle>{initial ? "Editar" : "Nova"} categoria</DialogTitle></DialogHeader>
       <div className="space-y-4">
         <div className="space-y-2"><Label>Nome</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex: Iniciante Masculino" /></div>
-        <div className="space-y-2"><Label>Descrição (regras, horário)</Label><Textarea rows={4} value={form.description ?? ""} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
+        <div className="space-y-2"><Label>Descrição</Label><Textarea rows={3} value={form.description ?? ""} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Ex: Categoria aberta para duplas iniciantes" /></div>
+        <div className="space-y-2"><Label>Regras da Categoria</Label><Textarea rows={4} value={form.rules ?? ""} onChange={(e) => setForm({ ...form, rules: e.target.value })} placeholder="Ex: Sets de 21 pontos, saque rotativo, melhor de 3 sets..." /></div>
         <div className="space-y-2"><Label>Premiação</Label><Textarea rows={3} value={form.prize ?? ""} onChange={(e) => setForm({ ...form, prize: e.target.value })} placeholder="Ex: 1º lugar R$ 1.000 + troféu, 2º lugar R$ 500..." /></div>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-2">
@@ -490,7 +614,13 @@ function CategoryDialog({ initial, onSave, uniformModels }: { initial: any; onSa
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-2"><Label>Vagas</Label><Input type="number" min={1} value={form.max_slots} onChange={(e) => setForm({ ...form, max_slots: e.target.value })} /></div>
-          <div className="space-y-2"><Label>Preço (R$)</Label><Input type="number" step="0.01" value={form.price_reais} onChange={(e) => setForm({ ...form, price_reais: e.target.value })} /></div>
+          <div className="space-y-2">
+            <Label>Preço (R$)</Label>
+            <Input type="number" step="0.01" min="10" value={form.price_reais} onChange={(e) => setForm({ ...form, price_reais: e.target.value })} />
+            {Number(form.price_reais) > 0 && Number(form.price_reais) < 10 && (
+              <p className="text-xs text-destructive">Mínimo R$ 10,00 (limite do processador de pagamento)</p>
+            )}
+          </div>
         </div>
         <div className="rounded-lg border border-border/50 p-3 space-y-3">
           <Label className="text-sm font-semibold">Regra de idade (categorias Master)</Label>
@@ -510,7 +640,24 @@ function CategoryDialog({ initial, onSave, uniformModels }: { initial: any; onSa
             </div>
           )}
         </div>
-        <div className="flex items-center gap-2"><Switch checked={form.active} onCheckedChange={(v) => setForm({ ...form, active: v })} /><Label>Ativa</Label></div>
+        <div className="rounded-lg border border-border/50 p-3 space-y-3">
+          <Label className="text-sm font-semibold">Visibilidade e disponibilidade</Label>
+          <div className="flex items-center gap-2"><Switch checked={form.active} onCheckedChange={(v) => setForm({ ...form, active: v })} /><Label>Ativa (aceita inscrições)</Label></div>
+          <div className="flex items-center gap-2"><Switch checked={form.visible} onCheckedChange={(v) => setForm({ ...form, visible: v })} /><Label>Visível na página pública</Label></div>
+          <div className="space-y-1.5">
+            <Label>Abertura programada das inscrições</Label>
+            <Input
+              type="datetime-local"
+              value={form.opens_at}
+              onChange={(e) => setForm({ ...form, opens_at: e.target.value })}
+            />
+            <p className="text-xs text-muted-foreground">Se preenchido, o botão de inscrição fica bloqueado até essa data e hora.</p>
+            {form.opens_at && (
+              <button type="button" className="text-xs text-destructive hover:underline" onClick={() => setForm({ ...form, opens_at: "" })}>Remover data programada</button>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-2"><Switch checked={!!form.has_prize} onCheckedChange={(v) => setForm({ ...form, has_prize: v })} /><Label>Tem premiação em dinheiro</Label></div>
       </div>
       <DialogFooter><Button variant="hero" onClick={() => onSave(form)}>Salvar</Button></DialogFooter>
     </DialogContent>
@@ -662,6 +809,109 @@ function PlanilhasTab({ id, championship }: { id: string; championship: any }) {
         <h3 className="font-semibold flex items-center gap-2"><ClipboardList className="size-4" /> Lista da portaria</h3>
         <p className="text-sm text-muted-foreground">Lista de duplas confirmadas para conferência na entrada do evento.</p>
         <Button variant="hero" onClick={exportGate} disabled={busy === "gate"}><Download className="size-4" /> {busy === "gate" ? "Gerando…" : "Baixar lista"}</Button>
+      </Card>
+    </div>
+  );
+}
+
+/* =================== ÁRBITROS =================== */
+function ArbitrosTab({ id }: { id: string }) {
+  const callRotate = useServerFn(createOrRotateRefereeInvite);
+  const callInvite = useServerFn(listRefereeInvites);
+  const callList = useServerFn(listChampionshipReferees);
+  const callRevoke = useServerFn(revokeRefereeFromChampionship);
+
+  const [rotating, setRotating] = useState(false);
+
+  const invite = useQuery({
+    queryKey: ["referee-invite", id],
+    queryFn: () => callInvite({ data: { championship_id: id } }),
+  });
+
+  const referees = useQuery({
+    queryKey: ["referee-list", id],
+    queryFn: () => callList({ data: { championship_id: id } }),
+  });
+
+  const qc = useQueryClient();
+
+  const rotate = async () => {
+    setRotating(true);
+    try {
+      await callRotate({ data: { championship_id: id } });
+      qc.invalidateQueries({ queryKey: ["referee-invite", id] });
+      toast.success("Link gerado");
+    } catch (e: any) { toast.error(e?.message ?? "Erro"); }
+    finally { setRotating(false); }
+  };
+
+  const revoke = async (userId: string, email: string) => {
+    if (!confirm(`Revogar acesso de ${email} a este campeonato?`)) return;
+    try {
+      await callRevoke({ data: { referee_user_id: userId, championship_id: id } });
+      qc.invalidateQueries({ queryKey: ["referee-list", id] });
+      toast.success("Acesso revogado");
+    } catch (e: any) { toast.error(e?.message ?? "Erro"); }
+  };
+
+  const token = invite.data?.invite?.token;
+  const inviteUrl = token
+    ? `${typeof window !== "undefined" ? window.location.origin : "https://www.opensync.com.br"}/arbitro/cadastro/${token}`
+    : null;
+
+  return (
+    <div className="space-y-6 max-w-3xl">
+      <p className="text-sm text-muted-foreground">
+        Gere um link de convite para árbitros. Quem se cadastrar pelo link terá acesso <strong>exclusivo às chaves</strong> deste campeonato.
+      </p>
+
+      <Card className="p-6 bg-gradient-card border-border/50 space-y-3">
+        <h2 className="font-semibold flex items-center gap-2"><Network className="size-4" /> Link de convite</h2>
+        {inviteUrl ? (
+          <div className="space-y-2">
+            <code className="block text-xs break-all rounded bg-muted/40 p-2">{inviteUrl}</code>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(inviteUrl); toast.success("Link copiado"); }}>
+                <Copy className="size-4" /> Copiar
+              </Button>
+              <Button size="sm" variant="ghost" onClick={rotate} disabled={rotating}>
+                <RefreshCw className="size-4" /> Gerar novo
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground">Nenhum link ativo. Gere um para compartilhar com os árbitros.</p>
+            <Button size="sm" variant="hero" onClick={rotate} disabled={rotating}>
+              {rotating ? <Loader2 className="size-4 animate-spin mr-2" /> : <UserPlus className="size-4 mr-2" />}
+              Gerar link
+            </Button>
+          </div>
+        )}
+        <p className="text-xs text-muted-foreground">Ao gerar um novo link, o anterior é invalidado automaticamente.</p>
+      </Card>
+
+      <Card className="p-6 bg-gradient-card border-border/50">
+        <h2 className="font-semibold mb-4">Árbitros com acesso</h2>
+        {referees.isLoading ? (
+          <p className="text-sm text-muted-foreground">Carregando…</p>
+        ) : (referees.data?.referees ?? []).length === 0 ? (
+          <p className="text-sm text-muted-foreground">Nenhum árbitro cadastrado ainda.</p>
+        ) : (
+          <ul className="divide-y divide-border/40">
+            {(referees.data!.referees as any[]).map((r) => (
+              <li key={r.user_id} className="flex items-center justify-between py-3 gap-3">
+                <div>
+                  <p className="font-medium text-sm">{r.email}</p>
+                  <p className="text-xs text-muted-foreground">desde {new Date(r.created_at).toLocaleDateString("pt-BR")}</p>
+                </div>
+                <Button size="sm" variant="ghost" onClick={() => revoke(r.user_id, r.email)} title="Revogar">
+                  <Trash2 className="size-4 text-destructive" />
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
       </Card>
     </div>
   );
@@ -993,6 +1243,7 @@ function ChavesTab({ id }: { id: string }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-xl font-semibold">Chaves deste campeonato</h2>
+        <SimulateBracketDialog defaultChampionshipId={id} onCreated={refetch} />
         <CreateBracketDialog defaultChampionshipId={id} onCreated={refetch} />
       </div>
       {isLoading ? (
@@ -1011,6 +1262,9 @@ function ChavesTab({ id }: { id: string }) {
                     <Badge variant={b.status === "finished" ? "default" : "secondary"}>{b.status === "finished" ? "Final" : "Live"}</Badge>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1 truncate">{cat?.name ?? "—"}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {b.match_format === "best_of_3_tiebreak" ? "Melhor de 3" : "Set único"}
+                  </p>
                 </Card>
               </Link>
             );
