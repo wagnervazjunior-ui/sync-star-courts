@@ -927,7 +927,7 @@ export type Database = {
         | "hospedagem"
         | "outro"
       reimbursement_status: "pending" | "paid"
-      shirt_size: "P" | "M" | "G" | "GG" | "XG"
+      shirt_size: "P" | "M" | "G" | "GG" | "XG" | "XXGG"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1074,7 +1074,7 @@ export const Constants = {
         "outro",
       ],
       reimbursement_status: ["pending", "paid"],
-      shirt_size: ["P", "M", "G", "GG", "XG"],
+      shirt_size: ["P", "M", "G", "GG", "XG", "XXGG"],
     },
   },
 } as const

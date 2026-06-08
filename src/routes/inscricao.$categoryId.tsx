@@ -17,7 +17,7 @@ import { Ruler, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { useState } from "react";
 
-const SHIRT_SIZES = ["P", "M", "G", "GG", "XG"] as const;
+const SHIRT_SIZES = ["P", "M", "G", "GG", "XG", "XXGG"] as const;
 
 const schema = z.object({
   contact_email: z.string().email("E-mail inválido"),
@@ -118,7 +118,7 @@ function RegisterPage() {
   return (
     <div className="min-h-screen">
       <PublicHeader />
-      <main className="mx-auto max-w-2xl px-4 py-8">
+      <main className="mx-auto max-w-2xl px-4 py-6 pb-28 md:py-8 md:pb-12">
         {ctx && (
           <div className="mb-6">
             <Link to="/campeonatos/$slug" params={{ slug: ctx.championship.slug }} className="text-sm text-primary hover:underline">← {ctx.championship.name}</Link>
@@ -206,8 +206,8 @@ function RegisterPage() {
 
             {ctx && <TermsBlock ctx={ctx} form={form} />}
 
-            <Button type="submit" variant="hero" size="lg" className="w-full" disabled={submitting || !form.watch("terms_accepted")}>
-              {submitting ? "Enviando…" : "Confirmar inscrição"}
+            <Button type="submit" variant="hero" size="lg" className="w-full h-12 text-base" disabled={submitting || !form.watch("terms_accepted")}>
+              {submitting ? "Enviando…" : "Confirmar inscrição →"}
             </Button>
           </form>
         </Card>
@@ -264,11 +264,25 @@ function TermsBlock({ ctx, form }: { ctx: any; form: any }) {
       <h3 className="font-semibold text-primary">Termo de Responsabilidade, Uso de Imagem e Regulamento</h3>
 
       <div className="space-y-2">
-        <p className="text-xs uppercase tracking-widest text-muted-foreground">1. Regulamento & Premiação</p>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <p className="text-xs uppercase tracking-widest text-muted-foreground">1. Regulamento & Premiação</p>
+          {ctx.championship?.regulations_pdf_url && (
+            <a
+              href={ctx.championship.regulations_pdf_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-md bg-primary/10 px-3 py-1 text-xs font-medium text-primary hover:bg-primary/20 transition-colors"
+            >
+              <Ruler className="size-3" /> Baixar regulamento (PDF)
+            </a>
+          )}
+        </div>
         {ctx.championship?.regulations ? (
           <div className="text-sm whitespace-pre-line max-h-48 overflow-y-auto rounded-md border border-border/40 p-3 bg-background/40">
             {ctx.championship.regulations}
           </div>
+        ) : ctx.championship?.regulations_pdf_url ? (
+          <p className="text-xs text-muted-foreground italic">Clique em "Baixar regulamento" acima para ler as regras completas.</p>
         ) : (
           <p className="text-xs text-muted-foreground italic">O organizador ainda não publicou o regulamento.</p>
         )}

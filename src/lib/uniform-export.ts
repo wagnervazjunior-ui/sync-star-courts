@@ -1,6 +1,6 @@
 import ExcelJS from "exceljs";
 
-const SIZES = ["P", "M", "G", "GG", "XG"] as const;
+const SIZES = ["P", "M", "G", "GG", "XG", "XXGG"] as const;
 type Size = (typeof SIZES)[number];
 
 const STATUS_LABEL: Record<string, string> = { pending: "Pendente", confirmed: "Confirmada", cancelled: "Cancelada" };

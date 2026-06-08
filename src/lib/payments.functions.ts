@@ -10,12 +10,34 @@ import {
   createCreditCardCharge as asaasCreateCardCharge,
   getPixQrCode,
   isAsaasMock,
+  refundPayment as asaasRefundPayment,
 } from "./asaas.server";
+import { isValidCPF } from "./utils";
 
 const Input = z.object({
   voucher: z.string().min(4).max(32),
   cpf: z.string().min(11).max(14).optional(),
 });
+
+const PIX_EXPIRY_MS = 15 * 60 * 1000; // 15 minutos
+
+export const cancelExpiredPix = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => z.object({ voucher: z.string().min(4).max(32) }).parse(input))
+  .handler(async ({ data }) => {
+    const voucher = data.voucher.toUpperCase();
+    const { data: reg } = await supabaseAdmin
+      .from("registrations")
+      .select("id, status, pix_expires_at")
+      .eq("voucher_code", voucher)
+      .maybeSingle();
+    if (!reg) return { cancelled: false };
+    if (reg.status !== "pending") return { cancelled: false };
+    if (!reg.pix_expires_at) return { cancelled: false };
+    const expired = new Date(reg.pix_expires_at).getTime() < Date.now();
+    if (!expired) return { cancelled: false };
+    await supabaseAdmin.from("registrations").update({ status: "cancelled" }).eq("id", reg.id).eq("status", "pending");
+    return { cancelled: true };
+  });
 
 export const createPixCharge = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => Input.parse(input))
@@ -60,10 +82,14 @@ export const createPixCharge = createServerFn({ method: "POST" })
     const cat: any = reg.category;
     const valueCents = cat?.price_cents ?? 0;
     if (valueCents <= 0) throw new Error("Categoria sem preço configurado");
+    if (valueCents < 1000) throw new Error("PRICE_BELOW_MINIMUM");
 
     const cleanCpf = (data.cpf ?? reg.payer_cpf ?? "").replace(/\D/g, "");
     if (!cleanCpf || cleanCpf.length < 11) {
       throw new Error("CPF_REQUIRED");
+    }
+    if (!isValidCPF(cleanCpf)) {
+      throw new Error("CPF_INVALID");
     }
     if (data.cpf && data.cpf !== reg.payer_cpf) {
       await supabaseAdmin.rpc("set_registration_payer", {
@@ -84,7 +110,7 @@ export const createPixCharge = createServerFn({ method: "POST" })
     });
 
     const dueDate = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-    const siteUrl = (process.env.PUBLIC_SITE_URL ?? "https://sync-star-courts.lovable.app").replace(/\/$/, "");
+    const siteUrl = (process.env.PUBLIC_SITE_URL ?? "https://www.opensync.com.br").replace(/\/$/, "");
     const voucherUrl = `${siteUrl}/voucher/${reg.id}`;
     const charge = await asaasCreatePixCharge({
       customerId: customer.id,
@@ -96,13 +122,15 @@ export const createPixCharge = createServerFn({ method: "POST" })
 
     const qr = await getPixQrCode(charge.id);
 
+    // Forçar expiração de 15 minutos independente do que o Asaas retorna
+    const ourExpiry = new Date(Date.now() + PIX_EXPIRY_MS).toISOString();
     const { error: upErr } = await supabaseAdmin.rpc("set_registration_pix", {
       _id: reg.id,
       _payment_id: charge.id,
       _customer_id: customer.id,
       _qr: qr.payload,
       _qr_b64: qr.encodedImage,
-      _expires_at: qr.expirationDate,
+      _expires_at: ourExpiry,
       _amount_cents: valueCents,
     });
     if (upErr) throw new Error(upErr.message);
@@ -112,7 +140,7 @@ export const createPixCharge = createServerFn({ method: "POST" })
       mock: isAsaasMock(),
       qrCodeBase64: qr.encodedImage,
       payload: qr.payload,
-      expiresAt: qr.expirationDate,
+      expiresAt: ourExpiry,
       amountCents: valueCents,
     };
   });
@@ -158,8 +186,10 @@ export const createCardCharge = createServerFn({ method: "POST" })
     const cat: any = reg.category;
     const valueCents = cat?.price_cents ?? 0;
     if (valueCents <= 0) throw new Error("Categoria sem preço configurado");
+    if (valueCents < 1000) throw new Error("PRICE_BELOW_MINIMUM");
 
     const cleanCpf = data.holderCpf.replace(/\D/g, "");
+    if (!isValidCPF(cleanCpf)) throw new Error("CPF_INVALID");
     const cleanCep = data.holderPostalCode.replace(/\D/g, "");
     const cleanCard = data.cardNumber.replace(/\s|-/g, "");
     const cleanPhone = (reg.contact_phone ?? "").replace(/\D/g, "");
@@ -189,7 +219,7 @@ export const createCardCharge = createServerFn({ method: "POST" })
         return "0.0.0.0";
       }
     })();
-    const siteUrl = (process.env.PUBLIC_SITE_URL ?? "https://sync-star-courts.lovable.app").replace(/\/$/, "");
+    const siteUrl = (process.env.PUBLIC_SITE_URL ?? "https://www.opensync.com.br").replace(/\/$/, "");
     const voucherUrl = `${siteUrl}/voucher/${reg.id}`;
 
     let charge;
@@ -330,4 +360,28 @@ export const confirmRegistrationManually = createServerFn({ method: "POST" })
       console.error("[confirmRegistrationManually] email error", err);
     }
     return { ok: true as const };
+  });
+
+export const refundRegistration = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ registration_id: z.string().uuid() }).parse(input))
+  .handler(async ({ data }) => {
+    const { data: reg, error } = await supabaseAdmin
+      .from("registrations")
+      .select("id, status, asaas_payment_id, payment_method, amount_cents")
+      .eq("id", data.registration_id)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!reg) throw new Error("Inscrição não encontrada");
+    if (reg.status !== "confirmed") throw new Error("Apenas inscrições confirmadas podem ser estornadas");
+    if (!reg.asaas_payment_id) throw new Error("Sem pagamento Asaas vinculado — cancele manualmente");
+
+    await asaasRefundPayment(reg.asaas_payment_id);
+
+    await supabaseAdmin
+      .from("registrations")
+      .update({ status: "cancelled" })
+      .eq("id", reg.id);
+
+    return { ok: true as const, amount_cents: reg.amount_cents };
   });
