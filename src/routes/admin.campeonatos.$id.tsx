@@ -575,7 +575,7 @@ function CategoryDialog({ initial, onSave, uniformModels }: { initial: any; onSa
     price_reais: initial?.price_reais ?? "0",
     active: initial?.active ?? true,
     visible: initial?.visible ?? true,
-    opens_at: initial?.opens_at ? new Date(initial.opens_at).toISOString().slice(0, 16) : "",
+    opens_at: initial?.opens_at ? (() => { const d = new Date(initial.opens_at); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16); })() : "",
     gender: initial?.gender ?? "mixed",
     uniform_model: initial?.uniform_model ?? "",
     age_rule_mode: initial?.age_rule_mode ?? "none",
