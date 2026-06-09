@@ -6,24 +6,31 @@ export function PublicHeader() {
   return (
     <>
       <header className="sticky top-0 z-40 border-b border-border/40 bg-background/80 backdrop-blur-xl">
-        <div className="relative mx-auto flex h-14 max-w-6xl items-center px-4">
+        <div className="mx-auto flex h-14 max-w-6xl items-center px-4">
+
           {/* Logo — esquerda */}
           <Link to="/" className="shrink-0">
             <Logo />
           </Link>
 
-          {/* Nav — absolutamente centralizado dentro da barra */}
-          <nav className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 hidden items-center gap-6 md:flex pointer-events-none">
-            <Link to="/campeonatos" className="pointer-events-auto text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+          {/* Nav — ocupa o espaço restante e centraliza o conteúdo */}
+          <nav className="hidden flex-1 items-center justify-center gap-6 md:flex">
+            <Link to="/campeonatos" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
               Campeonatos
             </Link>
-            <Link to="/tabelas" className="pointer-events-auto text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+            <Link to="/tabelas" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
               Tabelas
             </Link>
-            <Link to="/voucher" className="pointer-events-auto text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+            <Link to="/voucher" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
               Consultar voucher
             </Link>
           </nav>
+
+          {/* Espaçador invisível com a mesma largura do logo para balancear */}
+          <div className="invisible hidden shrink-0 md:block" aria-hidden>
+            <Logo />
+          </div>
+
         </div>
       </header>
 
