@@ -72,6 +72,7 @@ export async function findOrCreateCustomer(input: {
           mobilePhone: input.phone,
           cpfCnpj: input.cpfCnpj,
           externalReference: input.externalReference,
+          notificationDisabled: true,
         },
       });
     }
@@ -85,6 +86,7 @@ export async function findOrCreateCustomer(input: {
       mobilePhone: input.phone,
       cpfCnpj: input.cpfCnpj,
       externalReference: input.externalReference,
+      notificationDisabled: true,
     },
   });
 }
