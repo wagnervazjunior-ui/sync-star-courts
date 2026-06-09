@@ -134,6 +134,19 @@ function BracketHalf({
     </div>
   );
 
+  // For LB: major rounds (same match count as previous) don't advance the offset —
+  // only merging rounds (fewer matches than previous) do. This avoids misaligned connectors.
+  const effectiveIndices: number[] = [];
+  let effIdx = 0;
+  let prevCount = rounds[roundNums[0]]?.length ?? 0;
+  for (let i = 0; i < roundNums.length; i++) {
+    if (i === 0) { effectiveIndices.push(0); continue; }
+    const curCount = rounds[roundNums[i]]?.length ?? 0;
+    if (curCount < prevCount) effIdx++;
+    effectiveIndices.push(effIdx);
+    prevCount = curCount;
+  }
+
   return (
     <div>
       <SectionLabel title={title} color={color} />
@@ -144,7 +157,7 @@ function BracketHalf({
               key={r}
               label={getRoundLabel(r, totalRounds, color, isFinalPhase)}
               matches={rounds[r]}
-              roundIndex={idx}
+              roundIndex={effectiveIndices[idx]}
               isLast={idx === totalRounds - 1}
               color={color}
               cardProps={cardProps}

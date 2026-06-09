@@ -115,15 +115,26 @@ export function generateDoubleElim(n: number): GeneratedMatch[] {
     const wbLosers: SourceRef[] = wbRounds[w - 1].map((k) => ({ type: "loser_of", key: k }));
 
     const majorKeys: string[] = [];
-    const len = Math.min(lbPrev.length, wbLosers.length);
-    for (let i = 0; i < len; i++) {
+    const matchCount = Math.min(lbPrev.length, wbLosers.length);
+    for (let i = 0; i < matchCount; i++) {
       const key = `LB-${lbRoundNum}-${i + 1}`;
       matches.push({ key, phase: "LB", round: lbRoundNum, position: i + 1, source_a: lbPrev[i], source_b: wbLosers[wbLosers.length - 1 - i], bye: false });
       majorKeys.push(key);
     }
     lbRounds.push(majorKeys);
     lbRoundNum++;
-    lbPrev = majorKeys.map((k) => ({ type: "winner_of", key: k } as SourceRef));
+    // Extras that had no opponent this major round advance with a bye
+    const extraWb: SourceRef[] = wbLosers.length > lbPrev.length
+      ? wbLosers.slice(0, wbLosers.length - lbPrev.length)
+      : [];
+    const extraLb: SourceRef[] = lbPrev.length > wbLosers.length
+      ? lbPrev.slice(matchCount)
+      : [];
+    lbPrev = [
+      ...majorKeys.map((k) => ({ type: "winner_of", key: k } as SourceRef)),
+      ...extraWb,
+      ...extraLb,
+    ];
 
     // Skip MINOR in the last drop-in iteration so we keep 2 LB survivors
     if (!isLastDropIn && lbPrev.length > 1) {
