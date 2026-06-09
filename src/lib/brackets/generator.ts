@@ -123,52 +123,59 @@ export function generateDoubleElim(n: number): GeneratedMatch[] {
     }
   }
 
-  // Step 3: Anti-seeded LB R1 pairings — pos i vs pos (size/2 + 1 - i)
+  // Step 3: Collect LB R1 pairings (anti-seed: pos i vs pos size/2+1-i), then
+  // interleave top-half and bottom-half entries so sequential display pairs
+  // [2k, 2k+1] correspond to top-half vs bottom-half matchups in the next minor
+  // round — this makes the visual branching connectors align correctly.
+  type LbEntry = { kind: "match"; a: SourceRef; b: SourceRef } | { kind: "bye"; src: SourceRef };
+  const lbR1Entries: LbEntry[] = [];
+  for (let i = 1; i <= size / 4; i++) {
+    const posA = positions[i];
+    const posB = positions[size / 2 + 1 - i];
+    if (posA !== null && posB !== null) lbR1Entries.push({ kind: "match", a: posA, b: posB });
+    else if (posA !== null) lbR1Entries.push({ kind: "bye", src: posA });
+    else if (posB !== null) lbR1Entries.push({ kind: "bye", src: posB });
+  }
+
+  // Interleave: [0, half, 1, half+1, ...] so sequential pairs = top/bottom pairs
+  const lbR1Half = Math.floor(lbR1Entries.length / 2);
+  const lbR1Interleaved: LbEntry[] = [];
+  for (let k = 0; k < lbR1Half; k++) {
+    lbR1Interleaved.push(lbR1Entries[k]);
+    lbR1Interleaved.push(lbR1Entries[lbR1Half + k]);
+  }
+  if (lbR1Entries.length % 2 === 1) lbR1Interleaved.push(lbR1Entries[lbR1Entries.length - 1]);
+
   const lbR1Keys: string[] = [];
   let lbPrev: SourceRef[] = [];
   let lbRoundNum = 1;
 
-  for (let i = 1; i <= size / 4; i++) {
-    const posA = positions[i];
-    const posB = positions[size / 2 + 1 - i];
-    if (posA !== null && posB !== null) {
+  for (const entry of lbR1Interleaved) {
+    if (entry.kind === "match") {
       const key = `LB-${lbRoundNum}-${lbR1Keys.length + 1}`;
-      matches.push({ key, phase: "LB", round: lbRoundNum, position: lbR1Keys.length + 1, source_a: posA, source_b: posB, bye: false });
+      matches.push({ key, phase: "LB", round: lbRoundNum, position: lbR1Keys.length + 1, source_a: entry.a, source_b: entry.b, bye: false });
       lbR1Keys.push(key);
       lbPrev.push({ type: "winner_of", key });
-    } else if (posA !== null) {
-      lbPrev.push(posA); // bye: posA advances
-    } else if (posB !== null) {
-      lbPrev.push(posB); // bye: posB advances
+    } else {
+      lbPrev.push(entry.src);
     }
   }
-  if (lbR1Keys.length > 0) {
-    // push even if some positions were empty — round exists
-    const allLbR1: string[] = [];
-    for (let i = 1; i <= size / 4; i++) {
-      const posA = positions[i];
-      const posB = positions[size / 2 + 1 - i];
-      if (posA !== null && posB !== null) allLbR1.push(`LB-${lbRoundNum}-${allLbR1.length + 1}`);
-    }
-    lbRoundNum++;
-  } else if (lbPrev.length > 0) {
-    // All byes in LB R1 (very small bracket), no matches created but survivors exist
-  }
+  if (lbR1Keys.length > 0) lbRoundNum++;
 
   // ── LB R2+: major/minor rounds ────────────────────────────────────────────
 
-  // Helper: create a minor round (survivors pair among themselves)
+  // Minor round: sequential pairing (2i, 2i+1) — matches the visual connector
+  // rendering which assumes adjacent matches feed the same next-round slot.
   const doMinor = () => {
     if (lbPrev.length <= 1) return;
     const minorKeys: string[] = [];
     const half = Math.floor(lbPrev.length / 2);
-    // Challonge top-half vs bottom-half: pos i vs pos (half + i)
     for (let i = 0; i < half; i++) {
       const key = `LB-${lbRoundNum}-${i + 1}`;
-      matches.push({ key, phase: "LB", round: lbRoundNum, position: i + 1, source_a: lbPrev[i], source_b: lbPrev[half + i], bye: false });
+      matches.push({ key, phase: "LB", round: lbRoundNum, position: i + 1, source_a: lbPrev[2 * i], source_b: lbPrev[2 * i + 1], bye: false });
       minorKeys.push(key);
     }
-    const tail = lbPrev.length % 2 === 1 ? [lbPrev[Math.floor(lbPrev.length / 2)]] : [];
+    const tail = lbPrev.length % 2 === 1 ? [lbPrev[lbPrev.length - 1]] : [];
     lbRoundNum++;
     lbPrev = [...minorKeys.map((k) => ({ type: "winner_of", key: k } as SourceRef)), ...tail];
   };
