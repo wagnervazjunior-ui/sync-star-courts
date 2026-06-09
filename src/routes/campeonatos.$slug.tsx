@@ -28,7 +28,7 @@ function DetailPage() {
       const { data: ch, error } = await supabase.from("championships").select("*").eq("slug", slug).eq("active", true).maybeSingle();
       if (error) throw error;
       if (!ch) throw notFound();
-      const { data: cats } = await supabase.from("categories").select("*").eq("championship_id", ch.id).eq("active", true).eq("visible", true).order("name");
+      const { data: cats } = await supabase.from("categories").select("*").eq("championship_id", ch.id).eq("active", true).eq("visible", true).order("event_date", { ascending: true, nullsFirst: false }).order("name");
       // availability per category
       const availability: Record<string, number> = {};
       await Promise.all((cats ?? []).map(async (cat) => {
@@ -77,6 +77,12 @@ function DetailPage() {
                     <div className="flex items-start gap-3">
                       <div className="flex-1 min-w-0">
                         <h3 className="text-lg font-bold leading-tight">{cat.name}</h3>
+                        {(cat as any).event_date && (
+                          <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <Calendar className="size-3.5" />
+                            {new Date((cat as any).event_date).toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" })} às {new Date((cat as any).event_date).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                          </p>
+                        )}
                         {cat.description && (
                           <p className="mt-1 text-sm text-muted-foreground line-clamp-2">{cat.description}</p>
                         )}

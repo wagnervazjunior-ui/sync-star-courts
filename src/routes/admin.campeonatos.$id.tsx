@@ -497,6 +497,7 @@ function CategoriesTab({ id, championship }: { id: string; championship: any }) 
       age_rule_mode: form.age_rule_mode || "none",
       age_min: form.age_rule_mode && form.age_rule_mode !== "none" ? Number(form.age_min) : null,
       opens_at: form.opens_at ? new Date(form.opens_at).toISOString() : null,
+      event_date: form.event_date ? new Date(form.event_date).toISOString() : null,
     };
     delete payload.price_reais;
     const op = editing?.id
@@ -577,6 +578,7 @@ function CategoryDialog({ initial, onSave, uniformModels }: { initial: any; onSa
     active: initial?.active ?? true,
     visible: initial?.visible ?? true,
     opens_at: initial?.opens_at ? (() => { const d = new Date(initial.opens_at); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16); })() : "",
+    event_date: initial?.event_date ? (() => { const d = new Date(initial.event_date); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16); })() : "",
     gender: initial?.gender ?? "mixed",
     uniform_model: initial?.uniform_model ?? "",
     age_rule_mode: initial?.age_rule_mode ?? "none",
@@ -641,6 +643,19 @@ function CategoryDialog({ initial, onSave, uniformModels }: { initial: any; onSa
             </div>
           )}
         </div>
+        <div className="space-y-1.5">
+          <Label>Data e horário da categoria</Label>
+          <Input
+            type="datetime-local"
+            value={form.event_date}
+            onChange={(e) => setForm({ ...form, event_date: e.target.value })}
+          />
+          <p className="text-xs text-muted-foreground">Usado para ordenar as categorias na página pública.</p>
+          {form.event_date && (
+            <button type="button" className="text-xs text-destructive hover:underline" onClick={() => setForm({ ...form, event_date: "" })}>Remover data</button>
+          )}
+        </div>
+
         <div className="rounded-lg border border-border/50 p-3 space-y-3">
           <Label className="text-sm font-semibold">Visibilidade e disponibilidade</Label>
           <div className="flex items-center gap-2"><Switch checked={form.active} onCheckedChange={(v) => setForm({ ...form, active: v })} /><Label>Ativa (aceita inscrições)</Label></div>

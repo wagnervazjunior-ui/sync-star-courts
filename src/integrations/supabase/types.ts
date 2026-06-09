@@ -218,6 +218,7 @@ export type Database = {
           championship_id: string
           created_at: string
           description: string | null
+          event_date: string | null
           gender: Database["public"]["Enums"]["category_gender"]
           id: string
           max_slots: number
@@ -236,6 +237,7 @@ export type Database = {
           championship_id: string
           created_at?: string
           description?: string | null
+          event_date?: string | null
           gender?: Database["public"]["Enums"]["category_gender"]
           id?: string
           max_slots: number
@@ -254,6 +256,7 @@ export type Database = {
           championship_id?: string
           created_at?: string
           description?: string | null
+          event_date?: string | null
           gender?: Database["public"]["Enums"]["category_gender"]
           id?: string
           max_slots?: number
