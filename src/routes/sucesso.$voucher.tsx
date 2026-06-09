@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
-import { createPixCharge, simulatePayment, cancelExpiredPix } from "@/lib/payments.functions";
+import { createPixCharge, cancelExpiredPix } from "@/lib/payments.functions";
 import { resendVoucherEmail } from "@/lib/voucher.functions";
 import { PublicHeader } from "@/components/PublicHeader";
 import { Card } from "@/components/ui/card";
@@ -47,7 +47,6 @@ function SuccessPage() {
   const { voucher } = Route.useParams();
   const qc = useQueryClient();
   const callCreatePix = useServerFn(createPixCharge);
-  const callSimulate = useServerFn(simulatePayment);
   const callResend = useServerFn(resendVoucherEmail);
   const callCancelExpired = useServerFn(cancelExpiredPix);
   const [resending, setResending] = useState(false);
@@ -72,7 +71,6 @@ function SuccessPage() {
 
 
   const [generating, setGenerating] = useState(false);
-  const [mock, setMock] = useState(false);
   const [tab, setTab] = useState<"pix" | "card">("pix");
   const [cpfInput, setCpfInput] = useState("");
 
@@ -81,7 +79,6 @@ function SuccessPage() {
     try {
       const cpf = (cpfArg ?? cpfInput).replace(/\D/g, "") || undefined;
       const res = await callCreatePix({ data: { voucher, cpf } });
-      if ("mock" in res) setMock(res.mock);
       qc.invalidateQueries({ queryKey: ["voucher", voucher] });
     } catch (err: any) {
       const msg = err?.message ?? "Erro ao gerar PIX";
@@ -306,12 +303,6 @@ function SuccessPage() {
 
         {!isConfirmed && !isProcessing && (
           <Card className="p-6 bg-gradient-card border-border/50">
-            {mock && (
-              <div className="mb-4 flex items-start gap-2 rounded-md border border-yellow-500/30 bg-yellow-500/10 p-3 text-sm text-yellow-200">
-                <AlertTriangle className="size-4 mt-0.5" />
-                <span>Modo simulação — configure a chave Asaas para gerar cobranças reais.</span>
-              </div>
-            )}
             <Tabs value={tab} onValueChange={(v) => setTab(v as "pix" | "card")} className="w-full">
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="pix"><QrCode className="size-4 mr-2" />PIX</TabsTrigger>
@@ -353,25 +344,6 @@ function SuccessPage() {
                     </p>
                     <Button variant="ghost" className="w-full" onClick={() => qc.invalidateQueries({ queryKey: ["voucher", voucher] })}>
                       Já paguei, atualizar
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="w-full border-yellow-500/40 text-yellow-200 hover:bg-yellow-500/10"
-                      onClick={async () => {
-                        try {
-                          const res = await callSimulate({ data: { voucher } });
-                          if (res.status === "pending_webhook") {
-                            toast.success("Pagamento simulado — aguardando confirmação do Asaas");
-                          } else {
-                            toast.success("Pagamento simulado (sandbox)");
-                          }
-                          qc.invalidateQueries({ queryKey: ["voucher", voucher] });
-                        } catch (err: any) {
-                          toast.error(err?.message ?? "Falha ao simular");
-                        }
-                      }}
-                    >
-                      Simular pagamento (sandbox)
                     </Button>
                   </div>
                 ) : (
