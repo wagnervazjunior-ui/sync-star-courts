@@ -157,9 +157,10 @@ function BracketHalf({
             // LB: when next round has the same match count → major (WB drop-in, 1:1 stubs)
             //     when next round has fewer matches → minor (consolidation, 2:1 branching)
             // WB and final: always branching
+            const curMatchCount = rounds[r]?.length ?? 0;
             const nextMatchCount = nextR !== undefined ? (rounds[nextR]?.length ?? 0) : 0;
             const simpleConnectors = color === "amber" && !isFinalPhase
-              ? (nextR !== undefined && nextMatchCount === matches.length)
+              ? (nextR !== undefined && nextMatchCount === curMatchCount)
               : false;
 
             return (
