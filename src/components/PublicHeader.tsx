@@ -12,7 +12,7 @@ export function PublicHeader() {
           </Link>
 
           {/* Desktop nav — centralizado pelo grid */}
-          <nav className="hidden items-center gap-6 md:flex">
+          <nav className="hidden h-full items-center gap-6 md:flex">
             <Link to="/campeonatos" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
               Campeonatos
             </Link>
