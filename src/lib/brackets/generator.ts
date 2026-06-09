@@ -162,10 +162,10 @@ export function generateDoubleElim(n: number): GeneratedMatch[] {
     if (lbPrev.length <= 1) return;
     const minorKeys: string[] = [];
     const half = Math.floor(lbPrev.length / 2);
-    // Anti-seeded within minor: pair 0 vs last, 1 vs second-to-last, etc.
+    // Challonge top-half vs bottom-half: pos i vs pos (half + i)
     for (let i = 0; i < half; i++) {
       const key = `LB-${lbRoundNum}-${i + 1}`;
-      matches.push({ key, phase: "LB", round: lbRoundNum, position: i + 1, source_a: lbPrev[i], source_b: lbPrev[lbPrev.length - 1 - i], bye: false });
+      matches.push({ key, phase: "LB", round: lbRoundNum, position: i + 1, source_a: lbPrev[i], source_b: lbPrev[half + i], bye: false });
       minorKeys.push(key);
     }
     const tail = lbPrev.length % 2 === 1 ? [lbPrev[Math.floor(lbPrev.length / 2)]] : [];

@@ -154,11 +154,12 @@ function BracketHalf({
         <div className="flex items-start min-w-fit">
           {roundNums.map((r, idx) => {
             const nextR = roundNums[idx + 1];
-            // LB: odd rounds are minor (consolidation, 2:1 branching)
-            //     even rounds are major (WB drop-in, 1:1 stubs)
+            // LB: when next round has the same match count → major (WB drop-in, 1:1 stubs)
+            //     when next round has fewer matches → minor (consolidation, 2:1 branching)
             // WB and final: always branching
+            const nextMatchCount = nextR !== undefined ? (rounds[nextR]?.length ?? 0) : 0;
             const simpleConnectors = color === "amber" && !isFinalPhase
-              ? (nextR !== undefined && nextR % 2 === 0)
+              ? (nextR !== undefined && nextMatchCount === matches.length)
               : false;
 
             return (
