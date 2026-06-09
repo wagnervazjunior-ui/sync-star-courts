@@ -519,7 +519,7 @@ function CategoriesTab({ id, championship }: { id: string; championship: any }) 
       <div className="flex justify-end">
         <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setEditing(null); }}>
           <DialogTrigger asChild><Button variant="hero"><Plus className="size-4" /> Nova categoria</Button></DialogTrigger>
-          <CategoryDialog key={editing?.id ?? "new"} initial={editing} onSave={save} uniformModels={championship?.uniform_models ?? []} />
+          <CategoryDialog key={editing?._key ?? editing?.id ?? "new"} initial={editing} onSave={save} uniformModels={championship?.uniform_models ?? []} />
         </Dialog>
       </div>
       {championship?.active && cats && cats.length > 0 && cats.every((c: any) => !c.active) && (
@@ -553,7 +553,7 @@ function CategoriesTab({ id, championship }: { id: string; championship: any }) 
                 <div className="flex gap-1">
                   <Button size="sm" variant="premium" asChild><Link to="/admin/categorias/$categoryId" params={{ categoryId: c.id }}>Inscrições</Link></Button>
                   <Button size="sm" variant="ghost" onClick={() => { setEditing({ ...c, price_reais: (c.price_cents / 100).toFixed(2) }); setOpen(true); }} title="Editar"><Pencil className="size-4" /></Button>
-                  <Button size="sm" variant="ghost" onClick={() => { const { id, opens_at, ...rest } = c; setEditing({ ...rest, price_reais: (c.price_cents / 100).toFixed(2), opens_at: null }); setOpen(true); }} title="Duplicar categoria"><Copy className="size-4" /></Button>
+                  <Button size="sm" variant="ghost" onClick={() => { const { id, opens_at, ...rest } = c; setEditing({ ...rest, price_reais: (c.price_cents / 100).toFixed(2), opens_at: null, _key: `dup-${c.id}` }); setOpen(true); }} title="Duplicar categoria"><Copy className="size-4" /></Button>
                   <Button size="sm" variant="ghost" onClick={() => remove(c.id)}><Trash2 className="size-4 text-destructive" /></Button>
                 </div>
               </div>
