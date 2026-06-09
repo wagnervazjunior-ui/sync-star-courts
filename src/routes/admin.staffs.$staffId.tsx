@@ -3,6 +3,8 @@ import { useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  adminDeleteFee,
+  adminDeleteReimbursement,
   adminGetStaff,
   adminListFees,
   adminListReimbursements,
@@ -22,7 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, Copy, FileText } from "lucide-react";
+import { ArrowLeft, Copy, FileText, Tag, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/staffs/$staffId")({
@@ -54,6 +56,8 @@ function AdminStaffDetail() {
   const callFeeStatus = useServerFn(setFeeStatus);
   const callReceipt = useServerFn(getReceiptSignedUrl);
   const callFeeReceipt = useServerFn(getFeeReceiptSignedUrl);
+  const callDeleteReimb = useServerFn(adminDeleteReimbursement);
+  const callDeleteFee = useServerFn(adminDeleteFee);
 
   const [championship_id, setChampionshipId] = useState<string>("all");
   const [status, setStatus] = useState<string>("all");
@@ -152,6 +156,28 @@ function AdminStaffDetail() {
     }
   }
 
+  async function deleteReimb(id: string) {
+    if (!confirm("Excluir este reembolso?")) return;
+    try {
+      await callDeleteReimb({ data: { id } });
+      toast.success("Reembolso excluído");
+      qc.invalidateQueries({ queryKey: ["admin-staff-reimbs", staffId] });
+    } catch (e: any) {
+      toast.error(e?.message || "Falha ao excluir reembolso");
+    }
+  }
+
+  async function deleteFee(id: string) {
+    if (!confirm("Excluir este cachê?")) return;
+    try {
+      await callDeleteFee({ data: { id } });
+      toast.success("Cachê excluído");
+      qc.invalidateQueries({ queryKey: ["admin-staff-fees", staffId] });
+    } catch (e: any) {
+      toast.error(e?.message || "Falha ao excluir cachê");
+    }
+  }
+
   const s: any = staff.data?.staff;
 
   return (
@@ -174,6 +200,11 @@ function AdminStaffDetail() {
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <h1 className="text-2xl font-bold">{s.name}</h1>
+              {s.category?.name && (
+                <span className="inline-flex items-center gap-1 mt-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary font-medium">
+                  <Tag className="size-3" /> {s.category.name}
+                </span>
+              )}
               <p className="text-sm text-muted-foreground mt-1">CPF: {s.cpf}</p>
               <p className="text-sm text-muted-foreground">
                 {s.contact_email || s.contact_phone || "—"}
@@ -284,15 +315,26 @@ function AdminStaffDetail() {
                         {r.status === "paid" ? "Pago" : "Pendente"}
                       </Badge>
                     </td>
-                    <td className="py-2 pr-3 text-right space-x-2">
-                      {r.receipt_path && (
-                        <Button size="sm" variant="outline" onClick={() => openReceipt(r.id)}>
-                          <FileText className="size-3" /> Comprovante
+                    <td className="py-2 pr-3 text-right">
+                      <div className="inline-flex gap-1 justify-end flex-wrap">
+                        {r.receipt_path && (
+                          <Button size="sm" variant="outline" onClick={() => openReceipt(r.id)}>
+                            <FileText className="size-3" /> Comprovante
+                          </Button>
+                        )}
+                        <Button size="sm" onClick={() => toggleReimb(r.id, r.status)}>
+                          {r.status === "paid" ? "Marcar pendente" : "Marcar pago"}
                         </Button>
-                      )}
-                      <Button size="sm" onClick={() => toggleReimb(r.id, r.status)}>
-                        {r.status === "paid" ? "Marcar pendente" : "Marcar pago"}
-                      </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => deleteReimb(r.id)}
+                          title="Excluir reembolso"
+                        >
+                          <Trash2 className="size-3" />
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -331,15 +373,26 @@ function AdminStaffDetail() {
                         {f.status === "paid" ? "Pago" : "Pendente"}
                       </Badge>
                     </td>
-                    <td className="py-2 pr-3 text-right space-x-2">
-                      {f.receipt_path && (
-                        <Button size="sm" variant="outline" onClick={() => openFeeReceipt(f.id)}>
-                          <FileText className="size-3" /> Comprovante
+                    <td className="py-2 pr-3 text-right">
+                      <div className="inline-flex gap-1 justify-end flex-wrap">
+                        {f.receipt_path && (
+                          <Button size="sm" variant="outline" onClick={() => openFeeReceipt(f.id)}>
+                            <FileText className="size-3" /> Comprovante
+                          </Button>
+                        )}
+                        <Button size="sm" onClick={() => toggleFee(f.id, f.status)}>
+                          {f.status === "paid" ? "Marcar pendente" : "Marcar pago"}
                         </Button>
-                      )}
-                      <Button size="sm" onClick={() => toggleFee(f.id, f.status)}>
-                        {f.status === "paid" ? "Marcar pendente" : "Marcar pago"}
-                      </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-destructive hover:text-destructive"
+                          onClick={() => deleteFee(f.id)}
+                          title="Excluir cachê"
+                        >
+                          <Trash2 className="size-3" />
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}

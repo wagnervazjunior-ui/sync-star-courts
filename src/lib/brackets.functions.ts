@@ -15,7 +15,16 @@ async function assertCanManage(userId: string, championshipId: string) {
     _championship_id: championshipId,
   });
   if (error) throw new Error(error.message);
-  if (!data) throw new Error("CHAMPIONSHIP_NOT_ALLOWED");
+  if (data) return; // admin/master tem acesso
+
+  // Verificar se é árbitro com acesso a este campeonato
+  const { data: refLink } = await (supabaseAdmin as any)
+    .from("referee_championships")
+    .select("referee_user_id")
+    .eq("referee_user_id", userId)
+    .eq("championship_id", championshipId)
+    .maybeSingle();
+  if (!refLink) throw new Error("CHAMPIONSHIP_NOT_ALLOWED");
 }
 
 function matchKey(phase: string, round: number, position: number) {
@@ -33,11 +42,31 @@ export const listBrackets = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const userId = context.userId;
+
+    // Verificar se o usuário é árbitro (sem admin/master)
+    const { data: rolesData } = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId);
+    const roles = (rolesData ?? []).map((r: any) => r.role);
+    const isRefereeOnly = roles.includes("referee") && !roles.includes("admin") && !roles.includes("master");
+
     let q = supabaseAdmin
       .from("brackets")
       .select("id, name, championship_id, category_id, status, current_phase, match_format, created_at, updated_at")
       .order("created_at", { ascending: false });
-    if (data.championship_id) {
+
+    if (isRefereeOnly) {
+      // Árbitro: filtrar pelos campeonatos liberados a ele
+      const { data: refChamps } = await (supabaseAdmin as any)
+        .from("referee_championships")
+        .select("championship_id")
+        .eq("referee_user_id", userId);
+      const ids = (refChamps ?? []).map((r: any) => r.championship_id);
+      if (!ids.length) return { brackets: [], championships: [], categories: [] };
+      if (data.championship_id && !ids.includes(data.championship_id)) throw new Error("CHAMPIONSHIP_NOT_ALLOWED");
+      q = data.championship_id ? q.eq("championship_id", data.championship_id) : q.in("championship_id", ids);
+    } else if (data.championship_id) {
       await assertCanManage(userId, data.championship_id);
       q = q.eq("championship_id", data.championship_id);
     } else {
@@ -77,6 +106,29 @@ export const listBrackets = createServerFn({ method: "POST" })
     }
 
     return { brackets: filtered, championships: chs ?? [], categories: cats ?? [] };
+  });
+
+// ---------- Campeonatos acessíveis (admin OU árbitro) ----------
+export const listAccessibleChampionships = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const userId = context.userId;
+    const { data: rolesData } = await supabaseAdmin.from("user_roles").select("role").eq("user_id", userId);
+    const roles = (rolesData ?? []).map((r: any) => r.role);
+    const isRefereeOnly = roles.includes("referee") && !roles.includes("admin") && !roles.includes("master");
+
+    if (isRefereeOnly) {
+      const { data: refChamps } = await (supabaseAdmin as any)
+        .from("referee_championships")
+        .select("championship:championships(id, name, start_date)")
+        .eq("referee_user_id", userId);
+      const list = ((refChamps ?? []) as any[]).map((r) => r.championship).filter(Boolean);
+      return { championships: list as Array<{ id: string; name: string; start_date: string | null }> };
+    }
+
+    const { data, error } = await context.supabase.rpc("list_manageable_championships");
+    if (error) throw new Error(error.message);
+    return { championships: (data ?? []) as Array<{ id: string; name: string; start_date: string | null }> };
   });
 
 // ---------- CATEGORIES de um campeonato (com #confirmadas) ----------
@@ -407,6 +459,9 @@ async function maybeFinalize(bracketId: string) {
       t4 ? supabaseAdmin.from("bracket_teams").update({ final_rank: 4 }).eq("id", t4) : Promise.resolve(),
       supabaseAdmin.from("brackets").update({ status: "finished" }).eq("id", bracketId),
     ]);
+    // Disparar notificações de premiação se categoria tiver has_prize=true
+    const { triggerPrizeNotificationsForBracket } = await import("./prizes.functions");
+    triggerPrizeNotificationsForBracket(bracketId).catch(console.error);
   }
 }
 
@@ -497,6 +552,136 @@ export const swapWithinMatch = createServerFn({ method: "POST" })
       .eq("id", match.id);
     if (error) throw new Error(error.message);
     return { ok: true };
+  });
+
+// ---------- TOGGLE PUBLIC ----------
+export const toggleBracketPublic = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ id: z.string().uuid(), public: z.boolean() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { data: bracket } = await supabaseAdmin
+      .from("brackets")
+      .select("championship_id")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (!bracket) throw new Error("NOT_FOUND");
+    await assertCanManage(context.userId, bracket.championship_id);
+    const { error } = await supabaseAdmin
+      .from("brackets")
+      .update({ public: data.public } as any)
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true as const };
+  });
+
+// ---------- GET PUBLIC BRACKET (sem auth) ----------
+export const getPublicBracket = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data }) => {
+    const { data: bracket, error } = await supabaseAdmin
+      .from("brackets")
+      .select("*")
+      .eq("id", data.id)
+      .eq("public" as any, true)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!bracket) throw new Error("NOT_FOUND_OR_NOT_PUBLIC");
+
+    const [{ data: teams }, { data: matches }, { data: ch }, { data: cat }] = await Promise.all([
+      supabaseAdmin.from("bracket_teams").select("*").eq("bracket_id", data.id).order("seed"),
+      supabaseAdmin.from("bracket_matches").select("*").eq("bracket_id", data.id).order("phase").order("round").order("position"),
+      supabaseAdmin.from("championships").select("id, name, slug").eq("id", bracket.championship_id).maybeSingle(),
+      supabaseAdmin.from("categories").select("id, name, gender").eq("id", bracket.category_id).maybeSingle(),
+    ]);
+
+    return { bracket, teams: teams ?? [], matches: matches ?? [], championship: ch, category: cat };
+  });
+
+// ---------- LIST PUBLIC BRACKETS OF A CHAMPIONSHIP ----------
+export const listPublicBrackets = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({ championship_id: z.string().uuid() }).parse(d))
+  .handler(async ({ data }) => {
+    const { data: brackets, error } = await supabaseAdmin
+      .from("brackets")
+      .select("id, name, status, category_id, championship_id")
+      .eq("championship_id", data.championship_id)
+      .eq("public" as any, true)
+      .order("created_at");
+    if (error) throw new Error(error.message);
+    return { brackets: brackets ?? [] };
+  });
+
+// ---------- ADD TEAM TO EXISTING BRACKET (manual, with justification) ----------
+export const addTeamToBracket = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z.object({
+      bracket_id: z.string().uuid(),
+      team_name: z.string().trim().max(120).default(""),
+      athlete1_name: z.string().trim().min(1).max(120),
+      athlete2_name: z.string().trim().min(1).max(120),
+      reason: z.enum(["cash", "sponsor", "courtesy", "other"]),
+      note: z.string().max(500).optional(),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: bracket } = await supabaseAdmin
+      .from("brackets")
+      .select("championship_id")
+      .eq("id", data.bracket_id)
+      .maybeSingle();
+    if (!bracket) throw new Error("NOT_FOUND");
+    await assertCanManage(context.userId, bracket.championship_id);
+
+    // Next available seed
+    const { data: existing } = await supabaseAdmin
+      .from("bracket_teams")
+      .select("seed")
+      .eq("bracket_id", data.bracket_id)
+      .order("seed", { ascending: false })
+      .limit(1);
+    const nextSeed = ((existing?.[0]?.seed) ?? 0) + 1;
+
+    // Insert team
+    const { data: newTeam, error: tErr } = await supabaseAdmin
+      .from("bracket_teams")
+      .insert({
+        bracket_id: data.bracket_id,
+        seed: nextSeed,
+        team_name: data.team_name,
+        athlete1_name: data.athlete1_name,
+        athlete2_name: data.athlete2_name,
+        registration_id: null,
+      })
+      .select("id")
+      .single();
+    if (tErr) throw new Error(tErr.message);
+
+    // Try to fill first available BYE slot in unplayed matches
+    const { data: matches } = await supabaseAdmin
+      .from("bracket_matches")
+      .select("id, team_a_id, team_b_id, source_a, source_b, winner_team_id")
+      .eq("bracket_id", data.bracket_id)
+      .is("winner_team_id", null)
+      .order("round");
+
+    let placed = false;
+    for (const m of matches ?? []) {
+      const srcA = m.source_a as any;
+      const srcB = m.source_b as any;
+      if (!m.team_a_id && (!srcA || srcA.type === "bye" || srcA.type === "seed")) {
+        await supabaseAdmin.from("bracket_matches").update({ team_a_id: newTeam.id }).eq("id", m.id);
+        placed = true;
+        break;
+      }
+      if (!m.team_b_id && (!srcB || srcB.type === "bye" || srcB.type === "seed")) {
+        await supabaseAdmin.from("bracket_matches").update({ team_b_id: newTeam.id }).eq("id", m.id);
+        placed = true;
+        break;
+      }
+    }
+
+    return { ok: true, team_id: newTeam.id, placed };
   });
 
 // ---------- SWAP entre dois slots de partidas diferentes ----------

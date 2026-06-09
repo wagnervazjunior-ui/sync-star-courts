@@ -34,7 +34,7 @@ async function asaasFetch<T>(path: string, init: RequestInit & { json?: unknown 
     access_token: apiKey,
     "Content-Type": "application/json",
     accept: "application/json",
-    "User-Agent": "OpenSyncPay/1.0 (+https://sync-star-courts.lovable.app)",
+    "User-Agent": "OpenSyncPay/1.0 (+https://www.opensync.com.br)",
     ...(init.headers as Record<string, string> | undefined),
   };
   const body = init.json !== undefined ? JSON.stringify(init.json) : init.body;
@@ -173,6 +173,37 @@ export async function createCreditCardCharge(input: {
   return asaasFetch<AsaasCardCharge>("/payments", { method: "POST", json: body });
 }
 
+const PIX_KEY_TYPE_MAP: Record<string, string> = {
+  cpf: "CPF", email: "EMAIL", phone: "PHONE", random: "EVP",
+};
+
+export async function createPixTransfer(input: {
+  pixKey: string;
+  pixKeyType: string;
+  valueCents: number;
+  description: string;
+}): Promise<{ id: string }> {
+  if (isAsaasMock()) return { id: `mock_transfer_${Date.now()}` };
+  const res = await asaasFetch<{ id: string; status: string; failReason?: string }>("/transfers", {
+    method: "POST",
+    json: {
+      value: Number((input.valueCents / 100).toFixed(2)),
+      pixAddressKey: input.pixKey,
+      pixAddressKeyType: PIX_KEY_TYPE_MAP[input.pixKeyType] ?? "CPF",
+      description: input.description,
+    },
+  });
+  if (res.status === "FAILED") {
+    throw new Error(res.failReason ?? "Transferência PIX falhou no Asaas");
+  }
+  return res;
+}
+
+export async function refundPayment(paymentId: string): Promise<void> {
+  if (isAsaasMock()) return;
+  await asaasFetch(`/payments/${paymentId}/refund`, { method: "POST", json: {} });
+}
+
 export async function getPixQrCode(paymentId: string): Promise<PixQrCode> {
   if (isAsaasMock()) {
     // 1x1 transparent PNG, plus a fake BR Code payload so the UI can render.
@@ -185,6 +216,32 @@ export async function getPixQrCode(paymentId: string): Promise<PixQrCode> {
     };
   }
   return asaasFetch<PixQrCode>(`/payments/${paymentId}/pixQrCode`);
+}
+
+
+export async function getTransferReceiptUrl(transferId: string): Promise<string | null> {
+  if (isAsaasMock()) return null;
+  try {
+    const transfer = await asaasFetch<Record<string, unknown>>(`/transfers/${transferId}`);
+    const url = (transfer.receiptUrl ?? transfer.transactionReceiptUrl ?? transfer.receipt ?? null) as string | null;
+    if (url) return url;
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+export async function getTransferReceiptPdf(transferId: string): Promise<string | null> {
+  if (isAsaasMock()) return null;
+  const { apiKey, baseUrl } = getConfig();
+  if (!apiKey) return null;
+  const res = await fetch(`${baseUrl}/transfers/${transferId}/receipt`, {
+    headers: { access_token: apiKey, accept: "application/pdf" },
+  });
+  if (!res.ok) return null;
+  const buf = await res.arrayBuffer();
+  const b64 = Buffer.from(buf).toString("base64");
+  return b64;
 }
 
 export async function receivePaymentInCash(input: {

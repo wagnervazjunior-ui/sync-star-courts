@@ -129,7 +129,11 @@ export function CardPaymentForm({ voucher, amountCents, onConfirmed }: Props) {
       setResult(res);
       if (res.status === "confirmed") onConfirmed();
     } catch (err: any) {
-      setResult({ status: "failed", error: err?.message ?? "Erro inesperado" });
+      const msg = err?.message ?? "Erro inesperado";
+      const friendly = msg.includes("CPF_INVALID")
+        ? "CPF inválido. Verifique o número informado."
+        : msg;
+      setResult({ status: "failed", error: friendly });
     } finally {
       setSubmitting(false);
     }

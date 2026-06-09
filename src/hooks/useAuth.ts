@@ -7,6 +7,7 @@ export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isMaster, setIsMaster] = useState(false);
+  const [isReferee, setIsReferee] = useState(false);
   const [canCreateChampionships, setCanCreateChampionships] = useState(false);
   const [loading, setLoading] = useState(true);
   const [rolesUserId, setRolesUserId] = useState<string | null>(null);
@@ -32,22 +33,27 @@ export function useAuth() {
   const rolesLoading = loading || (!!user && rolesUserId !== user.id);
 
   useEffect(() => {
-    if (!user) { setIsAdmin(false); setIsMaster(false); setCanCreateChampionships(false); setRolesUserId(null); return; }
+    if (!user) { setIsAdmin(false); setIsMaster(false); setIsReferee(false); setCanCreateChampionships(false); setRolesUserId(null); return; }
     (async () => {
       const { data: rolesData } = await supabase.from("user_roles").select("role").eq("user_id", user.id);
       const roles = (rolesData ?? []).map((r) => r.role);
       const master = roles.includes("master" as any);
-      setIsAdmin(roles.includes("admin") || master);
+      const admin = roles.includes("admin" as any);
+      const referee = roles.includes("referee" as any);
       setIsMaster(master);
+      setIsReferee(referee && !admin && !master);
+      setIsAdmin(admin || master || referee); // referee gets past the admin layout guard
       if (master) {
         setCanCreateChampionships(true);
-      } else {
+      } else if (admin) {
         const { data: perm } = await supabase.from("admin_permissions" as any).select("can_create_championships").eq("user_id", user.id).maybeSingle();
         setCanCreateChampionships(!!(perm as any)?.can_create_championships);
+      } else {
+        setCanCreateChampionships(false);
       }
       setRolesUserId(user.id);
     })();
   }, [user]);
 
-  return { session, user, isAdmin, isMaster, canCreateChampionships, loading, rolesLoading };
+  return { session, user, isAdmin, isMaster, isReferee, canCreateChampionships, loading, rolesLoading };
 }

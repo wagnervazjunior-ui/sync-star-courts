@@ -81,74 +81,93 @@ export function MatchCard({
   onSwapInside?: (m: MatchCardData) => void;
   onMoveSlot?: (m: MatchCardData, slot: "a" | "b") => void;
 }) {
+  const isAdmin = !!(onOpenResult || onSwapInside || onMoveSlot);
+
   const teamA = teams.find((t) => t.id === match.team_a_id) ?? null;
   const teamB = teams.find((t) => t.id === match.team_b_id) ?? null;
   const seedA = teamA?.seed ?? (match.source_a?.type === "seed" ? match.source_a.seed : null);
   const seedB = teamB?.seed ?? (match.source_b?.type === "seed" ? match.source_b.seed : null);
   const nameA = teamA ? labelTeam(teamA) : describeSource(match.source_a, teams);
   const nameB = teamB ? labelTeam(teamB) : describeSource(match.source_b, teams);
-  const winA = match.winner_team_id && match.winner_team_id === match.team_a_id;
-  const winB = match.winner_team_id && match.winner_team_id === match.team_b_id;
+  const winA = !!(match.winner_team_id && match.winner_team_id === match.team_a_id);
+  const winB = !!(match.winner_team_id && match.winner_team_id === match.team_b_id);
   const ready = !!(teamA && teamB) && !match.winner_team_id;
   const { a: scoreA, b: scoreB } = aggregateScore(match.sets ?? [], format);
 
   const slotMovable = (slot: "a" | "b") => {
-    const src = slot === "a" ? match.source_a : match.source_b;
-    return !match.winner_team_id && (!src || src.type === "seed" || src.type === "bye");
+    if (match.winner_team_id) return false;
+    const teamId = slot === "a" ? match.team_a_id : match.team_b_id;
+    if (!teamId) return false;
+    return true; // any placed team in an unplayed match can be moved
   };
 
   return (
     <div
       className={cn(
-        "w-64 rounded-md border bg-card text-xs shadow-sm transition select-none",
-        ready ? "border-primary/60" : "border-border",
-        match.winner_team_id && "border-emerald-500/40",
-        match.bye && !match.winner_team_id && "opacity-60",
+        "w-72 rounded-lg border bg-card text-xs shadow-sm transition select-none overflow-hidden",
+        ready && !match.winner_team_id ? "border-primary/50" : "border-border",
+        match.winner_team_id && "border-emerald-500/30",
+        match.bye && !match.winner_team_id && "opacity-50",
       )}
     >
-      <div className="flex items-center justify-between border-b border-border/60 px-2 py-1 text-[10px] uppercase tracking-wider text-muted-foreground">
-        <span>
-          {match.phase} R{match.round} · #{match.position}
+      {/* Header — admin-only: dropdown + trophy */}
+      <div className="flex items-center justify-between px-2 py-1 border-b border-border/40 min-h-[24px]">
+        <span className="text-xs font-bold tabular-nums text-foreground/50 select-none">
+          #{match.position}
         </span>
         <div className="flex items-center gap-1">
           {match.winner_team_id && <Trophy className="size-3 text-emerald-500" />}
-          <DropdownMenu>
-            <DropdownMenuTrigger className="rounded p-0.5 hover:bg-muted/60" aria-label="Ações">
-              <MoreVertical className="size-3" />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="text-xs">
-              <DropdownMenuItem
-                disabled={!ready}
-                onClick={() => onOpenResult?.(match)}
-              >
-                Lançar resultado
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled={!!match.winner_team_id || !match.team_a_id || !match.team_b_id}
-                onClick={() => onSwapInside?.(match)}
-              >
-                Trocar A ↔ B desta partida
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                disabled={!slotMovable("a") || !match.team_a_id}
-                onClick={() => onMoveSlot?.(match, "a")}
-              >
-                Mover dupla A para outra partida
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled={!slotMovable("b") || !match.team_b_id}
-                onClick={() => onMoveSlot?.(match, "b")}
-              >
-                Mover dupla B para outra partida
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {isAdmin && (
+            <DropdownMenu>
+              <DropdownMenuTrigger className="rounded p-0.5 hover:bg-muted/60 min-h-0 min-w-0" aria-label="Ações">
+                <MoreVertical className="size-3" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="text-xs">
+                <DropdownMenuItem disabled={!ready} onClick={() => onOpenResult?.(match)}>
+                  Lançar resultado
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={!!match.winner_team_id || !match.team_a_id || !match.team_b_id}
+                  onClick={() => onSwapInside?.(match)}
+                >
+                  Trocar A ↔ B desta partida
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  disabled={!slotMovable("a") || !match.team_a_id}
+                  onClick={() => onMoveSlot?.(match, "a")}
+                >
+                  Mover dupla A para outra partida
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={!slotMovable("b") || !match.team_b_id}
+                  onClick={() => onMoveSlot?.(match, "b")}
+                >
+                  Mover dupla B para outra partida
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       </div>
-      <Row seed={seedA} name={nameA} score={scoreA} win={!!winA} onClick={() => onOpenResult?.(match)} />
-      <div className="h-px bg-border/40" />
-      <Row seed={seedB} name={nameB} score={scoreB} win={!!winB} onClick={() => onOpenResult?.(match)} />
+
+      <Row
+        seed={seedA}
+        name={nameA}
+        score={scoreA}
+        win={winA}
+        lost={winB}
+        onClick={() => onOpenResult?.(match)}
+      />
+      <div className="h-px bg-border/30" />
+      <Row
+        seed={seedB}
+        name={nameB}
+        score={scoreB}
+        win={winB}
+        lost={winA}
+        onClick={() => onOpenResult?.(match)}
+      />
     </div>
   );
 }
@@ -158,12 +177,14 @@ function Row({
   name,
   score,
   win,
+  lost,
   onClick,
 }: {
   seed: number | null;
   name: string;
   score: number | string;
   win: boolean;
+  lost: boolean;
   onClick?: () => void;
 }) {
   return (
@@ -171,15 +192,29 @@ function Row({
       type="button"
       onClick={onClick}
       className={cn(
-        "flex w-full items-center justify-between gap-2 px-2 py-1.5 text-left",
-        win ? "bg-emerald-500/10 font-semibold text-foreground" : "text-foreground/80 hover:bg-muted/40",
+        "flex w-full items-center gap-2 px-2 py-2 text-left transition-colors min-h-0",
+        win ? "bg-emerald-500/8 hover:bg-emerald-500/12" : "hover:bg-muted/30",
+        lost && "opacity-60",
       )}
     >
-      <span className="inline-block w-6 shrink-0 text-[10px] tabular-nums text-muted-foreground">
+      <span className="w-5 shrink-0 text-[10px] tabular-nums text-muted-foreground/60 text-right">
         {seed ?? "—"}
       </span>
-      <span className="flex-1 truncate">{name}</span>
-      <span className="w-6 text-right tabular-nums">{score}</span>
+      <span className={cn("flex-1 truncate text-xs", win ? "font-semibold text-foreground" : "text-foreground/80")}>
+        {name}
+      </span>
+      <span
+        className={cn(
+          "min-w-[28px] text-center tabular-nums text-[11px] font-bold px-1.5 py-0.5 rounded",
+          win
+            ? "bg-emerald-500 text-white"
+            : score === "-"
+            ? "text-muted-foreground/30"
+            : "text-amber-400",
+        )}
+      >
+        {score}
+      </span>
     </button>
   );
 }

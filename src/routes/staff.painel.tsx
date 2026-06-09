@@ -36,7 +36,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Loader2, LogOut, Plus, Receipt, Wallet, Pencil, FileText } from "lucide-react";
+import { Loader2, LogOut, Plus, Receipt, Wallet, Pencil, FileText, User } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/staff/painel")({
@@ -128,7 +128,7 @@ function StaffPanel() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl px-4 py-8 space-y-6">
+      <main className="mx-auto max-w-5xl px-4 py-6 pb-8 space-y-5 md:py-8 md:space-y-6">
         {/* Profile card */}
         <Card className="p-6 bg-gradient-card border-border/50">
           <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -272,10 +272,11 @@ function EditPixDialog({
   const [open, setOpen] = useState(false);
   const [type, setType] = useState(current.pix_key_type);
   const [key, setKey] = useState(current.pix_key);
+  const [declared, setDeclared] = useState(false);
   const [saving, setSaving] = useState(false);
   const call = useServerFn(updateStaffPix);
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) setDeclared(false); }}>
       <DialogTrigger asChild>
         <Button size="sm" variant="outline"><Pencil className="size-4" /> Editar PIX</Button>
       </DialogTrigger>
@@ -298,10 +299,22 @@ function EditPixDialog({
             <Label>Chave</Label>
             <Input value={key} onChange={(e) => setKey(e.target.value)} />
           </div>
+          <div className="flex items-start gap-3 rounded-lg border border-border/50 bg-card/40 p-3">
+            <input
+              type="checkbox"
+              id="pix-declare"
+              checked={declared}
+              onChange={(e) => setDeclared(e.target.checked)}
+              className="mt-0.5 size-4 accent-primary cursor-pointer"
+            />
+            <label htmlFor="pix-declare" className="text-xs text-muted-foreground cursor-pointer leading-relaxed">
+              Declaro que a chave PIX informada está correta e pertence à minha conta. Estou ciente de que sou responsável por quaisquer pagamentos realizados com base nestes dados.
+            </label>
+          </div>
           <Button
             variant="hero"
             className="w-full"
-            disabled={saving}
+            disabled={saving || !declared || !key.trim()}
             onClick={async () => {
               setSaving(true);
               try {
@@ -309,6 +322,7 @@ function EditPixDialog({
                 toast.success("PIX atualizado");
                 onSaved();
                 setOpen(false);
+                setDeclared(false);
               } catch {
                 toast.error("Erro ao atualizar PIX");
               } finally {

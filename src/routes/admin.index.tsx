@@ -1,7 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Trophy, Users, CheckCircle2, XCircle, Clock, DollarSign } from "lucide-react";
@@ -11,6 +12,13 @@ export const Route = createFileRoute("/admin/")({
 });
 
 function Dashboard() {
+  const { isReferee, isAdmin } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (isReferee && !isAdmin) navigate({ to: "/admin/chaves" });
+  }, [isReferee, isAdmin, navigate]);
+
   const [championshipId, setChampionshipId] = useState<string>("all");
   const { data: championships } = useQuery({
     queryKey: ["admin-championships"],

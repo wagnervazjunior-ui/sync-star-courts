@@ -106,15 +106,39 @@
 
 @layer base {
   * { border-color: var(--color-border); }
-  html { color-scheme: dark; }
+  html {
+    color-scheme: dark;
+    /* Prevent horizontal scroll on mobile */
+    overflow-x: hidden;
+  }
   body {
     background: var(--gradient-hero);
     background-attachment: fixed;
     color: var(--color-foreground);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+    /* Prevent body scroll issues on iOS */
+    -webkit-overflow-scrolling: touch;
   }
   h1, h2, h3, h4 { letter-spacing: -0.02em; }
+
+  /* Minimum touch target size — WCAG 2.5.5 */
+  button, [role="button"], a {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  /* Allow small inline links to stay compact */
+  a.inline-link {
+    min-height: unset;
+    min-width: unset;
+  }
+
+  /* iOS safe area for bottom navigation */
+  @supports (padding-bottom: env(safe-area-inset-bottom)) {
+    .pb-safe {
+      padding-bottom: calc(env(safe-area-inset-bottom) + 0.5rem);
+    }
+  }
 }
 
 @layer utilities {

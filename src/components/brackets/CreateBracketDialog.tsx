@@ -9,8 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogT
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { listCategoriesForBracket, createBracket } from "@/lib/brackets.functions";
-import { supabase } from "@/integrations/supabase/client";
+import { listCategoriesForBracket, createBracket, listAccessibleChampionships } from "@/lib/brackets.functions";
 
 export function CreateBracketDialog({
   onCreated,
@@ -32,13 +31,11 @@ export function CreateBracketDialog({
   const navigate = useNavigate();
   const callCreate = useServerFn(createBracket);
   const callCats = useServerFn(listCategoriesForBracket);
+  const callChamps = useServerFn(listAccessibleChampionships);
 
-  const { data: champs } = useQuery({
+  const { data: champsData } = useQuery({
     queryKey: ["my-championships"],
-    queryFn: async () => {
-      const { data } = await supabase.rpc("list_manageable_championships");
-      return data ?? [];
-    },
+    queryFn: () => callChamps(),
     enabled: open && !defaultChampionshipId,
   });
 
@@ -98,7 +95,7 @@ export function CreateBracketDialog({
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
                 <SelectContent>
-                  {(champs ?? []).map((c: any) => (
+                  {(champsData?.championships ?? []).map((c: any) => (
                     <SelectItem key={c.id} value={c.id}>
                       {c.name}
                     </SelectItem>

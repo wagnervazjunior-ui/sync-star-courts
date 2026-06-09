@@ -35,10 +35,12 @@ export function StandingsTab({
   teams,
   matches,
   onSaved,
+  readonly = false,
 }: {
   teams: TeamRef[];
   matches: MatchCardData[];
   onSaved: () => void;
+  readonly?: boolean;
 }) {
   const [editing, setEditing] = useState<TeamRef | null>(null);
 
@@ -129,15 +131,17 @@ export function StandingsTab({
                 </Badge>
               </div>
               <div>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="size-7"
-                  onClick={() => setEditing(r.team)}
-                  aria-label="Editar dupla"
-                >
-                  <Pencil className="size-3.5" />
-                </Button>
+                {!readonly && (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="size-7"
+                    onClick={() => setEditing(r.team)}
+                    aria-label="Editar dupla"
+                  >
+                    <Pencil className="size-3.5" />
+                  </Button>
+                )}
               </div>
             </div>
           );

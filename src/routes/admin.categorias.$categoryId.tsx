@@ -11,8 +11,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { useServerFn } from "@tanstack/react-start";
+import { refundRegistration } from "@/lib/payments.functions";
 import { toast } from "sonner";
-import { ArrowLeft, CheckCircle2, XCircle, Users, Pencil } from "lucide-react";
+import { ArrowLeft, CheckCircle2, XCircle, Users, Pencil, UserPlus, Loader2, RotateCcw, CreditCard, QrCode } from "lucide-react";
+import { AdminPinDialog } from "@/components/AdminPinDialog";
+
+const PAYMENT_METHOD_LABEL: Record<string, { label: string; icon: React.ReactNode }> = {
+  pix:         { label: "PIX",      icon: <QrCode className="size-3" /> },
+  credit_card: { label: "Cartão",   icon: <CreditCard className="size-3" /> },
+  cash:        { label: "Dinheiro", icon: null },
+};
+function brl(cents: number) { return `R$ ${(cents / 100).toFixed(2).replace(".", ",")}`; }
 
 const SHIRT_SIZES = ["P", "M", "G", "GG", "XG"] as const;
 const maskPhone = (v: string) => {
@@ -34,6 +44,21 @@ function CategoryAdminPage() {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<any | null>(null);
+  const [manualOpen, setManualOpen] = useState(false);
+  const [pinDialog, setPinDialog] = useState<{ title: string; description: string; action: () => Promise<void> } | null>(null);
+  const callRefund = useServerFn(refundRegistration);
+
+  const handleRefund = (id: string, voucher: string, amountCents: number) => {
+    setPinDialog({
+      title: "Confirmar estorno",
+      description: `Estornar inscrição ${voucher} (${brl(amountCents)})? O valor será devolvido ao pagador e a inscrição cancelada.`,
+      action: async () => {
+        await callRefund({ data: { registration_id: id } });
+        toast.success(`Estorno realizado — ${brl(amountCents)} devolvidos`);
+        qc.invalidateQueries({ queryKey: ["adm-cat-regs", categoryId] });
+      },
+    });
+  };
 
   const { data: cat } = useQuery({
     queryKey: ["adm-cat", categoryId],
@@ -42,7 +67,7 @@ function CategoryAdminPage() {
 
   const { data: regs } = useQuery({
     queryKey: ["adm-cat-regs", categoryId],
-    queryFn: async () => (await supabase.from("registrations").select("*").eq("category_id", categoryId).order("created_at", { ascending: false })).data ?? [],
+    queryFn: async () => (await supabase.from("registrations").select("*, category:categories(price_cents)").eq("category_id", categoryId).order("created_at", { ascending: false })).data ?? [],
   });
 
   const filtered = useMemo(() => {
@@ -80,6 +105,9 @@ function CategoryAdminPage() {
             <Badge variant="secondary" className="gap-1"><Users className="size-3" /> {totalAtivas}/{cat?.max_slots ?? 0} inscritos · {restantes} vaga(s)</Badge>
           </div>
         </div>
+        <Button variant="hero" onClick={() => setManualOpen(true)}>
+          <UserPlus className="size-4" /> Inscrever dupla
+        </Button>
       </div>
 
       <Card className="mt-6 p-4 bg-gradient-card border-border/50">
@@ -97,7 +125,9 @@ function CategoryAdminPage() {
               <TableHead>E-mail</TableHead>
               <TableHead>Atleta 1 (cam/short)</TableHead>
               <TableHead>Atleta 2 (cam/short)</TableHead>
-              <TableHead>Data</TableHead>
+              <TableHead>Pagamento</TableHead>
+              <TableHead>Confirmado em</TableHead>
+              <TableHead>Data inscrição</TableHead>
               <TableHead></TableHead>
             </TableRow>
           </TableHeader>
@@ -113,6 +143,18 @@ function CategoryAdminPage() {
                 <TableCell className="text-xs">{r.contact_email}</TableCell>
                 <TableCell className="text-sm">{r.athlete1_name}<br /><span className="text-xs text-muted-foreground">{r.athlete1_shirt_size} / {r.athlete1_shorts_size}</span></TableCell>
                 <TableCell className="text-sm">{r.athlete2_name}<br /><span className="text-xs text-muted-foreground">{r.athlete2_shirt_size} / {r.athlete2_shorts_size}</span></TableCell>
+                <TableCell className="text-xs whitespace-nowrap">
+                  {r.amount_cents > 0 && (
+                    <span className="font-semibold">{brl(r.amount_cents)}{r.installments > 1 ? ` (${r.installments}x)` : ""}</span>
+                  )}
+                  {r.payment_method && (() => {
+                    const pm = PAYMENT_METHOD_LABEL[r.payment_method];
+                    return pm ? <span className="flex items-center gap-1 mt-0.5 text-muted-foreground">{pm.icon}{pm.label}</span> : null;
+                  })()}
+                </TableCell>
+                <TableCell className="text-xs whitespace-nowrap text-muted-foreground">
+                  {r.confirmed_at ? new Date(r.confirmed_at).toLocaleString("pt-BR") : "—"}
+                </TableCell>
                 <TableCell className="text-xs whitespace-nowrap">{new Date(r.created_at).toLocaleString("pt-BR")}</TableCell>
                 <TableCell>
                   <div className="flex gap-1">
@@ -135,6 +177,16 @@ function CategoryAdminPage() {
                           </AlertDialogFooter>
                         </AlertDialogContent>
                       </AlertDialog>
+                    )}
+                    {r.status === "confirmed" && r.asaas_payment_id && (
+                      <Button
+                        size="sm" variant="outline"
+                        className="text-destructive border-destructive/40 hover:bg-destructive/10"
+                        title="Estornar pagamento"
+                        onClick={() => handleRefund(r.id, r.voucher_code, r.amount_cents)}
+                      >
+                        <RotateCcw className="size-4" />
+                      </Button>
                     )}
                     {r.status !== "cancelled" && (
                       <AlertDialog>
@@ -160,7 +212,7 @@ function CategoryAdminPage() {
               </TableRow>
             ))}
             {filtered.length === 0 && (
-              <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">Nenhuma inscrição.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-8">Nenhuma inscrição.</TableCell></TableRow>
             )}
           </TableBody>
         </Table>
@@ -173,7 +225,237 @@ function CategoryAdminPage() {
         onClose={() => setEditing(null)}
         onSaved={() => { setEditing(null); qc.invalidateQueries({ queryKey: ["adm-cat-regs", categoryId] }); }}
       />
+
+      <ManualRegistrationDialog
+        open={manualOpen}
+        onClose={() => setManualOpen(false)}
+        categoryId={categoryId}
+        ageRuleMode={cat?.age_rule_mode ?? "none"}
+        onSaved={() => {
+          setManualOpen(false);
+          qc.invalidateQueries({ queryKey: ["adm-cat-regs", categoryId] });
+        }}
+      />
+
+      <AdminPinDialog
+        open={!!pinDialog}
+        onOpenChange={(open) => { if (!open) setPinDialog(null); }}
+        title={pinDialog?.title ?? ""}
+        description={pinDialog?.description}
+        onConfirmed={async () => {
+          try {
+            await pinDialog?.action();
+          } catch (e: any) {
+            toast.error(e?.message ?? "Falha ao executar operação");
+          } finally {
+            setPinDialog(null);
+          }
+        }}
+      />
     </div>
+  );
+}
+
+function ManualRegistrationDialog({
+  open, onClose, categoryId, ageRuleMode, onSaved,
+}: {
+  open: boolean;
+  onClose: () => void;
+  categoryId: string;
+  ageRuleMode: string;
+  onSaved: () => void;
+}) {
+  const showAge = ageRuleMode && ageRuleMode !== "none";
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    contact_email: "",
+    contact_phone: "",
+    team_name: "",
+    athlete1_name: "",
+    athlete1_shirt_size: "M",
+    athlete1_shorts_size: "M",
+    athlete1_birthdate: "",
+    athlete2_name: "",
+    athlete2_shirt_size: "M",
+    athlete2_shorts_size: "M",
+    athlete2_birthdate: "",
+    reason: "" as "cash" | "sponsor" | "courtesy" | "other" | "",
+    note: "",
+  });
+
+  const reset = () => setForm({
+    contact_email: "", contact_phone: "", team_name: "",
+    athlete1_name: "", athlete1_shirt_size: "M", athlete1_shorts_size: "M", athlete1_birthdate: "",
+    athlete2_name: "", athlete2_shirt_size: "M", athlete2_shorts_size: "M", athlete2_birthdate: "",
+    reason: "", note: "",
+  });
+
+  const save = async () => {
+    if (!form.team_name.trim() || !form.athlete1_name.trim() || !form.athlete2_name.trim()) {
+      toast.error("Preencha nome da dupla e dos dois atletas");
+      return;
+    }
+    if (!form.contact_email.trim() && !form.contact_phone.trim()) {
+      toast.error("Informe ao menos e-mail ou WhatsApp");
+      return;
+    }
+    if (!form.reason) {
+      toast.error("Selecione o motivo da inscrição manual");
+      return;
+    }
+    setSaving(true);
+    try {
+      // 1. Criar inscrição via RPC (valida vagas com lock no banco)
+      const { data, error } = await supabase.rpc("create_registration", {
+        payload: {
+          category_id: categoryId,
+          contact_email: form.contact_email.toLowerCase().trim() || `admin+${Date.now()}@opensync.com.br`,
+          contact_phone: form.contact_phone || "",
+          team_name: form.team_name.trim(),
+          athlete1_name: form.athlete1_name.trim(),
+          athlete1_shirt_size: form.athlete1_shirt_size,
+          athlete1_shorts_size: form.athlete1_shorts_size,
+          athlete1_birthdate: form.athlete1_birthdate || null,
+          athlete2_name: form.athlete2_name.trim(),
+          athlete2_shirt_size: form.athlete2_shirt_size,
+          athlete2_shorts_size: form.athlete2_shorts_size,
+          athlete2_birthdate: form.athlete2_birthdate || null,
+          terms_accepted: true,
+        },
+      });
+      if (error) {
+        if (error.message.includes("SLOTS_FULL")) toast.error("Categoria sem vagas disponíveis");
+        else toast.error(error.message);
+        return;
+      }
+
+      // 2. Confirmar automaticamente (inscrição manual não precisa de pagamento)
+      const voucher = (data as any)?.voucher_code;
+      if (voucher) {
+        const { data: reg } = await supabase
+          .from("registrations")
+          .select("id")
+          .eq("voucher_code", voucher)
+          .maybeSingle();
+        if (reg?.id) {
+          await supabase.rpc("confirm_registration", {
+            _id: reg.id,
+            _reason: form.reason,
+            _note: form.note.trim() || null,
+          });
+        }
+      }
+
+      toast.success(`Dupla inscrita e confirmada! Voucher: ${voucher}`);
+      reset();
+      onSaved();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Erro ao inscrever dupla");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) { onClose(); reset(); } }}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <UserPlus className="size-5 text-primary" /> Inscrever dupla manualmente
+          </DialogTitle>
+        </DialogHeader>
+        <p className="text-xs text-muted-foreground -mt-2">A inscrição será criada e confirmada automaticamente, sem necessidade de pagamento.</p>
+
+        <div className="space-y-4">
+          {/* Justificativa */}
+          <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-3">
+            <h4 className="font-semibold text-sm text-primary">Justificativa da inscrição manual</h4>
+            <div className="space-y-2">
+              <Label>Motivo <span className="text-destructive">*</span></Label>
+              <Select value={form.reason} onValueChange={(v) => setForm({ ...form, reason: v as typeof form.reason })}>
+                <SelectTrigger><SelectValue placeholder="Selecione o motivo" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">Pagamento em dinheiro / PIX direto</SelectItem>
+                  <SelectItem value="sponsor">Patrocinador</SelectItem>
+                  <SelectItem value="courtesy">Cortesia</SelectItem>
+                  <SelectItem value="other">Outro</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Observação <span className="text-xs text-muted-foreground">(opcional)</span></Label>
+              <Input
+                value={form.note}
+                onChange={(e) => setForm({ ...form, note: e.target.value })}
+                placeholder="Ex: pagamento recebido via PIX em 31/05, comprovante arquivado"
+                maxLength={500}
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label>E-mail de contato</Label>
+              <Input type="email" value={form.contact_email} onChange={(e) => setForm({ ...form, contact_email: e.target.value })} placeholder="dupla@email.com" />
+            </div>
+            <div className="space-y-2">
+              <Label>WhatsApp</Label>
+              <Input value={form.contact_phone} onChange={(e) => setForm({ ...form, contact_phone: maskPhone(e.target.value) })} placeholder="(11) 99999-9999" />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Nome da dupla</Label>
+            <Input value={form.team_name} onChange={(e) => setForm({ ...form, team_name: e.target.value })} placeholder="Ex: Os Invencíveis" />
+          </div>
+
+          {[1, 2].map((n) => {
+            const nameKey = `athlete${n}_name` as keyof typeof form;
+            const shirtKey = `athlete${n}_shirt_size` as keyof typeof form;
+            const shortsKey = `athlete${n}_shorts_size` as keyof typeof form;
+            const birthKey = `athlete${n}_birthdate` as keyof typeof form;
+            return (
+              <div key={n} className="rounded-lg border border-border/50 p-3 space-y-3">
+                <h4 className="font-semibold text-primary">Atleta {n}</h4>
+                <div className="space-y-2">
+                  <Label>Nome completo</Label>
+                  <Input value={form[nameKey]} onChange={(e) => setForm({ ...form, [nameKey]: e.target.value })} />
+                </div>
+                {showAge && (
+                  <div className="space-y-2">
+                    <Label>Data de nascimento</Label>
+                    <Input type="date" value={form[birthKey]} onChange={(e) => setForm({ ...form, [birthKey]: e.target.value })} />
+                  </div>
+                )}
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Camiseta</Label>
+                    <Select value={form[shirtKey]} onValueChange={(v) => setForm({ ...form, [shirtKey]: v })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>{SHIRT_SIZES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Shorts</Label>
+                    <Select value={form[shortsKey]} onValueChange={(v) => setForm({ ...form, [shortsKey]: v })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>{SHIRT_SIZES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => { onClose(); reset(); }}>Cancelar</Button>
+          <Button variant="hero" onClick={save} disabled={saving}>
+            {saving ? <><Loader2 className="size-4 animate-spin mr-2" />Inscrevendo…</> : <><UserPlus className="size-4 mr-2" />Inscrever e confirmar</>}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

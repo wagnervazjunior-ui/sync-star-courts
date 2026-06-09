@@ -4,7 +4,8 @@ DECLARE
 BEGIN
   SELECT id INTO v_new FROM auth.users WHERE lower(email) = 'estacao.open23@gmail.com' LIMIT 1;
   IF v_new IS NULL THEN
-    RAISE EXCEPTION 'User estacao.open23@gmail.com not found in auth.users';
+    RAISE NOTICE 'User estacao.open23@gmail.com not found — skipping master role assignment. Run again after the user signs up.';
+    RETURN;
   END IF;
 
   INSERT INTO public.user_roles (user_id, role) VALUES (v_new, 'master'::public.app_role)

@@ -19,7 +19,7 @@ export interface VoucherEmailData {
 
 
 export function buildVoucherEmailSubject(d: VoucherEmailData) {
-  return `🏐 Inscrição confirmada — Voucher ${d.voucherCode} (${d.championshipName})`;
+  return ` Inscrição confirmada — Voucher ${d.voucherCode} (${d.championshipName})`;
 }
 
 export function buildVoucherEmailHtml(d: VoucherEmailData) {
@@ -60,7 +60,7 @@ export function buildVoucherEmailHtml(d: VoucherEmailData) {
           </table>
 
           <div style="background:#1a1a1a;border:1px solid #262626;border-radius:12px;padding:20px;margin-bottom:24px">
-            <p style="margin:0 0 12px;font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#f97316;font-weight:700">🏐 Atletas</p>
+            <p style="margin:0 0 12px;font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#f97316;font-weight:700"> Atletas</p>
             ${team}
             <div style="padding:12px 0;border-top:1px solid #262626">
               <p style="margin:0;font-size:15px;color:#fff;font-weight:600">${escape(d.athlete1Name)}</p>
@@ -92,7 +92,7 @@ export function buildVoucherEmailHtml(d: VoucherEmailData) {
         </td></tr>
 
         <tr><td style="padding:24px 32px;background:#0a0a0a;text-align:center;border-top:1px solid #262626">
-          <p style="margin:0;font-size:12px;color:#6b7280">Bora pra arena! 🔥🏐<br><strong style="color:#f97316">Equipe Open Sync</strong></p>
+          <p style="margin:0;font-size:12px;color:#6b7280">Bora pra arena! 🔥<br><strong style="color:#f97316">Equipe Open Sync</strong></p>
         </td></tr>
       </table>
     </td></tr>

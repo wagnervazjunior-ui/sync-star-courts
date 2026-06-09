@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
-import { createPixCharge, simulatePayment } from "@/lib/payments.functions";
+import { createPixCharge, simulatePayment, cancelExpiredPix } from "@/lib/payments.functions";
 import { resendVoucherEmail } from "@/lib/voucher.functions";
 import { PublicHeader } from "@/components/PublicHeader";
 import { Card } from "@/components/ui/card";
@@ -49,7 +49,9 @@ function SuccessPage() {
   const callCreatePix = useServerFn(createPixCharge);
   const callSimulate = useServerFn(simulatePayment);
   const callResend = useServerFn(resendVoucherEmail);
+  const callCancelExpired = useServerFn(cancelExpiredPix);
   const [resending, setResending] = useState(false);
+  const [countdown, setCountdown] = useState<number | null>(null);
 
   const { data, isLoading, error, refetch, isFetching } = useQuery({
     queryKey: ["voucher", voucher],
@@ -85,6 +87,10 @@ function SuccessPage() {
       const msg = err?.message ?? "Erro ao gerar PIX";
       if (msg.includes("CPF_REQUIRED")) {
         toast.error("Informe o CPF para gerar o PIX");
+      } else if (msg.includes("CPF_INVALID")) {
+        toast.error("CPF inválido. Verifique o número informado.");
+      } else if (msg.includes("PRICE_BELOW_MINIMUM")) {
+        toast.error("Valor mínimo de cobrança é R$ 10,00. Ajuste o preço da categoria.");
       } else {
         toast.error(msg);
       }
@@ -102,6 +108,29 @@ function SuccessPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data?.id, tab, data?.payer_cpf]);
+
+  // Countdown timer + auto-cancel on expiry
+  useEffect(() => {
+    if (!data?.pix_expires_at || data.status !== "pending" || !data.pix_qr_code) {
+      setCountdown(null);
+      return;
+    }
+    const tick = () => {
+      const remaining = Math.floor((new Date(data.pix_expires_at!).getTime() - Date.now()) / 1000);
+      if (remaining <= 0) {
+        setCountdown(0);
+        callCancelExpired({ data: { voucher } }).then((r) => {
+          if (r.cancelled) qc.invalidateQueries({ queryKey: ["voucher", voucher] });
+        }).catch(() => {});
+        return;
+      }
+      setCountdown(remaining);
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data?.pix_expires_at, data?.status, data?.pix_qr_code]);
 
   if (isLoading) {
     return (
@@ -170,7 +199,7 @@ function SuccessPage() {
   return (
     <div className="min-h-screen">
       <PublicHeader />
-      <main className="mx-auto max-w-xl px-4 py-10 space-y-4">
+      <main className="mx-auto max-w-xl px-4 py-6 pb-28 space-y-4 md:py-10 md:pb-10">
         <Card className="p-8 bg-gradient-card border-border/50 shadow-elegant text-center">
           <div className={`mx-auto inline-flex size-16 items-center justify-center rounded-full ${isConfirmed ? "bg-success/20 text-success" : isProcessing ? "bg-primary/20 text-primary" : "bg-primary/20 text-primary"}`}>
             {isConfirmed ? <CheckCircle2 className="size-10" /> : isProcessing ? <Clock className="size-10" /> : <Loader2 className="size-10 animate-spin" />}
@@ -308,6 +337,17 @@ function SuccessPage() {
                         <Button size="sm" variant="outline" onClick={copyPayload}><Copy className="size-4" /></Button>
                       </div>
                     </div>
+                    {countdown !== null && countdown > 0 && (
+                      <div className={`flex items-center justify-center gap-2 text-sm font-medium ${countdown <= 60 ? "text-destructive" : "text-yellow-400"}`}>
+                        <Clock className="size-4" />
+                        Expira em {Math.floor(countdown / 60)}:{String(countdown % 60).padStart(2, "0")} min
+                      </div>
+                    )}
+                    {countdown === 0 && (
+                      <div className="rounded-lg bg-destructive/10 border border-destructive/30 p-3 text-center text-sm text-destructive">
+                        O tempo esgotou e a vaga foi liberada. Gere um novo PIX para tentar novamente.
+                      </div>
+                    )}
                     <p className="text-xs text-muted-foreground text-center">
                       Esta tela atualiza sozinha quando o pagamento for identificado.
                     </p>

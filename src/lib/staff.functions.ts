@@ -1,4 +1,21 @@
 import { createServerFn, createMiddleware } from "@tanstack/react-start";
+
+export const STAFF_ROLES = [
+  { value: "arbitragem",   label: "Arbitragem" },
+  { value: "comunicacao",  label: "Comunicação" },
+  { value: "narracao",     label: "Narração" },
+  { value: "fotografia",   label: "Fotografia" },
+  { value: "video_maker",  label: "Video Maker" },
+  { value: "transmissao",  label: "Transmissão" },
+  { value: "loja",         label: "Loja" },
+  { value: "recepcao",     label: "Recepção" },
+  { value: "geral",        label: "Geral" },
+  { value: "bar",          label: "Bar" },
+  { value: "imprensa",     label: "Imprensa" },
+] as const;
+
+export type StaffRole = typeof STAFF_ROLES[number]["value"];
+import { createPixTransfer } from "./asaas.server";
 import {
   getRequestHeader,
   setResponseHeader,
@@ -70,6 +87,8 @@ const RegisterSchema = z
     contact_phone: z.string().max(30).optional().or(z.literal("")),
     pix_key_type: PixKeyType,
     pix_key: z.string().trim().min(1).max(200),
+    category_id: z.string().uuid().optional().nullable(),
+    staff_role: z.string().max(50).optional().nullable(),
   })
   .superRefine((v, ctx) => {
     if (!isValidCpf(v.cpf)) {
@@ -162,7 +181,9 @@ export const registerStaff = createServerFn({ method: "POST" })
         contact_phone: data.contact_phone || null,
         pix_key_type: data.pix_key_type,
         pix_key: data.pix_key.trim(),
-      })
+        category_id: data.category_id || null,
+        staff_role: data.staff_role || null,
+      } as any)
       .select("id")
       .single();
     if (error) throw new Error(error.message);
@@ -487,7 +508,7 @@ export const listMyStaffs = createServerFn({ method: "POST" })
     const { data: rows, error } = await supabaseAdmin
       .from("staffs")
       .select(
-        "id, name, cpf, rg, birthdate, contact_email, contact_phone, pix_key_type, pix_key, created_at, staff_championships(championship_id)",
+        "id, name, cpf, rg, birthdate, contact_email, contact_phone, pix_key_type, pix_key, staff_role, created_at, staff_championships(championship_id)",
       )
       .eq("owner_admin_id", context.userId)
       .order("created_at", { ascending: false });
@@ -503,6 +524,21 @@ export const listMyStaffs = createServerFn({ method: "POST" })
       list = list.filter((s: any) => !s.championship_ids.includes(data.not_in_championship_id));
     }
     return { staffs: list };
+  });
+
+export const updateStaffRole = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ staff_id: z.string().uuid(), staff_role: z.string().max(50).nullable() }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { error } = await supabaseAdmin
+      .from("staffs")
+      .update({ staff_role: data.staff_role } as any)
+      .eq("id", data.staff_id)
+      .eq("owner_admin_id", context.userId);
+    if (error) throw new Error(error.message);
+    return { ok: true as const };
   });
 
 export const linkStaffToChampionship = createServerFn({ method: "POST" })
@@ -577,9 +613,9 @@ export const adminGetStaff = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => z.object({ staff_id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
-    const { data: row, error } = await supabaseAdmin
+    const { data: row, error } = await (supabaseAdmin as any)
       .from("staffs")
-      .select("id, name, cpf, rg, birthdate, contact_email, contact_phone, pix_key_type, pix_key, owner_admin_id, created_at")
+      .select("id, name, cpf, rg, birthdate, contact_email, contact_phone, pix_key_type, pix_key, owner_admin_id, created_at, category_id, category:staff_categories(id, name)")
       .eq("id", data.staff_id)
       .maybeSingle();
     if (error) throw new Error(error.message);
@@ -594,7 +630,7 @@ export const adminListReimbursements = createServerFn({ method: "POST" })
     let query = supabaseAdmin
       .from("staff_reimbursements")
       .select(
-        "id, category, description, amount_cents, expense_date, receipt_path, status, paid_at, created_at, " +
+        "id, category, description, amount_cents, expense_date, receipt_path, status, paid_at, created_at, asaas_transfer_id, " +
           "staff:staffs!inner(id, name, cpf, pix_key_type, pix_key, owner_admin_id), " +
           "championship:championships!inner(id, name)",
       )
@@ -671,7 +707,7 @@ export const adminListFees = createServerFn({ method: "POST" })
     let query = supabaseAdmin
       .from("staff_fees")
       .select(
-        "id, amount_cents, description, receipt_path, status, paid_at, created_at, created_by_role, " +
+        "id, amount_cents, description, receipt_path, status, paid_at, created_at, created_by_role, asaas_transfer_id, " +
           "staff:staffs!inner(id, name, cpf, pix_key_type, pix_key, owner_admin_id), " +
           "championship:championships!inner(id, name, created_by)",
       )
@@ -781,6 +817,41 @@ export const getFeeReceiptSignedUrl = createServerFn({ method: "POST" })
     return { url: signed?.signedUrl ?? null };
   });
 
+export const adminCreateReimbursement = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    CreateReimbSchema.extend({ staff_id: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: staff } = await supabaseAdmin
+      .from("staffs")
+      .select("id, owner_admin_id")
+      .eq("id", data.staff_id)
+      .maybeSingle();
+    if (!staff || staff.owner_admin_id !== context.userId) throw new Error("FORBIDDEN");
+
+    const { data: link } = await supabaseAdmin
+      .from("staff_championships")
+      .select("id")
+      .eq("staff_id", data.staff_id)
+      .eq("championship_id", data.championship_id)
+      .maybeSingle();
+    if (!link) throw new Error("CHAMPIONSHIP_NOT_ALLOWED");
+
+    const { error } = await supabaseAdmin.from("staff_reimbursements").insert({
+      staff_id: data.staff_id,
+      championship_id: data.championship_id,
+      category: data.category,
+      description: data.description?.trim() ?? "",
+      amount_cents: data.amount_cents,
+      expense_date: data.expense_date,
+      receipt_path: data.receipt_path || null,
+      created_by_role: "admin",
+    });
+    if (error) throw new Error(error.message);
+    return { ok: true as const };
+  });
+
 export const createAdminReceiptUploadUrl = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) =>
@@ -813,16 +884,18 @@ export const exportStaffFinanceXlsx = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => ExportInput.parse(input ?? {}))
   .handler(async ({ data, context }) => {
     const ExcelJS = (await import("exceljs")).default;
+    const { getTransferReceiptUrl } = await import("./asaas.server");
 
     // Reimbursements
     let rq = supabaseAdmin
       .from("staff_reimbursements")
       .select(
-        "amount_cents, status, staff_id, championship_id, " +
+        "id, amount_cents, status, category, description, expense_date, paid_at, asaas_transfer_id, staff_id, championship_id, " +
           "staff:staffs!inner(id, name, cpf, pix_key_type, pix_key, owner_admin_id), " +
           "championship:championships(id, name)",
       )
-      .eq("staff.owner_admin_id", context.userId);
+      .eq("staff.owner_admin_id", context.userId)
+      .order("paid_at", { ascending: false });
     if (data.championship_id) rq = rq.eq("championship_id", data.championship_id);
     const { data: reimbs, error: e1 } = await rq;
     if (e1) throw new Error(e1.message);
@@ -831,11 +904,12 @@ export const exportStaffFinanceXlsx = createServerFn({ method: "POST" })
     let fq = supabaseAdmin
       .from("staff_fees")
       .select(
-        "amount_cents, status, staff_id, championship_id, " +
+        "id, amount_cents, status, description, paid_at, asaas_transfer_id, staff_id, championship_id, " +
           "staff:staffs!inner(id, name, cpf, pix_key_type, pix_key, owner_admin_id), " +
           "championship:championships(id, name)",
       )
-      .eq("staff.owner_admin_id", context.userId);
+      .eq("staff.owner_admin_id", context.userId)
+      .order("paid_at", { ascending: false });
     if (data.championship_id) fq = fq.eq("championship_id", data.championship_id);
     const { data: fees, error: e2 } = await fq;
     if (e2) throw new Error(e2.message);
@@ -941,8 +1015,302 @@ export const exportStaffFinanceXlsx = createServerFn({ method: "POST" })
       totalRow.font = { bold: true };
     }
 
+    // ── Aba: Reembolsos detalhados ──────────────────────────────────────────
+    const wsR = wb.addWorksheet("Reembolsos");
+    wsR.columns = [
+      { header: "Staff", key: "name", width: 28 },
+      { header: "CPF", key: "cpf", width: 16 },
+      { header: "Campeonato", key: "champ", width: 28 },
+      { header: "Categoria", key: "cat", width: 18 },
+      { header: "Descrição", key: "desc", width: 35 },
+      { header: "Data despesa", key: "date", width: 14 },
+      { header: "Valor (R$)", key: "amount", width: 14 },
+      { header: "Status", key: "status", width: 12 },
+      { header: "Pago em", key: "paid_at", width: 20 },
+      { header: "Chave PIX", key: "pix", width: 32 },
+      { header: "Comprovante", key: "receipt", width: 40 },
+    ];
+    wsR.getRow(1).font = { bold: true };
+    wsR.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1D4ED8" } };
+    wsR.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
+    wsR.getColumn("amount").numFmt = '"R$" #,##0.00';
+
+    const REIMB_CAT_LABEL: Record<string, string> = {
+      alimentacao: "Alimentação", transporte: "Transporte", passagem: "Passagem",
+      gasolina: "Gasolina", hospedagem: "Hospedagem", outro: "Outro",
+    };
+
+    for (const r of (reimbs ?? []) as any[]) {
+      const s = r.staff;
+      let receiptUrl = "";
+      if (r.asaas_transfer_id && r.status === "paid") {
+        receiptUrl = await getTransferReceiptUrl(r.asaas_transfer_id).catch(() => null) ?? "";
+      }
+      const row = wsR.addRow({
+        name: s?.name ?? "",
+        cpf: s?.cpf ?? "",
+        champ: r.championship?.name ?? "",
+        cat: REIMB_CAT_LABEL[r.category] ?? r.category ?? "",
+        desc: r.description ?? "",
+        date: r.expense_date ? new Date(r.expense_date).toLocaleDateString("pt-BR") : "",
+        amount: r.amount_cents / 100,
+        status: r.status === "paid" ? "Pago" : "Pendente",
+        paid_at: r.paid_at ? new Date(r.paid_at).toLocaleString("pt-BR") : "",
+        pix: s?.pix_key ?? "",
+        receipt: receiptUrl,
+      });
+      if (receiptUrl) {
+        row.getCell("receipt").value = { text: "Ver comprovante", hyperlink: receiptUrl };
+        row.getCell("receipt").font = { color: { argb: "FF1D4ED8" }, underline: true };
+      }
+      if (r.status === "paid") {
+        row.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE6F4EA" } };
+      }
+    }
+
+    // ── Aba: Cachês detalhados ──────────────────────────────────────────────
+    const wsF = wb.addWorksheet("Cachês");
+    wsF.columns = [
+      { header: "Staff", key: "name", width: 28 },
+      { header: "CPF", key: "cpf", width: 16 },
+      { header: "Campeonato", key: "champ", width: 28 },
+      { header: "Descrição", key: "desc", width: 35 },
+      { header: "Valor (R$)", key: "amount", width: 14 },
+      { header: "Status", key: "status", width: 12 },
+      { header: "Pago em", key: "paid_at", width: 20 },
+      { header: "Chave PIX", key: "pix", width: 32 },
+      { header: "Comprovante", key: "receipt", width: 40 },
+    ];
+    wsF.getRow(1).font = { bold: true };
+    wsF.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF059669" } };
+    wsF.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
+    wsF.getColumn("amount").numFmt = '"R$" #,##0.00';
+
+    for (const f of (fees ?? []) as any[]) {
+      const s = f.staff;
+      let receiptUrl = "";
+      if (f.asaas_transfer_id && f.status === "paid") {
+        receiptUrl = await getTransferReceiptUrl(f.asaas_transfer_id).catch(() => null) ?? "";
+      }
+      const row = wsF.addRow({
+        name: s?.name ?? "",
+        cpf: s?.cpf ?? "",
+        champ: f.championship?.name ?? "",
+        desc: f.description ?? "",
+        amount: f.amount_cents / 100,
+        status: f.status === "paid" ? "Pago" : "Pendente",
+        paid_at: f.paid_at ? new Date(f.paid_at).toLocaleString("pt-BR") : "",
+        pix: s?.pix_key ?? "",
+        receipt: receiptUrl,
+      });
+      if (receiptUrl) {
+        row.getCell("receipt").value = { text: "Ver comprovante", hyperlink: receiptUrl };
+        row.getCell("receipt").font = { color: { argb: "FF059669" }, underline: true };
+      }
+      if (f.status === "paid") {
+        row.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE6F4EA" } };
+      }
+    }
+
     const buf = await wb.xlsx.writeBuffer();
     const base64 = Buffer.from(buf as ArrayBuffer).toString("base64");
     const date = new Date().toISOString().slice(0, 10);
     return { filename: `financeiro-staff-${date}.xlsx`, base64 };
+  });
+
+// ---------- Staff categories ----------
+
+export const listStaffCategoriesByToken = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => z.object({ token: z.string().min(1) }).parse(input))
+  .handler(async ({ data }) => {
+    const { data: invite } = await supabaseAdmin
+      .from("staff_invites")
+      .select("owner_admin_id, active")
+      .eq("token", data.token)
+      .maybeSingle();
+    if (!invite || !invite.active) return { categories: [] as Array<{ id: string; name: string }> };
+    const { data: rows } = await (supabaseAdmin as any)
+      .from("staff_categories")
+      .select("id, name")
+      .eq("owner_admin_id", invite.owner_admin_id)
+      .order("name");
+    return { categories: (rows ?? []) as Array<{ id: string; name: string }> };
+  });
+
+export const listStaffCategories = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await (supabaseAdmin as any)
+      .from("staff_categories")
+      .select("id, name, created_at")
+      .eq("owner_admin_id", context.userId)
+      .order("name");
+    if (error) throw new Error(error.message);
+    return { categories: (data ?? []) as Array<{ id: string; name: string; created_at: string }> };
+  });
+
+export const createStaffCategory = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ name: z.string().trim().min(1, "Informe um nome").max(80) }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { error } = await (supabaseAdmin as any)
+      .from("staff_categories")
+      .insert({ owner_admin_id: context.userId, name: data.name });
+    if (error) throw new Error(error.message);
+    return { ok: true as const };
+  });
+
+export const deleteStaffCategory = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { error } = await (supabaseAdmin as any)
+      .from("staff_categories")
+      .delete()
+      .eq("id", data.id)
+      .eq("owner_admin_id", context.userId);
+    if (error) throw new Error(error.message);
+    return { ok: true as const };
+  });
+
+export const adminDeleteStaff = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ staff_id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { data: staff } = await supabaseAdmin
+      .from("staffs")
+      .select("id, owner_admin_id")
+      .eq("id", data.staff_id)
+      .maybeSingle();
+    if (!staff || staff.owner_admin_id !== context.userId) throw new Error("FORBIDDEN");
+    // Remove dependentes antes de excluir o staff
+    await supabaseAdmin.from("staff_sessions").delete().eq("staff_id", data.staff_id);
+    await supabaseAdmin.from("staff_reimbursements").delete().eq("staff_id", data.staff_id);
+    await supabaseAdmin.from("staff_fees").delete().eq("staff_id", data.staff_id);
+    await supabaseAdmin.from("staff_championships").delete().eq("staff_id", data.staff_id);
+    const { error } = await supabaseAdmin.from("staffs").delete().eq("id", data.staff_id);
+    if (error) throw new Error(error.message);
+    return { ok: true as const };
+  });
+
+export const adminDeleteReimbursement = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { data: row } = await supabaseAdmin
+      .from("staff_reimbursements")
+      .select("id, staff:staffs!inner(owner_admin_id)")
+      .eq("id", data.id)
+      .maybeSingle();
+    const owner = (row as any)?.staff?.owner_admin_id;
+    if (!row || owner !== context.userId) throw new Error("FORBIDDEN");
+    const { error } = await supabaseAdmin.from("staff_reimbursements").delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true as const };
+  });
+
+export const adminDeleteFee = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { data: row } = await supabaseAdmin
+      .from("staff_fees")
+      .select("id, staff:staffs!inner(owner_admin_id)")
+      .eq("id", data.id)
+      .maybeSingle();
+    const owner = (row as any)?.staff?.owner_admin_id;
+    if (!row || owner !== context.userId) throw new Error("FORBIDDEN");
+    const { error } = await supabaseAdmin.from("staff_fees").delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true as const };
+  });
+
+async function assertMaster(userId: string) {
+  const { data } = await supabaseAdmin.from("user_roles").select("role").eq("user_id", userId).eq("role", "master" as any).maybeSingle();
+  if (!data) throw new Error("Apenas admin master pode executar pagamentos via Asaas");
+}
+
+// ── Pay fee via Asaas PIX transfer ────────────────────────────────────────────
+export const payFeeViaAsaas = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ fee_id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    await assertMaster(context.userId);
+    const { data: fee } = await supabaseAdmin
+      .from("staff_fees")
+      .select("*, staff:staffs(name, pix_key, pix_key_type, owner_admin_id)")
+      .eq("id", data.fee_id)
+      .maybeSingle();
+    if (!fee) throw new Error("Cachê não encontrado");
+    const staff: any = fee.staff;
+    if (staff.owner_admin_id !== context.userId) throw new Error("FORBIDDEN");
+    if (fee.status === "paid") throw new Error("Cachê já está pago");
+    if (!staff.pix_key) throw new Error("Staff sem chave PIX cadastrada");
+
+    const transfer = await createPixTransfer({
+      pixKey: staff.pix_key,
+      pixKeyType: staff.pix_key_type,
+      valueCents: fee.amount_cents,
+      description: `Cachê staff: ${staff.name}${fee.description ? ` — ${fee.description}` : ""}`,
+    });
+
+    const now = new Date().toISOString();
+    const { error } = await supabaseAdmin
+      .from("staff_fees")
+      .update({ status: "paid", paid_at: now, paid_by: context.userId, asaas_transfer_id: transfer.id } as any)
+      .eq("id", data.fee_id);
+    if (error) throw new Error(error.message);
+    return { ok: true as const, transfer_id: transfer.id };
+  });
+
+// ── Pay reimbursement via Asaas PIX transfer ──────────────────────────────────
+export const payReimbursementViaAsaas = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ reimbursement_id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    await assertMaster(context.userId);
+    const { data: reimb } = await supabaseAdmin
+      .from("staff_reimbursements")
+      .select("*, staff:staffs(name, pix_key, pix_key_type, owner_admin_id)")
+      .eq("id", data.reimbursement_id)
+      .maybeSingle();
+    if (!reimb) throw new Error("Reembolso não encontrado");
+    const staff: any = reimb.staff;
+    if (staff.owner_admin_id !== context.userId) throw new Error("FORBIDDEN");
+    if (reimb.status === "paid") throw new Error("Reembolso já está pago");
+    if (!staff.pix_key) throw new Error("Staff sem chave PIX cadastrada");
+
+    const transfer = await createPixTransfer({
+      pixKey: staff.pix_key,
+      pixKeyType: staff.pix_key_type,
+      valueCents: reimb.amount_cents,
+      description: `Reembolso staff: ${staff.name} — ${reimb.description}`,
+    });
+
+    const now = new Date().toISOString();
+    const { error } = await supabaseAdmin
+      .from("staff_reimbursements")
+      .update({ status: "paid", paid_at: now, paid_by: context.userId, asaas_transfer_id: transfer.id } as any)
+      .eq("id", data.reimbursement_id);
+    if (error) throw new Error(error.message);
+    return { ok: true as const, transfer_id: transfer.id };
+  });
+
+// ── Comprovante de transferência Asaas ──────────────────────────────────────
+export const getAsaasTransferReceipt = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) => z.object({ transfer_id: z.string().min(1) }).parse(input))
+  .handler(async ({ data, context }) => {
+    await assertMaster(context.userId);
+    const { getTransferReceiptUrl, getTransferReceiptPdf } = await import("./asaas.server");
+
+    const url = await getTransferReceiptUrl(data.transfer_id);
+    if (url) return { type: "url" as const, value: url };
+
+    const pdf = await getTransferReceiptPdf(data.transfer_id);
+    if (pdf) return { type: "pdf" as const, value: pdf };
+
+    return { type: "none" as const, value: null };
   });

@@ -28,12 +28,13 @@ export const Route = createFileRoute("/api/public/asaas-webhook")({
         const expected = process.env.ASAAS_WEBHOOK_TOKEN;
         const provided = request.headers.get("asaas-access-token") ?? "";
 
-        // If the token is configured, enforce it. If it isn't, accept (mock mode)
-        // so we can wire the URL into the Asaas dashboard later without breaking.
-        if (expected) {
-          if (!provided || !timingSafeEqual(provided, expected)) {
-            return new Response("Invalid token", { status: 401 });
-          }
+        // Token is mandatory. Reject all requests if not configured.
+        if (!expected) {
+          console.error("[asaas-webhook] ASAAS_WEBHOOK_TOKEN not configured — rejecting request");
+          return new Response("Webhook not configured", { status: 503 });
+        }
+        if (!provided || !timingSafeEqual(provided, expected)) {
+          return new Response("Invalid token", { status: 401 });
         }
 
         let json: unknown;
@@ -55,11 +56,22 @@ export const Route = createFileRoute("/api/public/asaas-webhook")({
             event === "PAYMENT_CONFIRMED" ||
             event === "PAYMENT_APPROVED_BY_RISK_ANALYSIS"
           ) {
+            // Check status before confirming to avoid duplicate emails on Asaas retries
+            const { data: before } = await supabaseAdmin
+              .from("registrations")
+              .select("status")
+              .eq("id", registrationId)
+              .maybeSingle();
+
             await supabaseAdmin.rpc("confirm_registration_by_payment", {
               _payment_id: payment.id,
               _registration_id: registrationId,
             });
-            await sendVoucherConfirmationEmail(registrationId);
+
+            // Only send email if registration was not already confirmed (idempotent)
+            if (before?.status !== "confirmed") {
+              await sendVoucherConfirmationEmail(registrationId);
+            }
           } else if (event === "PAYMENT_AWAITING_RISK_ANALYSIS") {
             await supabaseAdmin.rpc("set_registration_processing", {
               _payment_id: payment.id,

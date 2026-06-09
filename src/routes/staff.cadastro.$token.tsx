@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { getInvite, registerStaff } from "@/lib/staff.functions";
+import { getInvite, listStaffCategoriesByToken, registerStaff, STAFF_ROLES } from "@/lib/staff.functions";
 import { PublicHeader } from "@/components/PublicHeader";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -28,6 +28,8 @@ const Schema = z.object({
   contact_phone: z.string().max(30).optional(),
   pix_key_type: z.enum(["cpf", "email", "phone", "random"]),
   pix_key: z.string().trim().min(1, "Informe a chave PIX"),
+  category_id: z.string().uuid().optional().nullable(),
+  staff_role: z.string().max(50).optional().nullable(),
 });
 
 type FormValues = z.infer<typeof Schema>;
@@ -45,15 +47,22 @@ function StaffRegisterPage() {
   const nav = useNavigate();
   const callGet = useServerFn(getInvite);
   const callRegister = useServerFn(registerStaff);
+  const callCategories = useServerFn(listStaffCategoriesByToken);
   const [checking, setChecking] = useState(true);
   const [valid, setValid] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
 
   useEffect(() => {
     callGet({ data: { token } })
-      .then((r) => setValid(r.ok))
+      .then((r) => {
+        setValid(r.ok);
+        if (r.ok) {
+          callCategories({ data: { token } }).then((c) => setCategories(c.categories));
+        }
+      })
       .finally(() => setChecking(false));
-  }, [token, callGet]);
+  }, [token, callGet, callCategories]);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(Schema),
@@ -66,6 +75,8 @@ function StaffRegisterPage() {
       contact_phone: "",
       pix_key_type: "cpf",
       pix_key: "",
+      category_id: null,
+      staff_role: null,
     },
   });
 
@@ -161,6 +172,34 @@ function StaffRegisterPage() {
             <Field label="Data de nascimento" error={form.formState.errors.birthdate?.message}>
               <Input type="date" {...form.register("birthdate")} />
             </Field>
+            <Field label="Área de atuação" error={form.formState.errors.staff_role?.message}>
+              <Select
+                value={form.watch("staff_role") ?? ""}
+                onValueChange={(v) => form.setValue("staff_role", v || null)}
+              >
+                <SelectTrigger><SelectValue placeholder="Selecione sua área" /></SelectTrigger>
+                <SelectContent>
+                  {STAFF_ROLES.map((r) => (
+                    <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            {categories.length > 0 && (
+              <Field label="Categoria (personalizada)" error={form.formState.errors.category_id?.message}>
+                <Select
+                  value={form.watch("category_id") ?? ""}
+                  onValueChange={(v) => form.setValue("category_id", v || null)}
+                >
+                  <SelectTrigger><SelectValue placeholder="Selecione sua categoria" /></SelectTrigger>
+                  <SelectContent>
+                    {categories.map((cat) => (
+                      <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field label="E-mail (opcional)" error={form.formState.errors.contact_email?.message}>
                 <Input type="email" {...form.register("contact_email")} placeholder="voce@email.com" />

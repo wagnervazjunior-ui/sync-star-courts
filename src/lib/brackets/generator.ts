@@ -1,7 +1,12 @@
 // Pure double-elimination bracket generator.
-// Estrutura: WB completo + LB completo. Encerra ao definir os 4 classificados
-// (1º=W WB-Final, 2º=L WB-Final, 3º=W LB-Final, 4º=L LB-Final), depois Fase Final
-// mata-mata: Semi1=1ºx4º, Semi2=2ºx3º, Final, Disputa de 3º.
+//
+// Format: WB + LB each run until 2 teams remain (no WB Final / LB Final in
+// the initial phase). Those 4 teams advance directly to the Fase Final as
+// semi-finalists. The admin can rearrange the semi-final matchups via "Mover
+// dupla". For very small brackets (size=4) a bye slot is used so the SEMI
+// always has 4 slots.
+//
+// Phases: WB, LB, SEMI, FINAL, THIRD.
 
 export type MatchPhase = "WB" | "LB" | "SEMI" | "FINAL" | "THIRD";
 
@@ -13,7 +18,7 @@ export type SourceRef =
   | null;
 
 export interface GeneratedMatch {
-  key: string; // ex "WB-1-3" (phase-round-position 1-indexed)
+  key: string;
   phase: MatchPhase;
   round: number;
   position: number;
@@ -22,7 +27,7 @@ export interface GeneratedMatch {
   bye: boolean;
 }
 
-// Pareamento padrão "standard seeding" (1vN, ..., recursivo).
+// Standard seeding order (1vN, recursive).
 export function standardSeedOrder(size: number): number[] {
   if (size === 1) return [1];
   const prev = standardSeedOrder(size / 2);
@@ -40,16 +45,13 @@ function nextPow2(n: number) {
   return p;
 }
 
-// Gera somente a estrutura (chaves) — não consome banco.
-// Para N duplas, devolve lista de matches WB + LB + SEMI + FINAL + THIRD.
 export function generateDoubleElim(n: number): GeneratedMatch[] {
-  if (n < 2) throw new Error("Mínimo 2 duplas");
+  if (n < 3) throw new Error("Mínimo 3 duplas");
   const size = nextPow2(n);
-  const order = standardSeedOrder(size); // ex size=4 → [1,4,2,3]
+  const order = standardSeedOrder(size);
   const matches: GeneratedMatch[] = [];
 
-  // -------- WB Round 1 --------
-  // pares consecutivos do order; se seed > n, oponente recebe bye
+  // ── WB Round 1 ────────────────────────────────────────────────────────────
   const wbRounds: string[][] = [];
   const r1Keys: string[] = [];
   for (let i = 0; i < size / 2; i++) {
@@ -58,116 +60,78 @@ export function generateDoubleElim(n: number): GeneratedMatch[] {
     const key = `WB-1-${i + 1}`;
     const a: SourceRef = s1 <= n ? { type: "seed", seed: s1 } : { type: "bye" };
     const b: SourceRef = s2 <= n ? { type: "seed", seed: s2 } : { type: "bye" };
-    const bye = a.type === "bye" || b.type === "bye";
-    matches.push({ key, phase: "WB", round: 1, position: i + 1, source_a: a, source_b: b, bye });
+    matches.push({ key, phase: "WB", round: 1, position: i + 1, source_a: a, source_b: b, bye: a.type === "bye" || b.type === "bye" });
     r1Keys.push(key);
   }
   wbRounds.push(r1Keys);
 
-  // -------- WB Rounds 2.. até a final do WB --------
+  // ── WB Rounds 2..  — stop when 2 teams remain (no WB Final) ───────────────
   let prev = r1Keys;
-  let round = 2;
-  while (prev.length > 1) {
+  let wbRound = 2;
+  while (prev.length > 2) {
     const cur: string[] = [];
     for (let i = 0; i < prev.length / 2; i++) {
-      const key = `WB-${round}-${i + 1}`;
-      matches.push({
-        key,
-        phase: "WB",
-        round,
-        position: i + 1,
-        source_a: { type: "winner_of", key: prev[i * 2] },
-        source_b: { type: "winner_of", key: prev[i * 2 + 1] },
-        bye: false,
-      });
+      const key = `WB-${wbRound}-${i + 1}`;
+      matches.push({ key, phase: "WB", round: wbRound, position: i + 1, source_a: { type: "winner_of", key: prev[i * 2] }, source_b: { type: "winner_of", key: prev[i * 2 + 1] }, bye: false });
       cur.push(key);
     }
     wbRounds.push(cur);
     prev = cur;
-    round++;
+    wbRound++;
   }
-  const wbFinalKey = prev[0];
+  // prev has exactly 2 elements — the 2 WB semi-finalists
+  const wbSemi: SourceRef[] = prev.map((k) => ({ type: "winner_of", key: k }));
 
-  // -------- LB --------
-  // Modelo padrão de double-elim:
-  // LB rodadas alternam "minor" (consolidação entre perdedores do LB) e "major" (drop-in de perdedores do WB).
-  // LB-R1: pareia perdedores do WB-R1 (descartando matches que foram bye — perdedor é "bye").
+  // ── LB ────────────────────────────────────────────────────────────────────
+  // LB R1: pair WB-R1 losers (skip byes)
   const lbRounds: string[][] = [];
   const wbR1Losers = wbRounds[0]
     .map((k) => ({ key: k, bye: matches.find((m) => m.key === k)!.bye }))
     .filter((x) => !x.bye)
     .map((x) => x.key);
 
-  // LB-R1: pareia perdedores do WB-R1 dois a dois; se número ímpar, último avança (bye no LB).
   const lbR1Keys: string[] = [];
   let lbRoundNum = 1;
+  let lbCarry: SourceRef[] = [];
+
   if (wbR1Losers.length >= 2) {
     for (let i = 0; i < Math.floor(wbR1Losers.length / 2); i++) {
       const key = `LB-${lbRoundNum}-${i + 1}`;
-      matches.push({
-        key,
-        phase: "LB",
-        round: lbRoundNum,
-        position: i + 1,
-        source_a: { type: "loser_of", key: wbR1Losers[i * 2] },
-        source_b: { type: "loser_of", key: wbR1Losers[i * 2 + 1] },
-        bye: false,
-      });
+      matches.push({ key, phase: "LB", round: lbRoundNum, position: i + 1, source_a: { type: "loser_of", key: wbR1Losers[i * 2] }, source_b: { type: "loser_of", key: wbR1Losers[i * 2 + 1] }, bye: false });
       lbR1Keys.push(key);
     }
   }
-  // sobrante (ímpar) — vira "carry" para próxima rodada do LB
-  let lbCarry: SourceRef[] = [];
   if (wbR1Losers.length % 2 === 1) {
     lbCarry.push({ type: "loser_of", key: wbR1Losers[wbR1Losers.length - 1] });
   }
-  let lbPrev: SourceRef[] = lbR1Keys.map((k) => ({ type: "winner_of", key: k }));
-  lbPrev = [...lbPrev, ...lbCarry];
+  let lbPrev: SourceRef[] = [...lbR1Keys.map((k) => ({ type: "winner_of", key: k } as SourceRef)), ...lbCarry];
   lbRounds.push(lbR1Keys);
   lbRoundNum++;
 
-  // A partir daqui alternamos:
-  //   major round = drop-in dos perdedores do WB-R{w}
-  //   minor round = consolidação interna do LB
-  // até sobrar 1 finalista do LB.
-  for (let w = 2; w < wbRounds.length; w++) {
+  // Major + minor rounds: drop losers from WB rounds 2..last into LB.
+  // Stop MINOR in the last iteration so LB ends with 2 survivors (not 1).
+  for (let w = 2; w <= wbRounds.length; w++) {
+    const isLastDropIn = w === wbRounds.length;
     const wbLosers: SourceRef[] = wbRounds[w - 1].map((k) => ({ type: "loser_of", key: k }));
-    // MAJOR: empareia cada participante do lbPrev com um perdedor do WB-R{w}
-    // (espera-se mesmo número)
+
     const majorKeys: string[] = [];
     const len = Math.min(lbPrev.length, wbLosers.length);
     for (let i = 0; i < len; i++) {
       const key = `LB-${lbRoundNum}-${i + 1}`;
-      matches.push({
-        key,
-        phase: "LB",
-        round: lbRoundNum,
-        position: i + 1,
-        source_a: lbPrev[i],
-        source_b: wbLosers[wbLosers.length - 1 - i], // reverso para evitar revanche imediata
-        bye: false,
-      });
+      matches.push({ key, phase: "LB", round: lbRoundNum, position: i + 1, source_a: lbPrev[i], source_b: wbLosers[wbLosers.length - 1 - i], bye: false });
       majorKeys.push(key);
     }
     lbRounds.push(majorKeys);
     lbRoundNum++;
-    lbPrev = majorKeys.map((k) => ({ type: "winner_of", key: k }));
+    lbPrev = majorKeys.map((k) => ({ type: "winner_of", key: k } as SourceRef));
 
-    // MINOR: se sobram >1, consolida
-    if (lbPrev.length > 1) {
+    // Skip MINOR in the last drop-in iteration so we keep 2 LB survivors
+    if (!isLastDropIn && lbPrev.length > 1) {
       const minorKeys: string[] = [];
       const half = Math.floor(lbPrev.length / 2);
       for (let i = 0; i < half; i++) {
         const key = `LB-${lbRoundNum}-${i + 1}`;
-        matches.push({
-          key,
-          phase: "LB",
-          round: lbRoundNum,
-          position: i + 1,
-          source_a: lbPrev[i * 2],
-          source_b: lbPrev[i * 2 + 1],
-          bye: false,
-        });
+        matches.push({ key, phase: "LB", round: lbRoundNum, position: i + 1, source_a: lbPrev[i * 2], source_b: lbPrev[i * 2 + 1], bye: false });
         minorKeys.push(key);
       }
       const tail: SourceRef[] = lbPrev.length % 2 === 1 ? [lbPrev[lbPrev.length - 1]] : [];
@@ -177,21 +141,13 @@ export function generateDoubleElim(n: number): GeneratedMatch[] {
     }
   }
 
-  // se ainda restam >1 no LB, consolida sem drop-in (caso bordas)
-  while (lbPrev.length > 1) {
+  // Extra consolidation (edge cases) — also stop at 2
+  while (lbPrev.length > 2) {
     const minorKeys: string[] = [];
     const half = Math.floor(lbPrev.length / 2);
     for (let i = 0; i < half; i++) {
       const key = `LB-${lbRoundNum}-${i + 1}`;
-      matches.push({
-        key,
-        phase: "LB",
-        round: lbRoundNum,
-        position: i + 1,
-        source_a: lbPrev[i * 2],
-        source_b: lbPrev[i * 2 + 1],
-        bye: false,
-      });
+      matches.push({ key, phase: "LB", round: lbRoundNum, position: i + 1, source_a: lbPrev[i * 2], source_b: lbPrev[i * 2 + 1], bye: false });
       minorKeys.push(key);
     }
     const tail: SourceRef[] = lbPrev.length % 2 === 1 ? [lbPrev[lbPrev.length - 1]] : [];
@@ -199,61 +155,27 @@ export function generateDoubleElim(n: number): GeneratedMatch[] {
     lbRoundNum++;
     lbPrev = [...minorKeys.map((k) => ({ type: "winner_of", key: k } as SourceRef)), ...tail];
   }
-  const lbFinalRef: SourceRef = lbPrev[0] ?? null;
-  // descobre key do último match do LB (se houver) — usado para alimentar SEMIs
-  // Encontra a referência: se lbFinalRef.type === "winner_of", a key alvo é lbFinalRef.key
-  const lbFinalKey =
-    lbFinalRef && lbFinalRef.type === "winner_of" ? lbFinalRef.key : null;
 
-  // -------- FASE FINAL --------
-  // 1º = vencedor do WB Final, 2º = perdedor do WB Final
-  // 3º = vencedor do LB Final, 4º = perdedor do LB Final
-  // Semi 1: 1º x 4º
-  // Semi 2: 2º x 3º
-  const fourthRef: SourceRef = lbFinalKey ? { type: "loser_of", key: lbFinalKey } : { type: "bye" };
-  const thirdRef: SourceRef = lbFinalKey ? { type: "winner_of", key: lbFinalKey } : lbFinalRef;
+  // lbPrev now has 1 or 2 LB semi-finalists
+  // Pad to 2 with BYE if only 1 (e.g. 4-team bracket)
+  while (lbPrev.length < 2) {
+    lbPrev.push({ type: "bye" });
+  }
+  const lbSemi: SourceRef[] = lbPrev;
 
-  matches.push({
-    key: "SEMI-1-1",
-    phase: "SEMI",
-    round: 1,
-    position: 1,
-    source_a: { type: "winner_of", key: wbFinalKey }, // 1º
-    source_b: fourthRef, // 4º
-    bye: false,
-  });
-  matches.push({
-    key: "SEMI-1-2",
-    phase: "SEMI",
-    round: 1,
-    position: 2,
-    source_a: { type: "loser_of", key: wbFinalKey }, // 2º
-    source_b: thirdRef, // 3º
-    bye: false,
-  });
-  matches.push({
-    key: "FINAL-1-1",
-    phase: "FINAL",
-    round: 1,
-    position: 1,
-    source_a: { type: "winner_of", key: "SEMI-1-1" },
-    source_b: { type: "winner_of", key: "SEMI-1-2" },
-    bye: false,
-  });
-  matches.push({
-    key: "THIRD-1-1",
-    phase: "THIRD",
-    round: 1,
-    position: 1,
-    source_a: { type: "loser_of", key: "SEMI-1-1" },
-    source_b: { type: "loser_of", key: "SEMI-1-2" },
-    bye: false,
-  });
+  // ── FASE FINAL: SEMI + FINAL + THIRD ──────────────────────────────────────
+  // Default seeding: WB-top vs LB-bottom, WB-bottom vs LB-top.
+  // Admin can rearrange via "Mover dupla" since slotMovable allows placed teams.
+  matches.push({ key: "SEMI-1-1", phase: "SEMI", round: 1, position: 1, source_a: wbSemi[0], source_b: lbSemi[1], bye: lbSemi[1]?.type === "bye" });
+  matches.push({ key: "SEMI-1-2", phase: "SEMI", round: 1, position: 2, source_a: wbSemi[1], source_b: lbSemi[0], bye: false });
+
+  matches.push({ key: "FINAL-1-1", phase: "FINAL", round: 1, position: 1, source_a: { type: "winner_of", key: "SEMI-1-1" }, source_b: { type: "winner_of", key: "SEMI-1-2" }, bye: false });
+  matches.push({ key: "THIRD-1-1", phase: "THIRD", round: 1, position: 1, source_a: { type: "loser_of", key: "SEMI-1-1" }, source_b: { type: "loser_of", key: "SEMI-1-2" }, bye: false });
 
   return matches;
 }
 
-// Avalia um conjunto de sets segundo formato. Retorna vencedor ("a"|"b") ou null se inválido/incompleto.
+// Evaluate a match result. Returns winner side ("a"|"b") or null.
 export function evaluateMatch(
   sets: Array<{ a: number; b: number }>,
   format: "single_set" | "best_of_3_tiebreak",
@@ -264,13 +186,10 @@ export function evaluateMatch(
     if (s.a === s.b) return null;
     return s.a > s.b ? "a" : "b";
   }
-  // best_of_3_tiebreak: 2 sets ganhos
-  let aw = 0;
-  let bw = 0;
+  let aw = 0, bw = 0;
   for (const s of sets) {
     if (s.a === s.b) continue;
-    if (s.a > s.b) aw++;
-    else bw++;
+    if (s.a > s.b) aw++; else bw++;
     if (aw === 2) return "a";
     if (bw === 2) return "b";
   }

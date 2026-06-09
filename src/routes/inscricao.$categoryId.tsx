@@ -52,7 +52,7 @@ function RegisterPage() {
   const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(false);
 
-  const { data: ctx } = useQuery({
+  const { data: ctx, isLoading: ctxLoading } = useQuery({
     queryKey: ["category-ctx", categoryId],
     queryFn: async () => {
       const { data: cat, error } = await supabase.from("categories").select("*, championship:championships(*)").eq("id", categoryId).maybeSingle();
@@ -101,6 +101,8 @@ function RegisterPage() {
         else if (error.message.includes("AGE_RULE_VIOLATION")) toast.error("As idades não atendem à regra desta categoria");
         else if (error.message.includes("BIRTHDATE_REQUIRED")) toast.error("Informe a data de nascimento de cada atleta");
         else if (error.message.includes("TERMS_NOT_ACCEPTED")) toast.error("Você precisa aceitar o termo para continuar");
+        else if (error.message.includes("REGISTRATION_NOT_OPEN")) toast.error("As inscrições para esta categoria ainda não estão abertas");
+        else if (error.message.includes("CATEGORY_NOT_FOUND")) toast.error("Esta categoria não está disponível");
         else toast.error(error.message);
         return;
       }
@@ -114,8 +116,8 @@ function RegisterPage() {
 
   const isMixed = ctx?.gender === "mixed";
   const athleteLabels = isMixed ? ["Atleta masculino", "Atleta feminina"] : ["Atleta 1", "Atleta 2"];
-  const opensAt = (ctx as any)?.opens_at ? new Date((ctx as any).opens_at) : null;
-  const notOpenYet = opensAt && opensAt > new Date();
+  const opensAt = ctx && (ctx as any).opens_at ? new Date((ctx as any).opens_at) : null;
+  const notOpenYet = !ctxLoading && ctx && opensAt && opensAt > new Date();
 
   return (
     <div className="min-h-screen">

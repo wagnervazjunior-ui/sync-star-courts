@@ -1,0 +1,2 @@
+ALTER TABLE public.brackets
+  ADD COLUMN IF NOT EXISTS public BOOLEAN NOT NULL DEFAULT false;

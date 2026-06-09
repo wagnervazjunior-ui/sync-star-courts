@@ -58,6 +58,10 @@ function PrizePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!declared) {
+      toast.error("Você precisa aceitar a declaração antes de continuar");
+      return;
+    }
     if (!recipient1Name.trim() || !recipient1PixKey.trim()) {
       toast.error("Preencha nome e chave PIX do recebedor");
       return;
