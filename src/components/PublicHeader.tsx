@@ -13,7 +13,7 @@ export function PublicHeader() {
           </Link>
 
           {/* Nav — absolutamente centralizado dentro da barra */}
-          <nav className="absolute inset-0 hidden items-center justify-center gap-6 md:flex pointer-events-none">
+          <nav className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 hidden items-center gap-6 md:flex pointer-events-none">
             <Link to="/campeonatos" className="pointer-events-auto text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
               Campeonatos
             </Link>
