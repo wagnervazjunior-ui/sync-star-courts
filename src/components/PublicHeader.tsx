@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { MobileNav } from "@/components/MobileNav";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
-import { LogOut, Shield, Network } from "lucide-react";
+import { LogOut, Network } from "lucide-react";
 
 export function PublicHeader() {
   const { user, isAdmin } = useAuth();
@@ -32,11 +32,6 @@ export function PublicHeader() {
           </nav>
 
           <div className="flex items-center gap-2">
-            {isAdmin && (
-              <Button variant="premium" size="sm" asChild>
-                <Link to="/admin"><Shield className="size-4" /> Admin</Link>
-              </Button>
-            )}
             {user ? (
               <Button
                 variant="ghost"
