@@ -22,6 +22,23 @@ export const getVoucherById = createServerFn({ method: "GET" })
     return reg;
   });
 
+// Public server fn: find registrations by contact email.
+export const getVouchersByEmail = createServerFn({ method: "GET" })
+  .inputValidator((input: unknown) => z.object({ email: z.string().email() }).parse(input))
+  .handler(async ({ data }) => {
+    const { data: regs, error } = await supabaseAdmin
+      .from("registrations")
+      .select(
+        `id, voucher_code, status, team_name, created_at,
+         category:categories(name, championship:championships(name))`,
+      )
+      .eq("contact_email", data.email.toLowerCase().trim())
+      .order("created_at", { ascending: false })
+      .limit(20);
+    if (error) throw new Error(error.message);
+    return regs ?? [];
+  });
+
 // Public server fn: resend the confirmation email for a confirmed registration.
 // Rate-limited to one send per 60 seconds per registration.
 export const resendVoucherEmail = createServerFn({ method: "POST" })
