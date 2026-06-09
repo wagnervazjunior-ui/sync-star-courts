@@ -147,27 +147,33 @@ function BracketHalf({
     prevCount = curCount;
   }
 
-  // LB rounds can increase in match count (carry byes + WB losers), so branching
-  // connectors are wrong. Use simple stubs for amber (LB) and final phase.
-  const simpleConnectors = color === "amber" || isFinalPhase;
-
   return (
     <div>
       <SectionLabel title={title} color={color} />
       <div className="overflow-x-auto pb-4">
         <div className="flex items-start min-w-fit">
-          {roundNums.map((r, idx) => (
-            <BracketRound
-              key={r}
-              label={getRoundLabel(r, totalRounds, color, isFinalPhase)}
-              matches={rounds[r]}
-              roundIndex={effectiveIndices[idx]}
-              isLast={idx === totalRounds - 1}
-              color={color}
-              cardProps={cardProps}
-              simpleConnectors={simpleConnectors}
-            />
-          ))}
+          {roundNums.map((r, idx) => {
+            const nextR = roundNums[idx + 1];
+            // LB: odd rounds are minor (consolidation, 2:1 branching)
+            //     even rounds are major (WB drop-in, 1:1 stubs)
+            // WB and final: always branching
+            const simpleConnectors = color === "amber" && !isFinalPhase
+              ? (nextR !== undefined && nextR % 2 === 0)
+              : false;
+
+            return (
+              <BracketRound
+                key={r}
+                label={getRoundLabel(r, totalRounds, color, isFinalPhase)}
+                matches={rounds[r]}
+                roundIndex={effectiveIndices[idx]}
+                isLast={idx === totalRounds - 1}
+                color={color}
+                cardProps={cardProps}
+                simpleConnectors={simpleConnectors}
+              />
+            );
+          })}
         </div>
       </div>
     </div>

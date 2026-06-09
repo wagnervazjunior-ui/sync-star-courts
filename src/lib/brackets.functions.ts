@@ -709,11 +709,16 @@ export const swapMatchSlots = createServerFn({ method: "POST" })
     if (!mA || !mB) throw new Error("NOT_FOUND");
     await assertCanManage(context.userId, (mA as any).bracket.championship_id);
     if (mA.winner_team_id || mB.winner_team_id) throw new Error("MATCH_ALREADY_PLAYED");
-    const srcA = data.slot_a === "a" ? (mA.source_a as any) : (mA.source_b as any);
-    const srcB = data.slot_b === "a" ? (mB.source_a as any) : (mB.source_b as any);
-    const isSeedOrigin = (s: any) => !s || s.type === "seed" || s.type === "bye";
-    if (!isSeedOrigin(srcA) || !isSeedOrigin(srcB))
-      throw new Error("SLOT_FROM_PROPAGATION");
+    // SEMI phase: admin freely arranges the 4 semi-finalists — all slots are movable.
+    // Other phases: only slots with seed/bye origin can be moved (not auto-propagated results).
+    const isSemi = mA.phase === "SEMI" && mB.phase === "SEMI";
+    if (!isSemi) {
+      const srcA = data.slot_a === "a" ? (mA.source_a as any) : (mA.source_b as any);
+      const srcB = data.slot_b === "a" ? (mB.source_a as any) : (mB.source_b as any);
+      const isSeedOrigin = (s: any) => !s || s.type === "seed" || s.type === "bye";
+      if (!isSeedOrigin(srcA) || !isSeedOrigin(srcB))
+        throw new Error("SLOT_FROM_PROPAGATION");
+    }
     const teamA = data.slot_a === "a" ? mA.team_a_id : mA.team_b_id;
     const teamB = data.slot_b === "a" ? mB.team_a_id : mB.team_b_id;
     const upd = async (m: any, slot: "a" | "b", newTeam: string | null) => {
