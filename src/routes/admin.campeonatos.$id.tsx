@@ -17,7 +17,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import {
   Plus, Pencil, Trash2, ArrowLeft, ExternalLink, AlertTriangle, Users, ClipboardList, Shield,
-  Upload, X, Loader2, Settings, BarChart3, FileSpreadsheet, ListChecks, Download, CheckCircle2, XCircle, UserPlus, Wallet, FileText, Copy, Network, RefreshCw, Clock,
+  Upload, X, Loader2, Settings, BarChart3, FileSpreadsheet, ListChecks, Download, CheckCircle2, XCircle, UserPlus, Wallet, FileText, Copy, Network, RefreshCw, Clock, Calendar,
 } from "lucide-react";
 import { generateGateListWorkbook } from "@/lib/gate-list-export";
 import { generateUniformWorkbook } from "@/lib/uniform-export";
@@ -547,6 +547,7 @@ function CategoriesTab({ id, championship }: { id: string; championship: any }) 
                   <p className="text-sm text-muted-foreground mt-1 flex items-center gap-3 flex-wrap">
                     <span className="inline-flex items-center gap-1"><Users className="size-3" /> {inscritos}/{c.max_slots} inscritos · {restantes} vaga(s)</span>
                     <span>R$ {(c.price_cents / 100).toFixed(2).replace(".", ",")}</span>
+                    {c.event_date && <span className="inline-flex items-center gap-1"><Calendar className="size-3" /> {new Date(c.event_date).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}</span>}
                     {c.opens_at && <span className="inline-flex items-center gap-1"><Clock className="size-3" /> Abre {new Date(c.opens_at).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}</span>}
                   </p>
                   {c.description && <p className="text-sm text-muted-foreground mt-1 whitespace-pre-line line-clamp-2">{c.description}</p>}
