@@ -147,6 +147,10 @@ function BracketHalf({
     prevCount = curCount;
   }
 
+  // LB rounds can increase in match count (carry byes + WB losers), so branching
+  // connectors are wrong. Use simple stubs for amber (LB) and final phase.
+  const simpleConnectors = color === "amber" || isFinalPhase;
+
   return (
     <div>
       <SectionLabel title={title} color={color} />
@@ -161,6 +165,7 @@ function BracketHalf({
               isLast={idx === totalRounds - 1}
               color={color}
               cardProps={cardProps}
+              simpleConnectors={simpleConnectors}
             />
           ))}
         </div>
@@ -172,7 +177,7 @@ function BracketHalf({
 // ─── BracketRound (one column) ────────────────────────────────────────────────
 
 function BracketRound({
-  label, matches, roundIndex, isLast, color, cardProps,
+  label, matches, roundIndex, isLast, color, cardProps, simpleConnectors = false,
 }: {
   label: string;
   matches: MatchCardData[];
@@ -180,6 +185,7 @@ function BracketRound({
   isLast: boolean;
   color: "emerald" | "amber";
   cardProps: any;
+  simpleConnectors?: boolean;
 }) {
   const step   = getRoundStep(roundIndex);    // center-to-center distance between consecutive matches
   const gap    = getRoundGap(roundIndex);     // pixel gap between card edges
@@ -211,37 +217,44 @@ function BracketRound({
         </div>
       </div>
 
-      {/* Connector column — absolutely positioned so each connector lands on its pair's card centers */}
+      {/* Connector column */}
       {!isLast && (
         <div className="relative shrink-0" style={{ width: 44, marginTop: ROUND_LABEL_H, height: areaH }}>
-          {pairs.map((pair, j) => {
-            // Center of M[2j] within the connector column (= within the matches area)
-            const topY = offset + 2 * j * step + CARD_H / 2;
-
-            if (pair.length < 2) {
+          {simpleConnectors ? (
+            // LB: simple horizontal stub per match (branching connectors are wrong for LB
+            // because rounds can increase in count due to carry byes)
+            matches.map((_, j) => {
+              const centerY = offset + j * step + CARD_H / 2;
               return (
                 <div key={j} className="absolute bg-foreground/30"
-                  style={{ left: 0, top: topY - 0.5, width: 44, height: 1 }} />
+                  style={{ left: 0, top: centerY - 0.5, width: 44, height: 1 }} />
               );
-            }
+            })
+          ) : (
+            // WB: branching connectors — each pair of matches feeds one winner to next round
+            pairs.map((pair, j) => {
+              const topY = offset + 2 * j * step + CARD_H / 2;
 
-            // Center of M[2j+1]
-            const botY  = offset + (2 * j + 1) * step + CARD_H / 2;
-            const spanH = botY - topY; // = step
+              if (pair.length < 2) {
+                return (
+                  <div key={j} className="absolute bg-foreground/30"
+                    style={{ left: 0, top: topY - 0.5, width: 44, height: 1 }} />
+                );
+              }
 
-            return (
-              <div key={j} className="absolute" style={{ left: 0, top: topY, width: 44, height: spanH }}>
-                {/* vertical arm from M[2j] center to M[2j+1] center */}
-                <div className="absolute bg-foreground/30" style={{ left: 20, top: 0, width: 1, height: spanH }} />
-                {/* horizontal: M[2j] card edge → arm (at top of this div) */}
-                <div className="absolute bg-foreground/30" style={{ left: 0, top: -0.5, width: 21, height: 1 }} />
-                {/* horizontal: M[2j+1] card edge → arm (at bottom of this div) */}
-                <div className="absolute bg-foreground/30" style={{ left: 0, top: spanH - 0.5, width: 21, height: 1 }} />
-                {/* horizontal: arm midpoint → next round */}
-                <div className="absolute bg-foreground/30" style={{ left: 20, top: spanH / 2 - 0.5, width: 24, height: 1 }} />
-              </div>
-            );
-          })}
+              const botY  = offset + (2 * j + 1) * step + CARD_H / 2;
+              const spanH = botY - topY;
+
+              return (
+                <div key={j} className="absolute" style={{ left: 0, top: topY, width: 44, height: spanH }}>
+                  <div className="absolute bg-foreground/30" style={{ left: 20, top: 0, width: 1, height: spanH }} />
+                  <div className="absolute bg-foreground/30" style={{ left: 0, top: -0.5, width: 21, height: 1 }} />
+                  <div className="absolute bg-foreground/30" style={{ left: 0, top: spanH - 0.5, width: 21, height: 1 }} />
+                  <div className="absolute bg-foreground/30" style={{ left: 20, top: spanH / 2 - 0.5, width: 24, height: 1 }} />
+                </div>
+              );
+            })
+          )}
         </div>
       )}
     </div>

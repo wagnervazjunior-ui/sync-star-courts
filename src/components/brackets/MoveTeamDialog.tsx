@@ -45,8 +45,12 @@ export function MoveTeamDialog({
       if (m.winner_team_id) continue;
       (["a", "b"] as const).forEach((slot) => {
         if (m.id === sourceMatch.id && slot === sourceSlot) return;
-        const src = slot === "a" ? m.source_a : m.source_b;
-        if (src && src.type !== "seed" && src.type !== "bye") return;
+        // SEMI: all slots are movable (admin arranges the 4 semi-finalists manually).
+        // Other phases: only slots seeded initially (not propagated) can be moved.
+        if (m.phase !== "SEMI") {
+          const src = slot === "a" ? m.source_a : m.source_b;
+          if (src && src.type !== "seed" && src.type !== "bye") return;
+        }
         const teamId = slot === "a" ? m.team_a_id : m.team_b_id;
         const team = teams.find((t) => t.id === teamId);
         const teamLabel = team ? labelTeam(team) : "(vazio)";
