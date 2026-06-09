@@ -81,17 +81,21 @@ function BracketDetail() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6 pb-8">
       <Button variant="ghost" size="sm" asChild>
         <Link to="/admin/chaves">
           <ArrowLeft className="size-4" /> Chaves
         </Link>
       </Button>
-      <div className="flex flex-wrap items-center justify-between gap-3">
+
+      {/* Header — empilhado no mobile, lado a lado no desktop */}
+      <div className="space-y-3">
         <div>
-          <h1 className="text-2xl font-bold">{data.bracket.name}</h1>
-          <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-            <span>{data.championship?.name} · {data.category?.name} · {teams.length} duplas · {data.bracket.match_format === "best_of_3_tiebreak" ? "Melhor de 3" : "Set único"}</span>
+          <h1 className="text-xl md:text-2xl font-bold leading-tight">{data.bracket.name}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {[data.championship?.name, data.category?.name, `${teams.length} duplas`, data.bracket.match_format === "best_of_3_tiebreak" ? "Melhor de 3" : "Set único"].filter(Boolean).join(" · ")}
+          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
             <Badge variant={data.bracket.status === "finished" ? "default" : "secondary"}>
               {data.bracket.status === "finished" ? "Finalizada" : "Em andamento"}
             </Badge>
@@ -100,27 +104,32 @@ function BracketDetail() {
             </Badge>
           </div>
         </div>
-        <div className="flex flex-wrap gap-2">
+
+        {/* Ações — labels visíveis no sm+, ícone-only no mobile */}
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             variant={isPublic ? "outline" : "hero"}
             size="sm"
             onClick={handleTogglePublic}
             disabled={toggling}
           >
-            {toggling
-              ? <Loader2 className="size-4 animate-spin" />
-              : isPublic ? <><EyeOff className="size-4" /> Ocultar</> : <><Eye className="size-4" /> Publicar</>
-            }
+            {toggling ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : isPublic ? (
+              <><EyeOff className="size-4" /><span className="hidden sm:inline ml-1">Ocultar</span></>
+            ) : (
+              <><Eye className="size-4" /><span className="hidden sm:inline ml-1">Publicar</span></>
+            )}
           </Button>
           {isPublic && (
             <Button variant="ghost" size="sm" asChild>
               <a href={`/chaves/${bracketId}`} target="_blank" rel="noopener noreferrer">
-                <ExternalLink className="size-4" /> Ver público
+                <ExternalLink className="size-4" /><span className="hidden sm:inline ml-1">Ver público</span>
               </a>
             </Button>
           )}
           <Button variant="secondary" size="sm" onClick={() => setAddTeamOpen(true)}>
-            <UserPlus className="size-4" /> Adicionar dupla
+            <UserPlus className="size-4" /><span className="ml-1">Adicionar dupla</span>
           </Button>
           <Button variant="ghost" size="sm" onClick={handleDelete} disabled={deleting}>
             <Trash2 className="size-4 text-destructive" />
@@ -129,10 +138,10 @@ function BracketDetail() {
       </div>
 
       <Tabs defaultValue="initial" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="initial">Fase Inicial</TabsTrigger>
-          <TabsTrigger value="final">Fase Final</TabsTrigger>
-          <TabsTrigger value="standings">Classificação</TabsTrigger>
+        <TabsList className="w-full sm:w-auto">
+          <TabsTrigger value="initial" className="flex-1 sm:flex-none">Fase Inicial</TabsTrigger>
+          <TabsTrigger value="final" className="flex-1 sm:flex-none">Fase Final</TabsTrigger>
+          <TabsTrigger value="standings" className="flex-1 sm:flex-none">Classificação</TabsTrigger>
         </TabsList>
         <TabsContent value="initial">
           <BracketView
