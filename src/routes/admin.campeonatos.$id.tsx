@@ -552,7 +552,8 @@ function CategoriesTab({ id, championship }: { id: string; championship: any }) 
                 </div>
                 <div className="flex gap-1">
                   <Button size="sm" variant="premium" asChild><Link to="/admin/categorias/$categoryId" params={{ categoryId: c.id }}>Inscrições</Link></Button>
-                  <Button size="sm" variant="ghost" onClick={() => { setEditing({ ...c, price_reais: (c.price_cents / 100).toFixed(2) }); setOpen(true); }}><Pencil className="size-4" /></Button>
+                  <Button size="sm" variant="ghost" onClick={() => { setEditing({ ...c, price_reais: (c.price_cents / 100).toFixed(2) }); setOpen(true); }} title="Editar"><Pencil className="size-4" /></Button>
+                  <Button size="sm" variant="ghost" onClick={() => { const { id, opens_at, ...rest } = c; setEditing({ ...rest, price_reais: (c.price_cents / 100).toFixed(2), opens_at: null }); setOpen(true); }} title="Duplicar categoria"><Copy className="size-4" /></Button>
                   <Button size="sm" variant="ghost" onClick={() => remove(c.id)}><Trash2 className="size-4 text-destructive" /></Button>
                 </div>
               </div>
