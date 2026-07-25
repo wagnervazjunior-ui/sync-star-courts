@@ -151,6 +151,13 @@ function StaffRegisterPage() {
             </div>
           </div>
 
+          <div className="mt-4 flex items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3">
+            <p className="text-sm">Já tem cadastro?</p>
+            <Button asChild variant="outline" size="sm">
+              <Link to="/staff/login">Fazer login</Link>
+            </Button>
+          </div>
+
           <form className="mt-6 space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
             <Field label="Nome completo" error={form.formState.errors.name?.message}>
               <Input {...form.register("name")} placeholder="Seu nome completo" />
@@ -236,8 +243,11 @@ function StaffRegisterPage() {
               {submitting ? <Loader2 className="size-4 animate-spin mr-2" /> : null}
               Concluir cadastro
             </Button>
-            <p className="text-center text-xs text-muted-foreground">
-              Já tem cadastro? <Link to="/staff/login" className="text-primary hover:underline">Entrar</Link>
+            <p className="text-center text-sm text-muted-foreground">
+              Já tem cadastro?{" "}
+              <Link to="/staff/login" className="font-medium text-primary hover:underline">
+                Fazer login
+              </Link>
             </p>
           </form>
         </Card>
