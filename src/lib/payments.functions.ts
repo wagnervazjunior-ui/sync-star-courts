@@ -201,6 +201,7 @@ export const createCardCharge = createServerFn({ method: "POST" })
       _postal_code: cleanCep,
       _payment_method: "credit_card",
       _installments: data.installments,
+      _amount_cents: valueCents,
     });
 
     const customer = await findOrCreateCustomer({
