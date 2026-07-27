@@ -783,7 +783,8 @@ function PlanilhasTab({ id, championship }: { id: string; championship: any }) {
         .from("registrations")
         .select("*, category:categories!inner(name, championship_id)")
         .eq("category.championship_id", id)
-        .eq("status", "confirmed");
+        .eq("status", "confirmed")
+        .order("created_at", { ascending: true });
       if (!regs || regs.length === 0) { toast.info("Nenhuma inscrição confirmada para exportar"); return; }
       await generateUniformWorkbook({
         championshipName: championship?.name ?? "",
