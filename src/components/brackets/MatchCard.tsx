@@ -137,13 +137,13 @@ export function MatchCard({
                   disabled={!slotMovable("a") || !match.team_a_id}
                   onClick={() => onMoveSlot?.(match, "a")}
                 >
-                  Mover dupla A para outra partida
+                  Trocar dupla A ({nameA || "vaga A"})
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   disabled={!slotMovable("b") || !match.team_b_id}
                   onClick={() => onMoveSlot?.(match, "b")}
                 >
-                  Mover dupla B para outra partida
+                  Trocar dupla B ({nameB || "vaga B"})
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

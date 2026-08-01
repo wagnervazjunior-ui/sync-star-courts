@@ -1,13 +1,24 @@
 import { useMemo, useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { ArrowRightLeft } from "lucide-react";
 import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import { swapMatchSlots } from "@/lib/brackets.functions";
 import type { MatchCardData, TeamRef } from "./MatchCard";
 import { labelTeam } from "./MatchCard";
+
+const PHASE_LABEL: Record<string, string> = {
+  WB: "Vencedores",
+  LB: "Perdedores",
+  SEMI: "Semifinal",
+  FINAL: "Final",
+  THIRD: "3º lugar",
+};
+
+function matchLabel(m: MatchCardData) {
+  return `${PHASE_LABEL[m.phase] ?? m.phase} · Rodada ${m.round} · Confronto #${m.position}`;
+}
 
 export function MoveTeamDialog({
   open,
@@ -26,8 +37,7 @@ export function MoveTeamDialog({
   teams: TeamRef[];
   onSaved: () => void;
 }) {
-  const [target, setTarget] = useState<string>("");
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving] = useState<string | null>(null);
   const callSwap = useServerFn(swapMatchSlots);
 
   const sourceTeamId = sourceMatch
@@ -39,7 +49,7 @@ export function MoveTeamDialog({
 
   const candidates = useMemo(() => {
     if (!sourceMatch) return [];
-    const out: Array<{ value: string; label: string }> = [];
+    const out: Array<{ value: string; teamLabel: string; matchLabel: string; opponentLabel: string }> = [];
     for (const m of allMatches) {
       if (m.phase !== sourceMatch.phase) continue;
       if (m.winner_team_id) continue;
@@ -52,21 +62,25 @@ export function MoveTeamDialog({
           if (src && src.type !== "seed" && src.type !== "bye") return;
         }
         const teamId = slot === "a" ? m.team_a_id : m.team_b_id;
+        const opponentId = slot === "a" ? m.team_b_id : m.team_a_id;
         const team = teams.find((t) => t.id === teamId);
-        const teamLabel = team ? labelTeam(team) : "(vazio)";
+        const opponent = teams.find((t) => t.id === opponentId);
         out.push({
           value: `${m.id}:${slot}`,
-          label: `${m.phase} R${m.round} #${m.position} · ${slot.toUpperCase()} — ${teamLabel}`,
+          teamLabel: team ? labelTeam(team) : "(vaga vazia)",
+          matchLabel: matchLabel(m),
+          opponentLabel: opponent ? `vs ${labelTeam(opponent)}` : "",
         });
       });
     }
-    return out;
+    // Vagas vazias primeiro é confuso — duplas de verdade primeiro, ordenadas por nome.
+    return out.sort((a, b) => a.teamLabel.localeCompare(b.teamLabel, "pt-BR"));
   }, [allMatches, sourceMatch, sourceSlot, teams]);
 
-  const handleSave = async () => {
-    if (!sourceMatch || !target) return;
-    const [matchId, slot] = target.split(":");
-    setSaving(true);
+  const handlePick = async (targetKey: string) => {
+    if (!sourceMatch) return;
+    const [matchId, slot] = targetKey.split(":");
+    setSaving(targetKey);
     try {
       await callSwap({
         data: {
@@ -76,10 +90,9 @@ export function MoveTeamDialog({
           slot_b: slot as "a" | "b",
         },
       });
-      toast.success("Duplas movidas");
+      toast.success("Duplas trocadas");
       onSaved();
       onClose();
-      setTarget("");
     } catch (e: any) {
       const msg = e.message ?? "Erro";
       toast.error(
@@ -90,7 +103,7 @@ export function MoveTeamDialog({
           : msg,
       );
     } finally {
-      setSaving(false);
+      setSaving(null);
     }
   };
 
@@ -98,48 +111,49 @@ export function MoveTeamDialog({
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Mover dupla</DialogTitle>
+      <DialogContent className="max-w-md p-0 gap-0 overflow-hidden">
+        <DialogHeader className="px-4 pt-4 pb-2">
+          <DialogTitle className="flex items-center gap-2 text-base">
+            <ArrowRightLeft className="size-4 text-primary" />
+            Trocar dupla
+          </DialogTitle>
+          <p className="text-sm text-muted-foreground">
+            <strong className="text-foreground">{sourceTeam ? labelTeam(sourceTeam) : "(vaga vazia)"}</strong>{" "}
+            está em <strong className="text-foreground">{matchLabel(sourceMatch)}</strong>. Escolha com quem trocar:
+          </p>
         </DialogHeader>
-        <div className="space-y-3 text-sm">
-          <p>
-            Movendo <strong>{sourceTeam ? labelTeam(sourceTeam) : "(vazio)"}</strong> de{" "}
-            <strong>
-              {sourceMatch.phase} R{sourceMatch.round} #{sourceMatch.position} · {sourceSlot.toUpperCase()}
-            </strong>
-          </p>
-          <div>
-            <Label>Partida destino</Label>
-            <Select value={target} onValueChange={setTarget}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione" />
-              </SelectTrigger>
-              <SelectContent>
-                {candidates.length === 0 && (
-                  <div className="p-2 text-xs text-muted-foreground">Nenhuma partida elegível.</div>
-                )}
-                {candidates.map((c) => (
-                  <SelectItem key={c.value} value={c.value}>
-                    {c.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Só é possível mover entre partidas da mesma fase, sem resultado lançado e cujos slots venham do seed inicial
-            (não da propagação automática).
-          </p>
-        </div>
-        <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button onClick={handleSave} disabled={saving || !target}>
-            Mover
-          </Button>
-        </DialogFooter>
+        <Command className="rounded-none border-t">
+          <CommandInput placeholder="Buscar dupla pelo nome…" />
+          <CommandList className="max-h-80">
+            <CommandEmpty>Nenhuma dupla elegível encontrada.</CommandEmpty>
+            <CommandGroup>
+              {candidates.map((c) => (
+                <CommandItem
+                  key={c.value}
+                  value={`${c.teamLabel} ${c.matchLabel}`}
+                  disabled={saving !== null}
+                  onSelect={() => handlePick(c.value)}
+                  className="flex items-center justify-between gap-3 py-2.5"
+                >
+                  <div className="min-w-0">
+                    <p className="font-medium truncate">{c.teamLabel}</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {c.matchLabel}
+                      {c.opponentLabel ? ` · ${c.opponentLabel}` : ""}
+                    </p>
+                  </div>
+                  {saving === c.value && (
+                    <span className="text-xs text-muted-foreground shrink-0">trocando…</span>
+                  )}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+        <p className="px-4 py-3 text-xs text-muted-foreground border-t">
+          Só é possível trocar entre confrontos da mesma fase, sem resultado lançado e cujas vagas venham do seed
+          inicial (não de vencedor/perdedor de outra partida).
+        </p>
       </DialogContent>
     </Dialog>
   );
