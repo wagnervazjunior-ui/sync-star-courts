@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { FlaskConical, Loader2 } from "lucide-react";
@@ -22,6 +23,8 @@ export function SimulateBracketDialog({
   const [championshipId, setChampionshipId] = useState(defaultChampionshipId ?? "");
   const [categoryId, setCategoryId] = useState("");
   const [numTeams, setNumTeams] = useState("8");
+  const [source, setSource] = useState<"fake" | "pasted">("fake");
+  const [pastedNames, setPastedNames] = useState("");
   const [matchFormat, setMatchFormat] = useState<"single_set" | "best_of_3_tiebreak">("single_set");
   const [targetScore, setTargetScore] = useState(18);
   const [saving, setSaving] = useState(false);
@@ -46,23 +49,44 @@ export function SimulateBracketDialog({
 
   const numTeamsInt = Math.max(3, Math.min(256, parseInt(numTeams, 10) || 3));
 
+  // Cada linha = uma dupla. Se tiver " e " no meio, separa em atleta 1/2;
+  // senão a linha toda vira o nome da dupla (sem separar atletas).
+  const pastedTeams = pastedNames
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const parts = line.split(/\s+e\s+/i);
+      return {
+        team_name: line,
+        athlete1_name: parts[0] ?? line,
+        athlete2_name: parts[1] ?? "",
+      };
+    });
+
   const handleCreate = async () => {
     if (!championshipId) { toast.error("Selecione o campeonato"); return; }
     if (!categoryId) { toast.error("Selecione a categoria"); return; }
+    if (source === "pasted" && pastedTeams.length < 3) {
+      toast.error("Cole pelo menos 3 duplas (uma por linha)");
+      return;
+    }
     setSaving(true);
     try {
-      // Gerar duplas fictícias
-      const manual_teams = Array.from({ length: numTeamsInt }, (_, i) => ({
-        team_name: `Dupla ${i + 1}`,
-        athlete1_name: `Atleta A${i + 1}`,
-        athlete2_name: `Atleta B${i + 1}`,
-      }));
+      const manual_teams = source === "pasted"
+        ? pastedTeams
+        : Array.from({ length: numTeamsInt }, (_, i) => ({
+            team_name: `Dupla ${i + 1}`,
+            athlete1_name: `Atleta A${i + 1}`,
+            athlete2_name: `Atleta B${i + 1}`,
+          }));
+      const teamCount = manual_teams.length;
 
       const res = await callCreate({
         data: {
           championship_id: championshipId,
           category_id: categoryId,
-          name: `Simulação ${numTeamsInt} duplas — ${today}`,
+          name: `Simulação ${teamCount} duplas — ${today}`,
           match_format: matchFormat,
           target_score: targetScore,
           tiebreak_points: 15,
@@ -70,7 +94,7 @@ export function SimulateBracketDialog({
         },
       });
 
-      toast.success(`Simulação criada com ${numTeamsInt} duplas`);
+      toast.success(`Simulação criada com ${teamCount} duplas`);
       setOpen(false);
       onCreated?.();
       navigate({ to: "/admin/chaves/$bracketId", params: { bracketId: res.bracket_id } });
@@ -127,19 +151,55 @@ export function SimulateBracketDialog({
           </div>
 
           <div className="space-y-1.5">
-            <Label>Número de duplas</Label>
-            <Input
-              type="number"
-              min={3}
-              max={256}
-              value={numTeams}
-              onChange={(e) => setNumTeams(e.target.value)}
-              onBlur={() => setNumTeams(String(numTeamsInt))}
-            />
-            <p className="text-xs text-muted-foreground">
-              Serão criadas: Dupla 1, Dupla 2, … Dupla {numTeamsInt}
-            </p>
+            <Label>Duplas</Label>
+            <div className="flex gap-1 rounded-lg border border-border/50 p-1">
+              <button
+                type="button"
+                onClick={() => setSource("fake")}
+                className={`flex-1 rounded-md px-2 py-1 text-xs font-medium transition-colors ${source === "fake" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                Fictícias
+              </button>
+              <button
+                type="button"
+                onClick={() => setSource("pasted")}
+                className={`flex-1 rounded-md px-2 py-1 text-xs font-medium transition-colors ${source === "pasted" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                Colar lista
+              </button>
+            </div>
           </div>
+
+          {source === "fake" ? (
+            <div className="space-y-1.5">
+              <Label>Número de duplas</Label>
+              <Input
+                type="number"
+                min={3}
+                max={256}
+                value={numTeams}
+                onChange={(e) => setNumTeams(e.target.value)}
+                onBlur={() => setNumTeams(String(numTeamsInt))}
+              />
+              <p className="text-xs text-muted-foreground">
+                Serão criadas: Dupla 1, Dupla 2, … Dupla {numTeamsInt}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              <Label>Duplas (uma por linha)</Label>
+              <Textarea
+                rows={8}
+                placeholder={"Kuka e Torres\nKairo e Gabriel\nLaurent e Caio Ramirez\n..."}
+                value={pastedNames}
+                onChange={(e) => setPastedNames(e.target.value)}
+                className="font-mono text-xs"
+              />
+              <p className="text-xs text-muted-foreground">
+                {pastedTeams.length} dupla{pastedTeams.length === 1 ? "" : "s"} reconhecida{pastedTeams.length === 1 ? "" : "s"}. Se a linha tiver " e " no meio, separa os dois nomes; senão a linha vira o nome da dupla inteira.
+              </p>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
@@ -167,7 +227,11 @@ export function SimulateBracketDialog({
 
         <DialogFooter>
           <Button variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
-          <Button variant="hero" onClick={handleCreate} disabled={saving || !championshipId || !categoryId}>
+          <Button
+            variant="hero"
+            onClick={handleCreate}
+            disabled={saving || !championshipId || !categoryId || (source === "pasted" && pastedTeams.length < 3)}
+          >
             {saving ? <Loader2 className="size-4 animate-spin mr-2" /> : <FlaskConical className="size-4 mr-2" />}
             Gerar simulação
           </Button>
