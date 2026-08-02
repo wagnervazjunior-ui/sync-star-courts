@@ -176,14 +176,20 @@ export function generateDoubleElim(n: number): GeneratedMatch[] {
     lbPrev = [...minorKeys.map((k) => ({ type: "winner_of", key: k } as SourceRef)), ...tail];
   };
 
-  // Helper: create a major round (WB losers drop in vs LB survivors)
-  const doMajor = (wbLosers: SourceRef[]) => {
+  // Helper: create a major round (WB losers drop in vs LB survivors).
+  // `reversed` controls anti-seed crossing: highest LB survivor faces lowest
+  // WB loser. This is correct for every drop-in EXCEPT the very last one
+  // (the WB semifinal round's losers merging into the final LB survivors) —
+  // by that point every LB lineage has already been cross-mixed, so crossing
+  // again just pairs a team with a branch that already absorbed its own
+  // semifinal opponent. The last drop-in instead pairs straight by index.
+  const doMajor = (wbLosers: SourceRef[], reversed: boolean = true) => {
     const matchCount = Math.min(lbPrev.length, wbLosers.length);
     const majorKeys: string[] = [];
     for (let i = 0; i < matchCount; i++) {
       const key = `LB-${lbRoundNum}-${i + 1}`;
-      // Anti-seed: highest LB survivor faces lowest WB loser (reversed wbLosers)
-      matches.push({ key, phase: "LB", round: lbRoundNum, position: i + 1, source_a: lbPrev[i], source_b: wbLosers[wbLosers.length - 1 - i], bye: false });
+      const opponent = reversed ? wbLosers[wbLosers.length - 1 - i] : wbLosers[i];
+      matches.push({ key, phase: "LB", round: lbRoundNum, position: i + 1, source_a: lbPrev[i], source_b: opponent, bye: false });
       majorKeys.push(key);
     }
     const extraWb = wbLosers.length > lbPrev.length ? wbLosers.slice(0, wbLosers.length - lbPrev.length) : [];
@@ -196,7 +202,8 @@ export function generateDoubleElim(n: number): GeneratedMatch[] {
   if (lbR2DirectEntries.length > 0) {
     // Consolidate lbPrev first if oversized
     while (lbPrev.length > lbR2DirectEntries.length && lbPrev.length > 2) doMinor();
-    doMajor(lbR2DirectEntries);
+    // This is the last drop-in when WB only has 2 rounds (no R3+ loop below).
+    doMajor(lbR2DirectEntries, wbRounds.length > 2);
   }
 
   // Process WB R3 and beyond
@@ -207,7 +214,7 @@ export function generateDoubleElim(n: number): GeneratedMatch[] {
     // Pre-consolidation: reduce lbPrev if it outnumbers WB losers
     while (lbPrev.length > wbLosers.length) doMinor();
 
-    doMajor(wbLosers);
+    doMajor(wbLosers, !isLastDropIn);
 
     // After major, if not last, consolidate for the next drop-in
     if (!isLastDropIn && lbPrev.length > 2) doMinor();
