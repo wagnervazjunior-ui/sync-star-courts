@@ -22,7 +22,7 @@ function ChavesIndex() {
   const callDelete = useServerFn(deleteBracket);
   const qc = useQueryClient();
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["brackets-list", search],
     queryFn: () => callList({ data: { search: search || undefined } }),
   });
@@ -67,6 +67,11 @@ function ChavesIndex() {
         <div className="flex items-center gap-2 text-muted-foreground">
           <Loader2 className="size-4 animate-spin" /> Carregando…
         </div>
+      ) : error ? (
+        <Card className="p-8 text-center space-y-3">
+          <p className="text-sm text-destructive">Erro ao carregar chaves: {(error as any)?.message ?? "erro desconhecido"}</p>
+          <Button size="sm" variant="outline" onClick={() => refetch()}>Tentar de novo</Button>
+        </Card>
       ) : !data?.brackets.length ? (
         <Card className="p-8 text-center text-muted-foreground">Nenhuma chave criada ainda.</Card>
       ) : (
