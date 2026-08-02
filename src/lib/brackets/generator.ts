@@ -4,7 +4,10 @@
 //   - Real WB R1 match → loser fills LB R1 at that slot position
 //   - Bye WB R1 slot → position reserved for whoever loses the WB R2 match
 //     that involves the bye winner (same "slot zone")
-//   - Anti-seeded pairing: pos_i vs pos_(size/2+1-i)
+//   - Same-origin pairing: pos_(2i-1) vs pos_(2i) — the two losers who fed the
+//     same WB R2 match play each other first (matches reference double-elim
+//     templates). The anti-seed crossing happens one round later instead,
+//     when LB R1 winners meet WB R2 losers.
 //   - Empty position (winner advanced past that slot) = bye in LB R1
 //
 // After LB R1, minor rounds consolidate survivors before each WB drop-in.
@@ -123,34 +126,27 @@ export function generateDoubleElim(n: number): GeneratedMatch[] {
     }
   }
 
-  // Step 3: Collect LB R1 pairings (anti-seed: pos i vs pos size/2+1-i), then
-  // interleave top-half and bottom-half entries so sequential display pairs
-  // [2k, 2k+1] correspond to top-half vs bottom-half matchups in the next minor
-  // round — this makes the visual branching connectors align correctly.
+  // Step 3: Collect LB R1 pairings — pos (2i-1) vs pos (2i), i.e. the two WB R1
+  // losers that fed the SAME WB R2 match play each other first in the losers
+  // bracket (matches the reference double-elim templates: loser of game 1 vs
+  // loser of game 2, not an anti-seeded cross to the opposite end of the
+  // bracket). The anti-seed crossing still happens naturally one round later,
+  // when LB R1 winners meet WB R2 losers in doMajor below.
   type LbEntry = { kind: "match"; a: SourceRef; b: SourceRef } | { kind: "bye"; src: SourceRef };
   const lbR1Entries: LbEntry[] = [];
   for (let i = 1; i <= size / 4; i++) {
-    const posA = positions[i];
-    const posB = positions[size / 2 + 1 - i];
+    const posA = positions[2 * i - 1];
+    const posB = positions[2 * i];
     if (posA !== null && posB !== null) lbR1Entries.push({ kind: "match", a: posA, b: posB });
     else if (posA !== null) lbR1Entries.push({ kind: "bye", src: posA });
     else if (posB !== null) lbR1Entries.push({ kind: "bye", src: posB });
   }
 
-  // Interleave: [0, half, 1, half+1, ...] so sequential pairs = top/bottom pairs
-  const lbR1Half = Math.floor(lbR1Entries.length / 2);
-  const lbR1Interleaved: LbEntry[] = [];
-  for (let k = 0; k < lbR1Half; k++) {
-    lbR1Interleaved.push(lbR1Entries[k]);
-    lbR1Interleaved.push(lbR1Entries[lbR1Half + k]);
-  }
-  if (lbR1Entries.length % 2 === 1) lbR1Interleaved.push(lbR1Entries[lbR1Entries.length - 1]);
-
   const lbR1Keys: string[] = [];
   let lbPrev: SourceRef[] = [];
   let lbRoundNum = 1;
 
-  for (const entry of lbR1Interleaved) {
+  for (const entry of lbR1Entries) {
     if (entry.kind === "match") {
       const key = `LB-${lbRoundNum}-${lbR1Keys.length + 1}`;
       matches.push({ key, phase: "LB", round: lbRoundNum, position: lbR1Keys.length + 1, source_a: entry.a, source_b: entry.b, bye: false });
