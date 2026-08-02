@@ -71,7 +71,7 @@ export const listBrackets = createServerFn({ method: "POST" })
       q = q.eq("championship_id", data.championship_id);
     } else {
       // restringir aos campeonatos visíveis
-      const { data: chs, error: e1 } = await supabaseAdmin.rpc("list_manageable_championships");
+      const { data: chs, error: e1 } = await context.supabase.rpc("list_manageable_championships");
       if (e1) throw new Error(e1.message);
       const ids = (chs ?? []).map((c: any) => c.id);
       if (!ids.length) return { brackets: [], championships: [], categories: [] };
