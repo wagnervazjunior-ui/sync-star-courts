@@ -1,12 +1,20 @@
 import { cn } from "@/lib/utils";
-import { MoreVertical, Trophy } from "lucide-react";
+import { MapPin, MoreVertical, Play, Square, Trophy } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 export interface MatchCardData {
   id: string;
@@ -20,6 +28,9 @@ export interface MatchCardData {
   source_b: any;
   bye: boolean;
   sets: Array<{ a: number; b: number }>;
+  court_number: number | null;
+  started_at: string | null;
+  match_format?: "single_set" | "best_of_3_tiebreak" | null;
 }
 
 export interface TeamRef {
@@ -70,18 +81,26 @@ export function MatchCard({
   match,
   teams,
   format,
+  courtCount = 0,
   onOpenResult,
   onSwapInside,
   onMoveSlot,
+  onAssignCourt,
+  onStartMatch,
+  onSetFormat,
 }: {
   match: MatchCardData;
   teams: TeamRef[];
   format?: "single_set" | "best_of_3_tiebreak";
+  courtCount?: number;
   onOpenResult?: (m: MatchCardData) => void;
   onSwapInside?: (m: MatchCardData) => void;
   onMoveSlot?: (m: MatchCardData, slot: "a" | "b") => void;
+  onAssignCourt?: (m: MatchCardData, court: number | null) => void;
+  onStartMatch?: (m: MatchCardData, started: boolean) => void;
+  onSetFormat?: (m: MatchCardData, format: "single_set" | "best_of_3_tiebreak" | null) => void;
 }) {
-  const isAdmin = !!(onOpenResult || onSwapInside || onMoveSlot);
+  const isAdmin = !!(onOpenResult || onSwapInside || onMoveSlot || onAssignCourt || onStartMatch || onSetFormat);
 
   const teamA = teams.find((t) => t.id === match.team_a_id) ?? null;
   const teamB = teams.find((t) => t.id === match.team_b_id) ?? null;
@@ -92,31 +111,125 @@ export function MatchCard({
   const winA = !!(match.winner_team_id && match.winner_team_id === match.team_a_id);
   const winB = !!(match.winner_team_id && match.winner_team_id === match.team_b_id);
   const ready = !!(teamA && teamB) && !match.winner_team_id;
-  const { a: scoreA, b: scoreB } = aggregateScore(match.sets ?? [], format);
+  const effectiveFormat = match.match_format ?? format;
+  const { a: scoreA, b: scoreB } = aggregateScore(match.sets ?? [], effectiveFormat);
+
+  const isFinished = !!match.winner_team_id;
+  const isInProgress = !isFinished && !!match.started_at;
+  const isScheduled = !isFinished && !isInProgress && !!match.court_number;
 
   const slotMovable = (slot: "a" | "b") => {
     if (match.winner_team_id) return false;
     const teamId = slot === "a" ? match.team_a_id : match.team_b_id;
     if (!teamId) return false;
-    return true; // any placed team in an unplayed match can be moved
+    return true;
   };
+
+  const courtBadge = isScheduled || isInProgress
+    ? `Quadra ${match.court_number}`
+    : null;
 
   return (
     <div
       className={cn(
         "w-72 rounded-lg border bg-card text-xs shadow-sm transition select-none overflow-hidden",
-        ready && !match.winner_team_id ? "border-primary/50" : "border-border",
-        match.winner_team_id && "border-emerald-500/30",
+        // Estados visuais (prioridade decrescente)
+        isFinished && "border-emerald-500/30",
+        isInProgress && !isFinished && "border-green-500 ring-1 ring-green-500/30 bg-green-500/5",
+        isScheduled && !isInProgress && !isFinished && "border-blue-500 ring-1 ring-blue-500/30 bg-blue-500/5",
+        !isFinished && !isInProgress && !isScheduled && ready && "border-primary/50",
+        !isFinished && !isInProgress && !isScheduled && !ready && "border-border",
         match.bye && !match.winner_team_id && "opacity-50",
       )}
     >
-      {/* Header — admin-only: dropdown + trophy */}
-      <div className="flex items-center justify-between px-2 py-1 border-b border-border/40 min-h-[24px]">
-        <span className="text-xs font-bold tabular-nums text-foreground/50 select-none">
-          #{match.position}
-        </span>
+      {/* Header */}
+      <div className={cn(
+        "flex items-center justify-between px-2 py-1 border-b min-h-[24px]",
+        isInProgress ? "border-green-500/30 bg-green-500/10" : isScheduled ? "border-blue-500/30 bg-blue-500/10" : "border-border/40",
+      )}>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs font-bold tabular-nums text-foreground/50 select-none">
+            #{match.position}
+          </span>
+          {courtBadge && (
+            <span className={cn(
+              "text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex items-center gap-0.5",
+              isInProgress ? "bg-green-500/20 text-green-400" : "bg-blue-500/20 text-blue-400",
+            )}>
+              <MapPin className="size-2.5" />
+              {courtBadge}
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-1">
-          {match.winner_team_id && <Trophy className="size-3 text-emerald-500" />}
+          {isFinished && <Trophy className="size-3 text-emerald-500" />}
+
+          {/* Botão play/stop — visível quando quadra definida e jogo não terminado */}
+          {isAdmin && onStartMatch && !isFinished && !!match.court_number && (
+            <button
+              type="button"
+              title={isInProgress ? "Pausar jogo" : "Iniciar jogo"}
+              onClick={() => onStartMatch(match, !isInProgress)}
+              className={cn(
+                "rounded p-0.5 transition-colors",
+                isInProgress
+                  ? "text-green-400 hover:bg-green-500/20"
+                  : "text-muted-foreground/60 hover:bg-muted/60 hover:text-green-400",
+              )}
+            >
+              {isInProgress ? <Square className="size-3 fill-current" /> : <Play className="size-3 fill-current" />}
+            </button>
+          )}
+
+          {/* Ícone de quadra — abre popover para seleção */}
+          {isAdmin && onAssignCourt && !isFinished && courtCount > 0 && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  title="Definir quadra"
+                  className={cn(
+                    "rounded p-0.5 transition-colors",
+                    isScheduled || isInProgress
+                      ? "text-blue-400 hover:bg-blue-500/20"
+                      : "text-muted-foreground/60 hover:bg-muted/60 hover:text-blue-400",
+                  )}
+                >
+                  <MapPin className="size-3" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-2" align="end">
+                <p className="text-xs font-semibold mb-2 text-muted-foreground">Definir quadra</p>
+                <div className="flex flex-wrap gap-1.5 max-w-[200px]">
+                  {Array.from({ length: courtCount }, (_, i) => i + 1).map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => onAssignCourt(match, match.court_number === n ? null : n)}
+                      className={cn(
+                        "w-8 h-8 rounded text-xs font-bold transition-colors border",
+                        match.court_number === n
+                          ? "bg-blue-500 text-white border-blue-500"
+                          : "border-border hover:border-blue-400 hover:text-blue-400",
+                      )}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                  {match.court_number && (
+                    <button
+                      type="button"
+                      onClick={() => onAssignCourt(match, null)}
+                      className="px-2 h-8 rounded text-[10px] border border-destructive/50 text-destructive/70 hover:bg-destructive/10 transition-colors"
+                    >
+                      Remover
+                    </button>
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
+
           {isAdmin && (
             <DropdownMenu>
               <DropdownMenuTrigger className="rounded p-0.5 hover:bg-muted/60 min-h-0 min-w-0" aria-label="Ações">
@@ -145,6 +258,33 @@ export function MatchCard({
                 >
                   Trocar dupla B ({nameB || "vaga B"})
                 </DropdownMenuItem>
+                {onSetFormat && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuSub>
+                      <DropdownMenuSubTrigger disabled={isFinished}>
+                        Formato desta partida{match.match_format ? " ✓" : ""}
+                      </DropdownMenuSubTrigger>
+                      <DropdownMenuSubContent>
+                        <DropdownMenuItem disabled={!match.match_format} onClick={() => onSetFormat(match, null)}>
+                          Padrão da chave
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          disabled={match.match_format === "single_set"}
+                          onClick={() => onSetFormat(match, "single_set")}
+                        >
+                          Set único
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          disabled={match.match_format === "best_of_3_tiebreak"}
+                          onClick={() => onSetFormat(match, "best_of_3_tiebreak")}
+                        >
+                          Melhor de 3 (com tiebreak)
+                        </DropdownMenuItem>
+                      </DropdownMenuSubContent>
+                    </DropdownMenuSub>
+                  </>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           )}

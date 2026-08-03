@@ -3,7 +3,7 @@ import { MatchCard, type MatchCardData, type TeamRef } from "./MatchCard";
 import { MatchResultDialog } from "./MatchResultDialog";
 import { MoveTeamDialog } from "./MoveTeamDialog";
 import { useServerFn } from "@tanstack/react-start";
-import { swapWithinMatch } from "@/lib/brackets.functions";
+import { swapWithinMatch, setMatchFormat } from "@/lib/brackets.functions";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -25,19 +25,26 @@ export function BracketView({
   teams,
   format,
   phase,
+  courtCount = 0,
   onRefresh,
+  onAssignCourt,
+  onStartMatch,
   readonly = false,
 }: {
   matches: MatchCardData[];
   teams: TeamRef[];
   format: "single_set" | "best_of_3_tiebreak";
   phase: Phase;
+  courtCount?: number;
   onRefresh: () => void;
+  onAssignCourt?: (matchId: string, court: number | null) => void;
+  onStartMatch?: (matchId: string, started: boolean) => void;
   readonly?: boolean;
 }) {
   const [selected, setSelected] = useState<MatchCardData | null>(null);
   const [moveCtx, setMoveCtx] = useState<{ match: MatchCardData; slot: "a" | "b" } | null>(null);
   const callSwapInside = useServerFn(swapWithinMatch);
+  const callSetFormat = useServerFn(setMatchFormat);
 
   const handleSwapInside = async (m: MatchCardData) => {
     if (readonly) return;
@@ -50,12 +57,27 @@ export function BracketView({
     }
   };
 
+  const handleSetFormat = async (m: MatchCardData, matchFormat: "single_set" | "best_of_3_tiebreak" | null) => {
+    if (readonly) return;
+    try {
+      await callSetFormat({ data: { match_id: m.id, match_format: matchFormat } });
+      toast.success(matchFormat ? "Formato definido para esta partida" : "Voltou ao formato padrão da chave");
+      onRefresh();
+    } catch (e: any) {
+      toast.error(e.message ?? "Erro");
+    }
+  };
+
   const cardProps = {
     teams,
     format,
+    courtCount,
     onOpenResult: readonly ? undefined : (m: MatchCardData) => { if (m.team_a_id && m.team_b_id) setSelected(m); },
     onSwapInside: readonly ? undefined : handleSwapInside,
     onMoveSlot: readonly ? undefined : (m: MatchCardData, slot: "a" | "b") => setMoveCtx({ match: m, slot }),
+    onAssignCourt: readonly || !onAssignCourt ? undefined : (m: MatchCardData, court: number | null) => onAssignCourt(m.id, court),
+    onStartMatch: readonly || !onStartMatch ? undefined : (m: MatchCardData, started: boolean) => onStartMatch(m.id, started),
+    onSetFormat: readonly ? undefined : handleSetFormat,
   };
 
   const byPhaseRound = useMemo(() => {
@@ -83,7 +105,7 @@ export function BracketView({
   return (
     <>
       {content}
-      <MatchResultDialog open={!!selected} onClose={() => setSelected(null)} match={selected} teams={teams} format={format} onSaved={onRefresh} />
+      <MatchResultDialog open={!!selected} onClose={() => setSelected(null)} match={selected} teams={teams} format={selected?.match_format ?? format} onSaved={onRefresh} />
       <MoveTeamDialog open={!!moveCtx} onClose={() => setMoveCtx(null)} sourceMatch={moveCtx?.match ?? null} sourceSlot={moveCtx?.slot ?? "a"} allMatches={matches} teams={teams} onSaved={onRefresh} />
     </>
   );
@@ -134,17 +156,23 @@ function BracketHalf({
     </div>
   );
 
-  // For LB: major rounds (same match count as previous) don't advance the offset —
-  // only merging rounds (fewer matches than previous) do. This avoids misaligned connectors.
+  // LB uses uniform spacing across all rounds (no branching doubling) because LB
+  // rounds alternate between major (drop-in) and minor (consolidation) and the
+  // count changes don't map cleanly to 2:1 branching like WB does.
+  // WB uses the standard doubling offset so branching connectors align.
   const effectiveIndices: number[] = [];
-  let effIdx = 0;
-  let prevCount = rounds[roundNums[0]]?.length ?? 0;
-  for (let i = 0; i < roundNums.length; i++) {
-    if (i === 0) { effectiveIndices.push(0); continue; }
-    const curCount = rounds[roundNums[i]]?.length ?? 0;
-    if (curCount < prevCount) effIdx++;
-    effectiveIndices.push(effIdx);
-    prevCount = curCount;
+  if (color === "amber" && !isFinalPhase) {
+    roundNums.forEach(() => effectiveIndices.push(0));
+  } else {
+    let effIdx = 0;
+    let prevCount = rounds[roundNums[0]]?.length ?? 0;
+    for (let i = 0; i < roundNums.length; i++) {
+      if (i === 0) { effectiveIndices.push(0); continue; }
+      const curCount = rounds[roundNums[i]]?.length ?? 0;
+      if (curCount < prevCount) effIdx++;
+      effectiveIndices.push(effIdx);
+      prevCount = curCount;
+    }
   }
 
   return (
@@ -153,15 +181,12 @@ function BracketHalf({
       <div className="overflow-x-auto pb-4">
         <div className="flex items-start min-w-fit">
           {roundNums.map((r, idx) => {
-            const nextR = roundNums[idx + 1];
-            // LB: when next round has the same match count → major (WB drop-in, 1:1 stubs)
-            //     when next round has fewer matches → minor (consolidation, 2:1 branching)
-            // WB and final: always branching
-            const curMatchCount = rounds[r]?.length ?? 0;
-            const nextMatchCount = nextR !== undefined ? (rounds[nextR]?.length ?? 0) : 0;
-            const simpleConnectors = color === "amber" && !isFinalPhase
-              ? (nextR !== undefined && nextMatchCount === curMatchCount)
-              : false;
+            // LB: always use simple horizontal stubs — mixing of major/minor rounds
+            //     means branching connectors would show wrong connections (e.g., LB-1-2
+            //     appears to branch into LB-2-1 but actually feeds LB-2-2 when there are
+            //     WB R2 drop-ins interleaved in lbPrev).
+            // WB and final: always branching (clean 2:1 reduction each round).
+            const simpleConnectors = color === "amber" && !isFinalPhase;
 
             return (
               <BracketRound

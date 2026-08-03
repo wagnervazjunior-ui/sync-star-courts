@@ -348,7 +348,8 @@ export const recordMatchResult = createServerFn({ method: "POST" })
 
     if (!match.team_a_id || !match.team_b_id) throw new Error("MATCH_NOT_READY");
 
-    const winnerSide = evaluateMatch(data.sets, br.match_format);
+    const effectiveFormat = (match as any).match_format ?? br.match_format;
+    const winnerSide = evaluateMatch(data.sets, effectiveFormat);
     if (!winnerSide) throw new Error("INVALID_RESULT");
     const winnerTeam = winnerSide === "a" ? match.team_a_id : match.team_b_id;
     const loserTeam = winnerSide === "a" ? match.team_b_id : match.team_a_id;
@@ -727,5 +728,115 @@ export const swapMatchSlots = createServerFn({ method: "POST" })
     };
     await upd(mA, data.slot_a, teamB);
     await upd(mB, data.slot_b, teamA);
+    return { ok: true };
+  });
+
+// ---------- COURT COUNT — configura número de quadras do local ----------
+export const setCourtCount = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z.object({
+      bracket_id: z.string().uuid(),
+      court_count: z.number().int().min(0).max(50),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: bracket } = await supabaseAdmin
+      .from("brackets")
+      .select("championship_id")
+      .eq("id", data.bracket_id)
+      .maybeSingle();
+    if (!bracket) throw new Error("NOT_FOUND");
+    await assertCanManage(context.userId, bracket.championship_id);
+    const { error } = await supabaseAdmin
+      .from("brackets")
+      .update({ court_count: data.court_count })
+      .eq("id", data.bracket_id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+// ---------- ASSIGN COURT — árbitro define a quadra de um jogo ----------
+export const assignCourt = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z.object({
+      match_id: z.string().uuid(),
+      court_number: z.number().int().min(1).max(50).nullable(),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: match } = await supabaseAdmin
+      .from("bracket_matches")
+      .select("id, winner_team_id, bracket:brackets(championship_id)")
+      .eq("id", data.match_id)
+      .maybeSingle();
+    if (!match) throw new Error("NOT_FOUND");
+    if ((match as any).winner_team_id) throw new Error("MATCH_FINISHED");
+    await assertCanManage(context.userId, (match as any).bracket.championship_id);
+    const patch: any = { court_number: data.court_number };
+    if (data.court_number === null) patch.started_at = null;
+    const { error } = await supabaseAdmin
+      .from("bracket_matches")
+      .update(patch)
+      .eq("id", data.match_id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+// ---------- START MATCH — árbitro inicia o jogo na quadra ----------
+export const startMatch = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z.object({ match_id: z.string().uuid(), started: z.boolean() }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: match } = await supabaseAdmin
+      .from("bracket_matches")
+      .select("id, court_number, winner_team_id, bracket:brackets(championship_id)")
+      .eq("id", data.match_id)
+      .maybeSingle();
+    if (!match) throw new Error("NOT_FOUND");
+    if ((match as any).winner_team_id) throw new Error("MATCH_FINISHED");
+    if (data.started && !(match as any).court_number) throw new Error("NO_COURT_ASSIGNED");
+    await assertCanManage(context.userId, (match as any).bracket.championship_id);
+    const { error } = await supabaseAdmin
+      .from("bracket_matches")
+      .update({ started_at: data.started ? new Date().toISOString() : null })
+      .eq("id", data.match_id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+// ---------- SET MATCH FORMAT — sobrescreve o formato de disputa de um jogo específico ----------
+export const setMatchFormat = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z.object({
+      match_id: z.string().uuid(),
+      // null = volta a usar o padrão da chave
+      match_format: z.enum(["single_set", "best_of_3_tiebreak"]).nullable(),
+      target_score: z.number().int().min(1).max(99).nullable().optional(),
+      tiebreak_points: z.number().int().min(1).max(99).nullable().optional(),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { data: match } = await supabaseAdmin
+      .from("bracket_matches")
+      .select("id, winner_team_id, bracket:brackets(championship_id)")
+      .eq("id", data.match_id)
+      .maybeSingle();
+    if (!match) throw new Error("NOT_FOUND");
+    if ((match as any).winner_team_id) throw new Error("MATCH_FINISHED");
+    await assertCanManage(context.userId, (match as any).bracket.championship_id);
+    const { error } = await supabaseAdmin
+      .from("bracket_matches")
+      .update({
+        match_format: data.match_format,
+        target_score: data.match_format ? (data.target_score ?? null) : null,
+        tiebreak_points: data.match_format ? (data.tiebreak_points ?? null) : null,
+      } as any)
+      .eq("id", data.match_id);
+    if (error) throw new Error(error.message);
     return { ok: true };
   });
