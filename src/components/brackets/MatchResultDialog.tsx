@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +31,21 @@ export function MatchResultDialog({
   const [saving, setSaving] = useState(false);
   const callRecord = useServerFn(recordMatchResult);
   const callReset = useServerFn(resetMatch);
+
+  // Reinicia os campos sempre que a partida aberta ou o formato mudam.
+  // (o diálogo fica montado o tempo todo, então o initializer do useState não
+  // basta — sem isso, um jogo "melhor de 3" reaproveitava 1 campo de "set único".)
+  const matchId = match?.id ?? null;
+  useEffect(() => {
+    if (!open || !match) return;
+    const existing = match.sets ?? [];
+    setSets(
+      Array.from({ length: numSets }, (_, i) => ({
+        a: existing[i]?.a != null ? String(existing[i].a) : "",
+        b: existing[i]?.b != null ? String(existing[i].b) : "",
+      })),
+    );
+  }, [open, matchId, numSets]);
 
   if (!match) return null;
   const teamA = teams.find((t) => t.id === match.team_a_id);
