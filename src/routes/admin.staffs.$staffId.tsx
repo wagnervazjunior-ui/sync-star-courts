@@ -14,6 +14,7 @@ import {
   listManageableChampionships,
   payFeeViaAsaas,
   payReimbursementViaAsaas,
+  payStaffBalanceViaAsaas,
   setFeeStatus,
   setReimbursementStatus,
 } from "@/lib/staff.functions";
@@ -114,6 +115,23 @@ function AdminStaffDetail() {
         const res = await callPayReimb({ data: { reimbursement_id: id } });
         toast.success(`PIX enviado! Transfer: ${res.transfer_id}`);
         qc.invalidateQueries({ queryKey: ["admin-staff-reimbs", staffId] });
+      },
+    );
+  };
+
+  const callPayBalance = useServerFn(payStaffBalanceViaAsaas);
+
+  const closeAccount = (champId: string, champName: string, totalCents: number, count: number) => {
+    if (!s) return;
+    openPixConfirmation(
+      s.name, s.pix_key, s.pix_key_type,
+      "Fechar conta via PIX",
+      `Pagar R$ ${(totalCents / 100).toFixed(2).replace(".", ",")} via PIX para ${s.name} (${count} lançamento${count === 1 ? "" : "s"} de ${champName})`,
+      async () => {
+        const res = await callPayBalance({ data: { staff_id: staffId, championship_id: champId } });
+        toast.success(`PIX enviado! ${res.count} lançamentos pagos.`);
+        qc.invalidateQueries({ queryKey: ["admin-staff-reimbs", staffId] });
+        qc.invalidateQueries({ queryKey: ["admin-staff-fees", staffId] });
       },
     );
   };
@@ -361,6 +379,34 @@ function AdminStaffDetail() {
           </div>
         </div>
       </Card>
+
+      {championship_id !== "all" && isMaster && (stats.rPending + stats.fPending) > 0 && (
+        <Card className="p-6 bg-gradient-card border-primary/40">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <h2 className="font-semibold">
+                Fechar conta — {champs.data?.championships.find((c) => c.id === championship_id)?.name ?? "campeonato"}
+              </h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                {brl(stats.rPending + stats.fPending)} pendentes ({reimbList.filter((r: any) => r.status === "pending").length} reembolso(s) + {feeList.filter((f: any) => f.status === "pending").length} cachê(s))
+              </p>
+            </div>
+            <Button
+              variant="hero"
+              onClick={() =>
+                closeAccount(
+                  championship_id,
+                  champs.data?.championships.find((c) => c.id === championship_id)?.name ?? "campeonato",
+                  stats.rPending + stats.fPending,
+                  reimbList.filter((r: any) => r.status === "pending").length + feeList.filter((f: any) => f.status === "pending").length,
+                )
+              }
+            >
+              💸 Pagar tudo via PIX
+            </Button>
+          </div>
+        </Card>
+      )}
 
       <Card className="p-6 bg-gradient-card border-border/50">
         <h2 className="font-semibold mb-3">Reembolsos</h2>
