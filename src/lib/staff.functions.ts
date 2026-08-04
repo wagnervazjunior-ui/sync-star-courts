@@ -328,6 +328,60 @@ export const createReimbursement = createServerFn({ method: "POST" })
     return { ok: true as const };
   });
 
+const UpdateReimbSchema = z.object({
+  id: z.string().uuid(),
+  category: z.enum(["alimentacao", "transporte", "passagem", "gasolina", "hospedagem", "outro"]),
+  description: z.string().trim().max(500).optional().nullable(),
+  amount_cents: z.number().int().positive().max(100_000_000),
+  expense_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  receipt_path: z.string().max(500).optional().nullable(),
+});
+
+export const updateMyReimbursement = createServerFn({ method: "POST" })
+  .middleware([requireStaffAuth])
+  .inputValidator((input: unknown) => UpdateReimbSchema.parse(input))
+  .handler(async ({ data, context }) => {
+    const { data: existing } = await supabaseAdmin
+      .from("staff_reimbursements")
+      .select("id, staff_id, status")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (!existing) throw new Error("REIMBURSEMENT_NOT_FOUND");
+    if (existing.staff_id !== context.staff.id) throw new Error("FORBIDDEN");
+    if (existing.status === "paid") throw new Error("REIMBURSEMENT_LOCKED_PAID");
+
+    const { error } = await supabaseAdmin
+      .from("staff_reimbursements")
+      .update({
+        category: data.category,
+        description: data.description?.trim() ?? "",
+        amount_cents: data.amount_cents,
+        expense_date: data.expense_date,
+        receipt_path: data.receipt_path ?? null,
+      })
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true as const };
+  });
+
+export const deleteMyReimbursement = createServerFn({ method: "POST" })
+  .middleware([requireStaffAuth])
+  .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { data: existing } = await supabaseAdmin
+      .from("staff_reimbursements")
+      .select("id, staff_id, status")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (!existing) throw new Error("REIMBURSEMENT_NOT_FOUND");
+    if (existing.staff_id !== context.staff.id) throw new Error("FORBIDDEN");
+    if (existing.status === "paid") throw new Error("REIMBURSEMENT_LOCKED_PAID");
+
+    const { error } = await supabaseAdmin.from("staff_reimbursements").delete().eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true as const };
+  });
+
 export const createReceiptUploadUrl = createServerFn({ method: "POST" })
   .middleware([requireStaffAuth])
   .inputValidator((input: unknown) =>
