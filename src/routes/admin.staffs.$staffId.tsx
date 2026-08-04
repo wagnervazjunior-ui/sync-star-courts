@@ -380,7 +380,7 @@ function AdminStaffDetail() {
         </div>
       </Card>
 
-      {championship_id !== "all" && isMaster && (stats.rPending + stats.fPending) > 0 && (
+      {championship_id !== "all" && isMaster && s && (stats.rPending + stats.fPending) > 0 && (
         <Card className="p-6 bg-gradient-card border-primary/40">
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div>
