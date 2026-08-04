@@ -5,6 +5,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createReceiptUploadUrl,
   createReimbursement,
+  updateMyReimbursement,
+  deleteMyReimbursement,
   getStaffMe,
   listMyFees,
   listMyReimbursements,
@@ -36,7 +38,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Loader2, LogOut, Plus, Receipt, Wallet, Pencil, FileText, User } from "lucide-react";
+import { Loader2, LogOut, Plus, Receipt, Wallet, Pencil, FileText, User, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/staff/painel")({
@@ -60,6 +62,7 @@ function brl(cents: number) {
 function StaffPanel() {
   const nav = useNavigate();
   const qc = useQueryClient();
+  const [editingReimb, setEditingReimb] = useState<any | null>(null);
   const callMe = useServerFn(getStaffMe);
   const callLogout = useServerFn(staffLogout);
 
@@ -177,7 +180,12 @@ function StaffPanel() {
           ) : (
             <div className="space-y-2">
               {(reimbs.data!.reimbursements as any[]).map((r) => (
-                <ReimbursementRow key={r.id} r={r} />
+                <ReimbursementRow
+                  key={r.id}
+                  r={r}
+                  onEdit={setEditingReimb}
+                  onDeleted={() => qc.invalidateQueries({ queryKey: ["staff-reimbursements"] })}
+                />
               ))}
             </div>
           )}
@@ -209,6 +217,12 @@ function StaffPanel() {
           )}
         </Card>
       </main>
+      <EditReimbursementDialog
+        open={!!editingReimb}
+        onClose={() => setEditingReimb(null)}
+        reimbursement={editingReimb}
+        onSaved={() => qc.invalidateQueries({ queryKey: ["staff-reimbursements"] })}
+      />
     </div>
   );
 }
@@ -228,13 +242,35 @@ function StatCard({ label, value, tone }: { label: string; value: string; tone?:
   );
 }
 
-function ReimbursementRow({ r }: { r: any }) {
+function ReimbursementRow({ r, onEdit, onDeleted }: { r: any; onEdit: (r: any) => void; onDeleted: () => void }) {
   const callReceipt = useServerFn(getMyReceiptSignedUrl);
+  const callDelete = useServerFn(deleteMyReimbursement);
+  const [deleting, setDeleting] = useState(false);
+
   const openReceipt = async () => {
     const { url } = await callReceipt({ data: { reimbursement_id: r.id } });
     if (url) window.open(url, "_blank");
     else toast.error("Comprovante indisponível");
   };
+
+  const handleDelete = async () => {
+    if (!confirm("Excluir este reembolso?")) return;
+    setDeleting(true);
+    try {
+      await callDelete({ data: { id: r.id } });
+      toast.success("Reembolso excluído");
+      onDeleted();
+    } catch (e: any) {
+      toast.error(
+        e?.message === "REIMBURSEMENT_LOCKED_PAID"
+          ? "Este reembolso já foi pago e não pode ser excluído"
+          : "Erro ao excluir reembolso",
+      );
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <div className="flex items-center justify-between gap-3 rounded-lg border border-border/50 p-3">
       <div className="min-w-0">
@@ -257,6 +293,23 @@ function ReimbursementRow({ r }: { r: any }) {
           </Button>
         )}
         <p className="font-semibold">{brl(r.amount_cents)}</p>
+        {r.status === "pending" && (
+          <>
+            <Button size="sm" variant="ghost" onClick={() => onEdit(r)} title="Editar reembolso">
+              <Pencil className="size-4" />
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-destructive hover:text-destructive"
+              onClick={handleDelete}
+              disabled={deleting}
+              title="Excluir reembolso"
+            >
+              <Trash2 className="size-4" />
+            </Button>
+          </>
+        )}
       </div>
     </div>
   );
@@ -456,6 +509,129 @@ function NewReimbursementDialog({
           <Button variant="hero" className="w-full" onClick={submit} disabled={saving}>
             {saving ? <Loader2 className="size-4 animate-spin mr-2" /> : <Wallet className="size-4 mr-2" />}
             Lançar reembolso
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function EditReimbursementDialog({
+  open,
+  onClose,
+  reimbursement,
+  onSaved,
+}: {
+  open: boolean;
+  onClose: () => void;
+  reimbursement: {
+    id: string;
+    category: string;
+    description: string;
+    amount_cents: number;
+    expense_date: string;
+    receipt_path: string | null;
+  } | null;
+  onSaved: () => void;
+}) {
+  const [category, setCategory] = useState<string>("alimentacao");
+  const [description, setDescription] = useState("");
+  const [amount, setAmount] = useState("");
+  const [expense_date, setExpenseDate] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const callUpload = useServerFn(createReceiptUploadUrl);
+  const callUpdate = useServerFn(updateMyReimbursement);
+
+  useEffect(() => {
+    if (!open || !reimbursement) return;
+    setCategory(reimbursement.category);
+    setDescription(reimbursement.description ?? "");
+    setAmount((reimbursement.amount_cents / 100).toFixed(2).replace(".", ","));
+    setExpenseDate(reimbursement.expense_date);
+    setFile(null);
+  }, [open, reimbursement]);
+
+  if (!reimbursement) return null;
+
+  const submit = async () => {
+    const cents = Math.round(parseFloat(amount.replace(",", ".")) * 100);
+    if (!cents || cents <= 0) { toast.error("Valor inválido"); return; }
+    setSaving(true);
+    try {
+      let receipt_path = reimbursement.receipt_path;
+      if (file) {
+        const up = await callUpload({ data: { filename: file.name } });
+        const putRes = await fetch(up.signedUrl, {
+          method: "PUT",
+          headers: { "Content-Type": file.type || "application/octet-stream" },
+          body: file,
+        });
+        if (!putRes.ok) throw new Error("Falha no upload do comprovante");
+        receipt_path = up.path;
+      }
+      await callUpdate({
+        data: {
+          id: reimbursement.id,
+          category: category as any,
+          description,
+          amount_cents: cents,
+          expense_date,
+          receipt_path,
+        },
+      });
+      toast.success("Reembolso atualizado");
+      onSaved();
+      onClose();
+    } catch (e: any) {
+      toast.error(
+        e?.message === "REIMBURSEMENT_LOCKED_PAID"
+          ? "Este reembolso já foi pago e não pode ser editado"
+          : "Erro ao salvar",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Editar reembolso</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Categoria</Label>
+              <Select value={category} onValueChange={setCategory}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {Object.entries(CATEGORY_LABEL).map(([k, v]) => (
+                    <SelectItem key={k} value={k}>{v}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Valor (R$)</Label>
+              <Input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0,00" inputMode="decimal" />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Data da despesa</Label>
+            <Input type="date" value={expense_date} onChange={(e) => setExpenseDate(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Descrição</Label>
+            <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descreva o gasto" />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Novo comprovante (opcional — deixe em branco pra manter o atual)</Label>
+            <Input type="file" accept="image/*,application/pdf" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+          </div>
+          <Button variant="hero" className="w-full" onClick={submit} disabled={saving}>
+            {saving ? <Loader2 className="size-4 animate-spin mr-2" /> : <Pencil className="size-4 mr-2" />}
+            Salvar alterações
           </Button>
         </div>
       </DialogContent>
