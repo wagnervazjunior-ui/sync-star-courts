@@ -227,6 +227,20 @@ function AdminStaffs() {
     return { total, paid, pending: total - paid };
   }, [reimbs.data]);
 
+  const totalsByCategory = useMemo(() => {
+    const rs = reimbs.data?.reimbursements ?? [];
+    const map = new Map<string, { total: number; paid: number }>();
+    for (const r of rs as any[]) {
+      const cur = map.get(r.category) ?? { total: 0, paid: 0 };
+      cur.total += r.amount_cents;
+      if (r.status === "paid") cur.paid += r.amount_cents;
+      map.set(r.category, cur);
+    }
+    return Array.from(map.entries())
+      .map(([category, v]) => ({ category, ...v }))
+      .sort((a, b) => b.total - a.total);
+  }, [reimbs.data]);
+
   const feeTotals = useMemo(() => {
     const fs = fees.data?.fees ?? [];
     const total = fs.reduce((a, r: any) => a + r.amount_cents, 0);
@@ -834,6 +848,24 @@ function AdminStaffs() {
           </div>
         )}
       </Card>
+
+      {/* Reimbursements by Category */}
+      {totalsByCategory.length > 0 && (
+        <Card className="p-6 bg-gradient-card border-border/50">
+          <h2 className="font-semibold mb-3">Reembolsos por categoria (todos os staffs)</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+            {totalsByCategory.map(({ category, total, paid }) => (
+              <div key={category} className="rounded-lg border border-border/40 p-3">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">
+                  {CATEGORY_LABEL[category] ?? category}
+                </p>
+                <p className="text-lg font-bold mt-0.5">{brl(total)}</p>
+                <p className="text-xs text-muted-foreground">Pago {brl(paid)}</p>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* Reimbursements */}
       <Card className="p-6 bg-gradient-card border-border/50">
