@@ -1352,6 +1352,82 @@ export const payReimbursementViaAsaas = createServerFn({ method: "POST" })
     return { ok: true as const, transfer_id: transfer.id };
   });
 
+// ── Fechar conta: paga cachês + reembolsos pendentes de um staff, num só campeonato, numa única transferência ──
+export const payStaffBalanceViaAsaas = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ staff_id: z.string().uuid(), championship_id: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    await assertMaster(context.userId);
+    const { data: staff } = await supabaseAdmin
+      .from("staffs")
+      .select("id, name, pix_key, pix_key_type, owner_admin_id")
+      .eq("id", data.staff_id)
+      .maybeSingle();
+    if (!staff || staff.owner_admin_id !== context.userId) throw new Error("FORBIDDEN");
+    if (!staff.pix_key) throw new Error("Staff sem chave PIX cadastrada");
+
+    const [{ data: fees }, { data: reimbs }] = await Promise.all([
+      supabaseAdmin
+        .from("staff_fees")
+        .select("id, amount_cents")
+        .eq("staff_id", data.staff_id)
+        .eq("championship_id", data.championship_id)
+        .eq("status", "pending"),
+      supabaseAdmin
+        .from("staff_reimbursements")
+        .select("id, amount_cents")
+        .eq("staff_id", data.staff_id)
+        .eq("championship_id", data.championship_id)
+        .eq("status", "pending"),
+    ]);
+
+    const feeIds = (fees ?? []).map((f: any) => f.id as string);
+    const reimbIds = (reimbs ?? []).map((r: any) => r.id as string);
+    const totalCents =
+      (fees ?? []).reduce((s: number, f: any) => s + f.amount_cents, 0) +
+      (reimbs ?? []).reduce((s: number, r: any) => s + r.amount_cents, 0);
+
+    if (totalCents <= 0) throw new Error("NOTHING_TO_PAY");
+
+    const { data: champ } = await supabaseAdmin
+      .from("championships")
+      .select("name")
+      .eq("id", data.championship_id)
+      .maybeSingle();
+
+    const transfer = await createPixTransfer({
+      pixKey: staff.pix_key,
+      pixKeyType: staff.pix_key_type,
+      valueCents: totalCents,
+      description: `Fechamento staff: ${staff.name} — ${champ?.name ?? ""} (${feeIds.length} cachês, ${reimbIds.length} reembolsos)`,
+    });
+
+    const now = new Date().toISOString();
+    await Promise.all([
+      feeIds.length
+        ? supabaseAdmin
+            .from("staff_fees")
+            .update({ status: "paid", paid_at: now, paid_by: context.userId, asaas_transfer_id: transfer.id } as any)
+            .in("id", feeIds)
+        : Promise.resolve(),
+      reimbIds.length
+        ? supabaseAdmin
+            .from("staff_reimbursements")
+            .update({ status: "paid", paid_at: now, paid_by: context.userId, asaas_transfer_id: transfer.id } as any)
+            .in("id", reimbIds)
+        : Promise.resolve(),
+    ]);
+
+    return {
+      ok: true as const,
+      transfer_id: transfer.id,
+      total_cents: totalCents,
+      count: feeIds.length + reimbIds.length,
+    };
+  });
+
 // ── Comprovante de transferência Asaas ──────────────────────────────────────
 export const getAsaasTransferReceipt = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
