@@ -214,6 +214,19 @@ function AdminStaffDetail() {
     };
   }, [reimbList, feeList]);
 
+  const byCategory = useMemo(() => {
+    const map = new Map<string, { total: number; paid: number }>();
+    for (const r of reimbList) {
+      const cur = map.get(r.category) ?? { total: 0, paid: 0 };
+      cur.total += r.amount_cents;
+      if (r.status === "paid") cur.paid += r.amount_cents;
+      map.set(r.category, cur);
+    }
+    return Array.from(map.entries())
+      .map(([category, v]) => ({ category, ...v }))
+      .sort((a, b) => b.total - a.total);
+  }, [reimbList]);
+
   async function toggleReimb(id: string, current: "pending" | "paid") {
     try {
       await callReimbStatus({ data: { id, status: current === "paid" ? "pending" : "paid" } });
@@ -350,6 +363,23 @@ function AdminStaffDetail() {
           <p className="text-xl font-bold mt-1">{brl(stats.rPending + stats.fPending)}</p>
         </Card>
       </div>
+
+      {byCategory.length > 0 && (
+        <Card className="p-6 bg-gradient-card border-border/50">
+          <h2 className="font-semibold mb-3">Reembolsos por categoria</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+            {byCategory.map(({ category, total, paid }) => (
+              <div key={category} className="rounded-lg border border-border/40 p-3">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">
+                  {CATEGORY_LABEL[category] ?? category}
+                </p>
+                <p className="text-lg font-bold mt-0.5">{brl(total)}</p>
+                <p className="text-xs text-muted-foreground">Pago {brl(paid)}</p>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       <Card className="p-6 bg-gradient-card border-border/50">
         <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
