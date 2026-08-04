@@ -391,12 +391,14 @@ function AdminStaffDetail() {
                     <td className="py-2 pr-3">{CATEGORY_LABEL[r.category] ?? r.category}</td>
                     <td className="py-2 pr-3 text-muted-foreground">{r.description}</td>
                     <td className="py-2 pr-3">
-                      <button
-                        className="inline-flex items-center gap-1 hover:text-primary text-xs"
-                        onClick={() => { navigator.clipboard.writeText(s.pix_key); toast.success("PIX copiado"); }}
-                      >
-                        <Copy className="size-3" /> {s.pix_key}
-                      </button>
+                      {s && (
+                        <button
+                          className="inline-flex items-center gap-1 hover:text-primary text-xs"
+                          onClick={() => { navigator.clipboard.writeText(s.pix_key); toast.success("PIX copiado"); }}
+                        >
+                          <Copy className="size-3" /> {s.pix_key}
+                        </button>
+                      )}
                     </td>
                     <td className="py-2 pr-3 font-medium">{brl(r.amount_cents)}</td>
                     <td className="py-2 pr-3">
@@ -411,7 +413,7 @@ function AdminStaffDetail() {
                             <FileText className="size-3" /> Comprovante
                           </Button>
                         )}
-                        {r.status === "pending" && isMaster && (
+                        {r.status === "pending" && isMaster && s && (
                           <Button size="sm" variant="hero" onClick={() => payReimbAsaas(r.id, s.name, r.amount_cents, s.pix_key, s.pix_key_type)} title="Enviar PIX via Asaas">
                             💸 PIX
                           </Button>
@@ -468,12 +470,14 @@ function AdminStaffDetail() {
                     <td className="py-2 pr-3">{f.championship?.name}</td>
                     <td className="py-2 pr-3 text-muted-foreground">{f.description}</td>
                     <td className="py-2 pr-3">
-                      <button
-                        className="inline-flex items-center gap-1 hover:text-primary text-xs"
-                        onClick={() => { navigator.clipboard.writeText(s.pix_key); toast.success("PIX copiado"); }}
-                      >
-                        <Copy className="size-3" /> {s.pix_key}
-                      </button>
+                      {s && (
+                        <button
+                          className="inline-flex items-center gap-1 hover:text-primary text-xs"
+                          onClick={() => { navigator.clipboard.writeText(s.pix_key); toast.success("PIX copiado"); }}
+                        >
+                          <Copy className="size-3" /> {s.pix_key}
+                        </button>
+                      )}
                     </td>
                     <td className="py-2 pr-3 font-medium">{brl(f.amount_cents)}</td>
                     <td className="py-2 pr-3">
@@ -488,7 +492,7 @@ function AdminStaffDetail() {
                             <FileText className="size-3" /> Comprovante
                           </Button>
                         )}
-                        {f.status === "pending" && isMaster && (
+                        {f.status === "pending" && isMaster && s && (
                           <Button size="sm" variant="hero" onClick={() => payFeeAsaas(f.id, s.name, f.amount_cents, s.pix_key, s.pix_key_type)} title="Enviar PIX via Asaas">
                             💸 PIX
                           </Button>
