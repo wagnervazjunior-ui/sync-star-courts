@@ -10,7 +10,10 @@ import {
   adminListReimbursements,
   getFeeReceiptSignedUrl,
   getReceiptSignedUrl,
+  getAsaasTransferReceipt,
   listManageableChampionships,
+  payFeeViaAsaas,
+  payReimbursementViaAsaas,
   setFeeStatus,
   setReimbursementStatus,
 } from "@/lib/staff.functions";
@@ -24,7 +27,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, Copy, FileText, Tag, Trash2 } from "lucide-react";
+import { ArrowLeft, Copy, Download, FileText, Tag, Trash2 } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { AdminPinDialog } from "@/components/AdminPinDialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/staffs/$staffId")({
@@ -58,6 +69,75 @@ function AdminStaffDetail() {
   const callFeeReceipt = useServerFn(getFeeReceiptSignedUrl);
   const callDeleteReimb = useServerFn(adminDeleteReimbursement);
   const callDeleteFee = useServerFn(adminDeleteFee);
+  const { isMaster } = useAuth();
+  const callPayFee = useServerFn(payFeeViaAsaas);
+  const callPayReimb = useServerFn(payReimbursementViaAsaas);
+  const callGetTransferReceipt = useServerFn(getAsaasTransferReceipt);
+  const [pinDialog, setPinDialog] = useState<{ title: string; description: string; action: () => Promise<void> } | null>(null);
+  const [beneficiaryDialog, setBeneficiaryDialog] = useState<{
+    title: string; description: string;
+    staffName: string; pixKey: string; pixType: string;
+    action: () => void;
+  } | null>(null);
+
+  const openPixConfirmation = (
+    staffName: string, pixKey: string, pixType: string,
+    pinTitle: string, pinDescription: string,
+    action: () => Promise<void>,
+  ) => {
+    setBeneficiaryDialog({
+      title: pinTitle, description: pinDescription,
+      staffName, pixKey, pixType,
+      action: () => setPinDialog({ title: pinTitle, description: pinDescription, action }),
+    });
+  };
+
+  const payFeeAsaas = (id: string, staffName: string, amountCents: number, pixKey: string, pixType: string) => {
+    openPixConfirmation(
+      staffName, pixKey, pixType,
+      "Confirmar pagamento PIX",
+      `Pagar R$ ${(amountCents / 100).toFixed(2).replace(".", ",")} via PIX para ${staffName}`,
+      async () => {
+        const res = await callPayFee({ data: { fee_id: id } });
+        toast.success(`PIX enviado! Transfer: ${res.transfer_id}`);
+        qc.invalidateQueries({ queryKey: ["admin-staff-fees", staffId] });
+      },
+    );
+  };
+
+  const payReimbAsaas = (id: string, staffName: string, amountCents: number, pixKey: string, pixType: string) => {
+    openPixConfirmation(
+      staffName, pixKey, pixType,
+      "Confirmar reembolso PIX",
+      `Pagar R$ ${(amountCents / 100).toFixed(2).replace(".", ",")} via PIX para ${staffName}`,
+      async () => {
+        const res = await callPayReimb({ data: { reimbursement_id: id } });
+        toast.success(`PIX enviado! Transfer: ${res.transfer_id}`);
+        qc.invalidateQueries({ queryKey: ["admin-staff-reimbs", staffId] });
+      },
+    );
+  };
+
+  const downloadTransferReceipt = async (transferId: string, label: string) => {
+    try {
+      const res = await callGetTransferReceipt({ data: { transfer_id: transferId } });
+      if (res.type === "url" && res.value) {
+        window.open(res.value, "_blank");
+      } else if (res.type === "pdf" && res.value) {
+        const bytes = Uint8Array.from(atob(res.value), (c) => c.charCodeAt(0));
+        const blob = new Blob([bytes], { type: "application/pdf" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `comprovante-${label}.pdf`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+      } else {
+        toast.error("Comprovante não disponível no Asaas");
+      }
+    } catch (e: any) {
+      toast.error(e?.message ?? "Erro ao buscar comprovante");
+    }
+  };
 
   const [championship_id, setChampionshipId] = useState<string>("all");
   const [status, setStatus] = useState<string>("all");
@@ -297,6 +377,7 @@ function AdminStaffDetail() {
                   <th className="py-2 pr-3">Campeonato</th>
                   <th className="py-2 pr-3">Categoria</th>
                   <th className="py-2 pr-3">Descrição</th>
+                  <th className="py-2 pr-3">PIX</th>
                   <th className="py-2 pr-3">Valor</th>
                   <th className="py-2 pr-3">Status</th>
                   <th className="py-2 pr-3"></th>
@@ -309,6 +390,14 @@ function AdminStaffDetail() {
                     <td className="py-2 pr-3">{r.championship?.name}</td>
                     <td className="py-2 pr-3">{CATEGORY_LABEL[r.category] ?? r.category}</td>
                     <td className="py-2 pr-3 text-muted-foreground">{r.description}</td>
+                    <td className="py-2 pr-3">
+                      <button
+                        className="inline-flex items-center gap-1 hover:text-primary text-xs"
+                        onClick={() => { navigator.clipboard.writeText(s.pix_key); toast.success("PIX copiado"); }}
+                      >
+                        <Copy className="size-3" /> {s.pix_key}
+                      </button>
+                    </td>
                     <td className="py-2 pr-3 font-medium">{brl(r.amount_cents)}</td>
                     <td className="py-2 pr-3">
                       <Badge variant={r.status === "paid" ? "default" : "secondary"}>
@@ -322,8 +411,18 @@ function AdminStaffDetail() {
                             <FileText className="size-3" /> Comprovante
                           </Button>
                         )}
-                        <Button size="sm" onClick={() => toggleReimb(r.id, r.status)}>
-                          {r.status === "paid" ? "Marcar pendente" : "Marcar pago"}
+                        {r.status === "pending" && isMaster && (
+                          <Button size="sm" variant="hero" onClick={() => payReimbAsaas(r.id, s.name, r.amount_cents, s.pix_key, s.pix_key_type)} title="Enviar PIX via Asaas">
+                            💸 PIX
+                          </Button>
+                        )}
+                        {r.status === "paid" && r.asaas_transfer_id && (
+                          <Button size="sm" variant="ghost" onClick={() => downloadTransferReceipt(r.asaas_transfer_id, s.name ?? r.id)} title="Baixar comprovante Asaas">
+                            <Download className="size-4" />
+                          </Button>
+                        )}
+                        <Button size="sm" onClick={() => toggleReimb(r.id, r.status)} title="Sem enviar PIX pelo sistema — use para pagamentos feitos por fora">
+                          {r.status === "paid" ? "Marcar pendente manualmente" : "Marcar pago manualmente"}
                         </Button>
                         <Button
                           size="sm"
@@ -357,6 +456,7 @@ function AdminStaffDetail() {
                 <tr>
                   <th className="py-2 pr-3">Campeonato</th>
                   <th className="py-2 pr-3">Descrição</th>
+                  <th className="py-2 pr-3">PIX</th>
                   <th className="py-2 pr-3">Valor</th>
                   <th className="py-2 pr-3">Status</th>
                   <th className="py-2 pr-3"></th>
@@ -367,6 +467,14 @@ function AdminStaffDetail() {
                   <tr key={f.id} className="border-t border-border/40">
                     <td className="py-2 pr-3">{f.championship?.name}</td>
                     <td className="py-2 pr-3 text-muted-foreground">{f.description}</td>
+                    <td className="py-2 pr-3">
+                      <button
+                        className="inline-flex items-center gap-1 hover:text-primary text-xs"
+                        onClick={() => { navigator.clipboard.writeText(s.pix_key); toast.success("PIX copiado"); }}
+                      >
+                        <Copy className="size-3" /> {s.pix_key}
+                      </button>
+                    </td>
                     <td className="py-2 pr-3 font-medium">{brl(f.amount_cents)}</td>
                     <td className="py-2 pr-3">
                       <Badge variant={f.status === "paid" ? "default" : "secondary"}>
@@ -380,8 +488,18 @@ function AdminStaffDetail() {
                             <FileText className="size-3" /> Comprovante
                           </Button>
                         )}
-                        <Button size="sm" onClick={() => toggleFee(f.id, f.status)}>
-                          {f.status === "paid" ? "Marcar pendente" : "Marcar pago"}
+                        {f.status === "pending" && isMaster && (
+                          <Button size="sm" variant="hero" onClick={() => payFeeAsaas(f.id, s.name, f.amount_cents, s.pix_key, s.pix_key_type)} title="Enviar PIX via Asaas">
+                            💸 PIX
+                          </Button>
+                        )}
+                        {f.status === "paid" && f.asaas_transfer_id && (
+                          <Button size="sm" variant="ghost" onClick={() => downloadTransferReceipt(f.asaas_transfer_id, s.name ?? f.id)} title="Baixar comprovante Asaas">
+                            <Download className="size-4" />
+                          </Button>
+                        )}
+                        <Button size="sm" onClick={() => toggleFee(f.id, f.status)} title="Sem enviar PIX pelo sistema — use para pagamentos feitos por fora">
+                          {f.status === "paid" ? "Marcar pendente manualmente" : "Marcar pago manualmente"}
                         </Button>
                         <Button
                           size="sm"
@@ -401,6 +519,51 @@ function AdminStaffDetail() {
           </div>
         )}
       </Card>
+
+      <Dialog open={!!beneficiaryDialog} onOpenChange={(o) => { if (!o) setBeneficiaryDialog(null); }}>
+        <DialogContent className="sm:max-w-sm" aria-describedby={undefined}>
+          <DialogHeader>
+            <DialogTitle>{beneficiaryDialog?.title}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-1">
+            <p className="text-sm text-muted-foreground">{beneficiaryDialog?.description}</p>
+            <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3">
+              <div>
+                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-0.5">Favorecido</p>
+                <p className="font-semibold text-base">{beneficiaryDialog?.staffName}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Declarado pelo próprio staff ao cadastrar</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-0.5">Chave PIX ({beneficiaryDialog?.pixType?.toUpperCase()})</p>
+                <p className="font-mono text-sm break-all">{beneficiaryDialog?.pixKey}</p>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">O staff declarou que esses dados estão corretos no momento do cadastro. Esta operação não pode ser desfeita.</p>
+          </div>
+          <div className="flex gap-2 justify-end">
+            <Button variant="outline" onClick={() => setBeneficiaryDialog(null)}>Cancelar</Button>
+            <Button variant="hero" onClick={() => { beneficiaryDialog?.action(); setBeneficiaryDialog(null); }}>
+              Confirmar e pagar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <AdminPinDialog
+        open={!!pinDialog}
+        onOpenChange={(open) => { if (!open) setPinDialog(null); }}
+        title={pinDialog?.title ?? ""}
+        description={pinDialog?.description}
+        onConfirmed={async () => {
+          try {
+            await pinDialog?.action();
+          } catch (e: any) {
+            toast.error(e?.message ?? "Falha ao executar operação");
+          } finally {
+            setPinDialog(null);
+          }
+        }}
+      />
     </div>
   );
 }
