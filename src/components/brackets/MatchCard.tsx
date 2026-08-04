@@ -263,23 +263,17 @@ export function MatchCard({
                     <DropdownMenuSeparator />
                     <DropdownMenuSub>
                       <DropdownMenuSubTrigger disabled={isFinished}>
-                        Formato desta partida{match.match_format ? " ✓" : ""}
+                        Formato desta partida
                       </DropdownMenuSubTrigger>
                       <DropdownMenuSubContent>
-                        <DropdownMenuItem disabled={!match.match_format} onClick={() => onSetFormat(match, null)}>
-                          Padrão da chave
+                        <DropdownMenuItem onClick={() => onSetFormat(match, null)}>
+                          {!match.match_format ? "✓ " : "   "}Padrão da chave
                         </DropdownMenuItem>
-                        <DropdownMenuItem
-                          disabled={match.match_format === "single_set"}
-                          onClick={() => onSetFormat(match, "single_set")}
-                        >
-                          Set único
+                        <DropdownMenuItem onClick={() => onSetFormat(match, "single_set")}>
+                          {match.match_format === "single_set" ? "✓ " : "   "}Set único
                         </DropdownMenuItem>
-                        <DropdownMenuItem
-                          disabled={match.match_format === "best_of_3_tiebreak"}
-                          onClick={() => onSetFormat(match, "best_of_3_tiebreak")}
-                        >
-                          Melhor de 3 (com tiebreak)
+                        <DropdownMenuItem onClick={() => onSetFormat(match, "best_of_3_tiebreak")}>
+                          {match.match_format === "best_of_3_tiebreak" ? "✓ " : "   "}Melhor de 3 (com tiebreak)
                         </DropdownMenuItem>
                       </DropdownMenuSubContent>
                     </DropdownMenuSub>
