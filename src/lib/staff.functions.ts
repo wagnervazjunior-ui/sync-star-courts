@@ -1405,20 +1405,26 @@ export const payStaffBalanceViaAsaas = createServerFn({ method: "POST" })
     });
 
     const now = new Date().toISOString();
-    await Promise.all([
+    const [feeResult, reimbResult] = await Promise.all([
       feeIds.length
         ? supabaseAdmin
             .from("staff_fees")
             .update({ status: "paid", paid_at: now, paid_by: context.userId, asaas_transfer_id: transfer.id } as any)
             .in("id", feeIds)
-        : Promise.resolve(),
+        : Promise.resolve({ error: null }),
       reimbIds.length
         ? supabaseAdmin
             .from("staff_reimbursements")
             .update({ status: "paid", paid_at: now, paid_by: context.userId, asaas_transfer_id: transfer.id } as any)
             .in("id", reimbIds)
-        : Promise.resolve(),
+        : Promise.resolve({ error: null }),
     ]);
+    if (feeResult.error || reimbResult.error) {
+      throw new Error(
+        `Transferência PIX enviada (${transfer.id}), mas falha ao atualizar status: ` +
+          [feeResult.error?.message, reimbResult.error?.message].filter(Boolean).join("; "),
+      );
+    }
 
     return {
       ok: true as const,
