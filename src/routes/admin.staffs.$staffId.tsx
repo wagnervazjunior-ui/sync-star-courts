@@ -495,7 +495,7 @@ function AdminStaffDetail() {
                           </Button>
                         )}
                         {r.status === "paid" && r.asaas_transfer_id && (
-                          <Button size="sm" variant="ghost" onClick={() => downloadTransferReceipt(r.asaas_transfer_id, s.name ?? r.id)} title="Baixar comprovante Asaas">
+                          <Button size="sm" variant="ghost" onClick={() => downloadTransferReceipt(r.asaas_transfer_id, s?.name ?? r.id)} title="Baixar comprovante Asaas">
                             <Download className="size-4" />
                           </Button>
                         )}
@@ -574,7 +574,7 @@ function AdminStaffDetail() {
                           </Button>
                         )}
                         {f.status === "paid" && f.asaas_transfer_id && (
-                          <Button size="sm" variant="ghost" onClick={() => downloadTransferReceipt(f.asaas_transfer_id, s.name ?? f.id)} title="Baixar comprovante Asaas">
+                          <Button size="sm" variant="ghost" onClick={() => downloadTransferReceipt(f.asaas_transfer_id, s?.name ?? f.id)} title="Baixar comprovante Asaas">
                             <Download className="size-4" />
                           </Button>
                         )}
