@@ -24,8 +24,8 @@ import { generateUniformWorkbook } from "@/lib/uniform-export";
 import { useAuth } from "@/hooks/useAuth";
 import { useServerFn } from "@tanstack/react-start";
 import {
-  adminListReimbursements, setReimbursementStatus, getReceiptSignedUrl,
-  adminListFees, setFeeStatus, getFeeReceiptSignedUrl, exportStaffFinanceXlsx,
+  adminListReimbursements,
+  adminListFees, exportStaffFinanceXlsx,
 } from "@/lib/staff.functions";
 import { listBrackets } from "@/lib/brackets.functions";
 import {
@@ -33,6 +33,7 @@ import {
 } from "@/lib/referee.functions";
 import { CreateBracketDialog } from "@/components/brackets/CreateBracketDialog";
 import { SimulateBracketDialog } from "@/components/brackets/SimulateBracketDialog";
+import { StaffFinanceCards } from "@/components/StaffFinanceCards";
 
 type TabKey = "configuracoes" | "dashboard" | "categorias" | "inscricoes" | "planilhas" | "staff" | "chaves" | "arbitros" | "permissoes";
 
@@ -1026,20 +1027,13 @@ function PermissoesTab({ id }: { id: string }) {
 }
 
 /* =================== STAFF (reembolsos & cachês por torneio) =================== */
-const REIMB_CATEGORY_LABEL: Record<string, string> = {
-  alimentacao: "Alimentação", transporte: "Transporte", passagem: "Passagem",
-  gasolina: "Gasolina", hospedagem: "Hospedagem", outro: "Outro",
-};
 function brl(c: number) { return `R$ ${(c / 100).toFixed(2).replace(".", ",")}`; }
 
 function StaffTab({ id }: { id: string }) {
   const qc = useQueryClient();
+  const { isMaster } = useAuth();
   const callList = useServerFn(adminListReimbursements);
-  const callStatus = useServerFn(setReimbursementStatus);
-  const callReceipt = useServerFn(getReceiptSignedUrl);
   const callFees = useServerFn(adminListFees);
-  const callFeeStatus = useServerFn(setFeeStatus);
-  const callFeeReceipt = useServerFn(getFeeReceiptSignedUrl);
   const callExport = useServerFn(exportStaffFinanceXlsx);
   const [status, setStatus] = useState<string>("all");
   const [exporting, setExporting] = useState(false);
@@ -1066,25 +1060,6 @@ function StaffTab({ id }: { id: string }) {
     const paid = fs.filter((r: any) => r.status === "paid").reduce((a: number, r: any) => a + r.amount_cents, 0);
     return { total, paid, pending: total - paid };
   }, [fees.data]);
-
-  const toggleReimb = async (rid: string, current: "pending" | "paid") => {
-    await callStatus({ data: { id: rid, status: current === "paid" ? "pending" : "paid" } });
-    qc.invalidateQueries({ queryKey: ["champ-staff-reimbs", id] });
-    toast.success(current === "paid" ? "Marcado como pendente" : "Marcado como pago");
-  };
-  const toggleFee = async (fid: string, current: "pending" | "paid") => {
-    await callFeeStatus({ data: { id: fid, status: current === "paid" ? "pending" : "paid" } });
-    qc.invalidateQueries({ queryKey: ["champ-staff-fees", id] });
-    toast.success(current === "paid" ? "Marcado como pendente" : "Marcado como pago");
-  };
-  const openReceipt = async (rid: string) => {
-    const { url } = await callReceipt({ data: { reimbursement_id: rid } });
-    if (url) window.open(url, "_blank"); else toast.error("Comprovante indisponível");
-  };
-  const openFeeReceipt = async (fid: string) => {
-    const { url } = await callFeeReceipt({ data: { fee_id: fid } });
-    if (url) window.open(url, "_blank"); else toast.error("Comprovante indisponível");
-  };
 
   const handleExport = async () => {
     try {
@@ -1139,52 +1114,6 @@ function StaffTab({ id }: { id: string }) {
           <StatBox label="Pago" value={brl(fTotals.paid)} tone="success" />
           <StatBox label="Pendente" value={brl(fTotals.pending)} tone="warn" />
         </div>
-        {fees.isLoading ? <p className="text-sm text-muted-foreground">Carregando…</p>
-          : (fees.data?.fees ?? []).length === 0 ? <p className="text-sm text-muted-foreground">Nenhum cachê lançado.</p>
-          : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-left text-xs uppercase tracking-wider text-muted-foreground">
-                <tr>
-                  <th className="py-2 pr-3">Staff</th>
-                  <th className="py-2 pr-3">Descrição</th>
-                  <th className="py-2 pr-3">PIX</th>
-                  <th className="py-2 pr-3 text-right">Valor</th>
-                  <th className="py-2 pr-3">Status</th>
-                  <th className="py-2 pr-3"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {(fees.data!.fees as any[]).map((r) => (
-                  <tr key={r.id} className="border-t border-border/40">
-                    <td className="py-2 pr-3 font-medium">{r.staff?.name}</td>
-                    <td className="py-2 pr-3 max-w-xs truncate" title={r.description}>{r.description || "—"}</td>
-                    <td className="py-2 pr-3">
-                      <button className="inline-flex items-center gap-1 hover:text-primary text-xs"
-                        onClick={() => { navigator.clipboard.writeText(r.staff?.pix_key ?? ""); toast.success("PIX copiado"); }}>
-                        <Copy className="size-3" /> {r.staff?.pix_key}
-                      </button>
-                    </td>
-                    <td className="py-2 pr-3 text-right font-semibold">{brl(r.amount_cents)}</td>
-                    <td className="py-2 pr-3"><Badge variant={r.status === "paid" ? "default" : "secondary"}>{r.status === "paid" ? "Pago" : "Pendente"}</Badge></td>
-                    <td className="py-2 pr-3">
-                      <div className="flex gap-1 justify-end">
-                        {r.receipt_path && (
-                          <Button size="sm" variant="ghost" onClick={() => openFeeReceipt(r.id)} title="Ver anexo">
-                            <FileText className="size-4" />
-                          </Button>
-                        )}
-                        <Button size="sm" variant={r.status === "paid" ? "outline" : "hero"} onClick={() => toggleFee(r.id, r.status)}>
-                          {r.status === "paid" ? "Desfazer" : "Marcar pago"}
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
       </Card>
 
       <Card className="p-6 bg-gradient-card border-border/50">
@@ -1194,56 +1123,22 @@ function StaffTab({ id }: { id: string }) {
           <StatBox label="Pago" value={brl(rTotals.paid)} tone="success" />
           <StatBox label="Pendente" value={brl(rTotals.pending)} tone="warn" />
         </div>
-        {reimbs.isLoading ? <p className="text-sm text-muted-foreground">Carregando…</p>
-          : (reimbs.data?.reimbursements ?? []).length === 0 ? <p className="text-sm text-muted-foreground">Nenhum reembolso encontrado.</p>
-          : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-left text-xs uppercase tracking-wider text-muted-foreground">
-                <tr>
-                  <th className="py-2 pr-3">Staff</th>
-                  <th className="py-2 pr-3">Categoria</th>
-                  <th className="py-2 pr-3">Descrição</th>
-                  <th className="py-2 pr-3">Data</th>
-                  <th className="py-2 pr-3">PIX</th>
-                  <th className="py-2 pr-3 text-right">Valor</th>
-                  <th className="py-2 pr-3">Status</th>
-                  <th className="py-2 pr-3"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {(reimbs.data!.reimbursements as any[]).map((r) => (
-                  <tr key={r.id} className="border-t border-border/40">
-                    <td className="py-2 pr-3 font-medium">{r.staff?.name}</td>
-                    <td className="py-2 pr-3"><Badge variant="outline">{REIMB_CATEGORY_LABEL[r.category] ?? r.category}</Badge></td>
-                    <td className="py-2 pr-3 max-w-xs truncate" title={r.description}>{r.description}</td>
-                    <td className="py-2 pr-3">{new Date(r.expense_date).toLocaleDateString("pt-BR")}</td>
-                    <td className="py-2 pr-3">
-                      <button className="inline-flex items-center gap-1 hover:text-primary text-xs"
-                        onClick={() => { navigator.clipboard.writeText(r.staff?.pix_key ?? ""); toast.success("PIX copiado"); }}>
-                        <Copy className="size-3" /> {r.staff?.pix_key}
-                      </button>
-                    </td>
-                    <td className="py-2 pr-3 text-right font-semibold">{brl(r.amount_cents)}</td>
-                    <td className="py-2 pr-3"><Badge variant={r.status === "paid" ? "default" : "secondary"}>{r.status === "paid" ? "Pago" : "Pendente"}</Badge></td>
-                    <td className="py-2 pr-3">
-                      <div className="flex gap-1 justify-end">
-                        {r.receipt_path && (
-                          <Button size="sm" variant="ghost" onClick={() => openReceipt(r.id)} title="Ver comprovante">
-                            <FileText className="size-4" />
-                          </Button>
-                        )}
-                        <Button size="sm" variant={r.status === "paid" ? "outline" : "hero"} onClick={() => toggleReimb(r.id, r.status)}>
-                          {r.status === "paid" ? "Desfazer" : "Marcar pago"}
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+      </Card>
+
+      <Card className="p-6 bg-gradient-card border-border/50">
+        <h2 className="font-semibold mb-4 flex items-center gap-2">
+          <Wallet className="size-5 text-primary" /> Staff — cachês e reembolsos
+        </h2>
+        <StaffFinanceCards
+          reimbursements={(reimbs.data?.reimbursements ?? []) as any[]}
+          fees={(fees.data?.fees ?? []) as any[]}
+          championshipId={id}
+          isMaster={isMaster}
+          onPaid={() => {
+            qc.invalidateQueries({ queryKey: ["champ-staff-reimbs", id] });
+            qc.invalidateQueries({ queryKey: ["champ-staff-fees", id] });
+          }}
+        />
       </Card>
     </div>
   );
