@@ -4,8 +4,6 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   adminCreateReimbursement,
-  adminDeleteFee,
-  adminDeleteReimbursement,
   adminDeleteStaff,
   adminListFees,
   adminListReimbursements,
@@ -16,19 +14,12 @@ import {
   deleteStaffCategory,
   exportStaffFinanceXlsx,
   updateStaffRole,
-  payFeeViaAsaas,
-  payReimbursementViaAsaas,
-  getAsaasTransferReceipt,
   STAFF_ROLES,
-  getFeeReceiptSignedUrl,
-  getReceiptSignedUrl,
   linkStaffToChampionship,
   listManageableChampionships,
   listMyStaffs,
   listStaffCategories,
   listStaffInvites,
-  setFeeStatus,
-  setReimbursementStatus,
   unlinkStaffFromChampionship,
 } from "@/lib/staff.functions";
 import { Card } from "@/components/ui/card";
@@ -54,7 +45,7 @@ import {
 import { Copy, Download, FileText, Link as LinkIcon, Link2, Loader2, Plus, RefreshCw, Tag, Trash2, Trophy, Users, Wallet } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
-import { AdminPinDialog } from "@/components/AdminPinDialog";
+import { StaffFinanceCards } from "@/components/StaffFinanceCards";
 
 export const Route = createFileRoute("/admin/staffs/")({
   head: () => ({ meta: [{ title: "Staffs — Admin Open Sync" }] }),
@@ -88,54 +79,18 @@ function AdminStaffs() {
   const callRotate = useServerFn(createOrRotateStaffInviteForChampionship);
   const callStaffs = useServerFn(listMyStaffs);
   const callList = useServerFn(adminListReimbursements);
-  const callStatus = useServerFn(setReimbursementStatus);
-  const callReceipt = useServerFn(getReceiptSignedUrl);
   const callFees = useServerFn(adminListFees);
-  const callFeeStatus = useServerFn(setFeeStatus);
-  const callFeeReceipt = useServerFn(getFeeReceiptSignedUrl);
   const callExport = useServerFn(exportStaffFinanceXlsx);
   const callDeleteStaff = useServerFn(adminDeleteStaff);
-  const callPayFee = useServerFn(payFeeViaAsaas);
-  const callPayReimb = useServerFn(payReimbursementViaAsaas);
-  const callDeleteReimb = useServerFn(adminDeleteReimbursement);
-  const callDeleteFee = useServerFn(adminDeleteFee);
   const callListCategories = useServerFn(listStaffCategories);
   const callCreateCategory = useServerFn(createStaffCategory);
   const callDeleteCategory = useServerFn(deleteStaffCategory);
   const [exporting, setExporting] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [creatingCategory, setCreatingCategory] = useState(false);
-  const [pinDialog, setPinDialog] = useState<{ title: string; description: string; action: () => Promise<void> } | null>(null);
   const [newReimbOpen, setNewReimbOpen] = useState(false);
   const callAdminCreateReimb = useServerFn(adminCreateReimbursement);
   const callAdminUpload = useServerFn(createAdminReceiptUploadUrl);
-  const callGetTransferReceipt = useServerFn(getAsaasTransferReceipt);
-  const [beneficiaryDialog, setBeneficiaryDialog] = useState<{
-    title: string; description: string;
-    staffName: string; pixKey: string; pixType: string;
-    action: () => void;
-  } | null>(null);
-
-  const downloadTransferReceipt = async (transferId: string, label: string) => {
-    try {
-      const res = await callGetTransferReceipt({ data: { transfer_id: transferId } });
-      if (res.type === "url" && res.value) {
-        window.open(res.value, "_blank");
-      } else if (res.type === "pdf" && res.value) {
-        const bytes = Uint8Array.from(atob(res.value), (c) => c.charCodeAt(0));
-        const blob = new Blob([bytes], { type: "application/pdf" });
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = `comprovante-${label}.pdf`;
-        a.click();
-        URL.revokeObjectURL(a.href);
-      } else {
-        toast.error("Comprovante não disponível no Asaas");
-      }
-    } catch (e: any) {
-      toast.error(e?.message ?? "Erro ao buscar comprovante");
-    }
-  };
 
   async function handleExport() {
     try {
@@ -254,24 +209,6 @@ function AdminStaffs() {
     toast.success("Link gerado");
   };
 
-  const toggleReimb = async (id: string, current: "pending" | "paid") => {
-    await callStatus({ data: { id, status: current === "paid" ? "pending" : "paid" } });
-    qc.invalidateQueries({ queryKey: ["admin-reimbursements"] });
-    toast.success(current === "paid" ? "Marcado como pendente" : "Marcado como pago");
-  };
-
-  const toggleFee = async (id: string, current: "pending" | "paid") => {
-    await callFeeStatus({ data: { id, status: current === "paid" ? "pending" : "paid" } });
-    qc.invalidateQueries({ queryKey: ["admin-fees"] });
-    toast.success(current === "paid" ? "Marcado como pendente" : "Marcado como pago");
-  };
-
-  const openReceipt = async (id: string) => {
-    const { url } = await callReceipt({ data: { reimbursement_id: id } });
-    if (url) window.open(url, "_blank");
-    else toast.error("Comprovante indisponível");
-  };
-
   const linkStaff = async (staffId: string, champId: string) => {
     try {
       await callLink({ data: { staff_id: staffId, championship_id: champId } });
@@ -299,12 +236,6 @@ function AdminStaffs() {
     }
   };
 
-  const openFeeReceipt = async (id: string) => {
-    const { url } = await callFeeReceipt({ data: { fee_id: id } });
-    if (url) window.open(url, "_blank");
-    else toast.error("Comprovante indisponível");
-  };
-
   const deleteStaff = async (id: string, name: string) => {
     if (!confirm(`Excluir o staff "${name}"? Todos os dados dele (sessões, reembolsos, cachês, vínculos) serão removidos.`)) return;
     try {
@@ -318,17 +249,6 @@ function AdminStaffs() {
     }
   };
 
-  const deleteReimb = async (id: string) => {
-    if (!confirm("Excluir este reembolso?")) return;
-    try {
-      await callDeleteReimb({ data: { id } });
-      qc.invalidateQueries({ queryKey: ["admin-reimbursements"] });
-      toast.success("Reembolso excluído");
-    } catch (e: any) {
-      toast.error(e?.message || "Falha ao excluir reembolso");
-    }
-  };
-
   const handleRoleChange = async (staffId: string, role: string) => {
     try {
       await callUpdateRole({ data: { staff_id: staffId, staff_role: role === "none" ? null : role } });
@@ -337,55 +257,6 @@ function AdminStaffs() {
     } catch (e: any) {
       toast.error(e?.message || "Falha ao atualizar área");
     }
-  };
-
-  const deleteFee = async (id: string) => {
-    if (!confirm("Excluir este cachê?")) return;
-    try {
-      await callDeleteFee({ data: { id } });
-      qc.invalidateQueries({ queryKey: ["admin-fees"] });
-      toast.success("Cachê excluído");
-    } catch (e: any) {
-      toast.error(e?.message || "Falha ao excluir cachê");
-    }
-  };
-
-  const openPixConfirmation = (
-    staffName: string, pixKey: string, pixType: string,
-    pinTitle: string, pinDescription: string,
-    action: () => Promise<void>,
-  ) => {
-    setBeneficiaryDialog({
-      title: pinTitle, description: pinDescription,
-      staffName, pixKey, pixType,
-      action: () => setPinDialog({ title: pinTitle, description: pinDescription, action }),
-    });
-  };
-
-  const payFeeAsaas = (id: string, staffName: string, amountCents: number, pixKey: string, pixType: string) => {
-    openPixConfirmation(
-      staffName, pixKey, pixType,
-      "Confirmar pagamento PIX",
-      `Pagar R$ ${(amountCents / 100).toFixed(2).replace(".", ",")} via PIX para ${staffName}`,
-      async () => {
-        const res = await callPayFee({ data: { fee_id: id } });
-        toast.success(`PIX enviado! Transfer: ${res.transfer_id}`);
-        qc.invalidateQueries({ queryKey: ["admin-fees"] });
-      },
-    );
-  };
-
-  const payReimbAsaas = (id: string, staffName: string, amountCents: number, pixKey: string, pixType: string) => {
-    openPixConfirmation(
-      staffName, pixKey, pixType,
-      "Confirmar reembolso PIX",
-      `Pagar R$ ${(amountCents / 100).toFixed(2).replace(".", ",")} via PIX para ${staffName}`,
-      async () => {
-        const res = await callPayReimb({ data: { reimbursement_id: id } });
-        toast.success(`PIX enviado! Transfer: ${res.transfer_id}`);
-        qc.invalidateQueries({ queryKey: ["admin-reimbursements"] });
-      },
-    );
   };
 
   const handleCreateCategory = async () => {
@@ -763,90 +634,6 @@ function AdminStaffs() {
           <Stat label="Pago" value={brl(feeTotals.paid)} tone="success" />
           <Stat label="Pendente" value={brl(feeTotals.pending)} tone="warn" />
         </div>
-        {fees.isLoading ? (
-          <p className="text-sm text-muted-foreground">Carregando…</p>
-        ) : (fees.data?.fees ?? []).length === 0 ? (
-          <p className="text-sm text-muted-foreground">Nenhum cachê lançado.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-left text-xs uppercase tracking-wider text-muted-foreground">
-                <tr>
-                  <th className="py-2 pr-3">Staff</th>
-                  <th className="py-2 pr-3">Campeonato</th>
-                  <th className="py-2 pr-3">Descrição</th>
-                  <th className="py-2 pr-3">PIX</th>
-                  <th className="py-2 pr-3 text-right">Valor</th>
-                  <th className="py-2 pr-3">Status</th>
-                  <th className="py-2 pr-3"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {(fees.data!.fees as any[]).map((r) => (
-                  <tr key={r.id} className="border-t border-border/40">
-                    <td className="py-2 pr-3 font-medium">{r.staff?.name}</td>
-                    <td className="py-2 pr-3 text-muted-foreground">{r.championship?.name}</td>
-                    <td className="py-2 pr-3 max-w-xs truncate" title={r.description}>
-                      {r.description || "—"}
-                    </td>
-                    <td className="py-2 pr-3">
-                      <button
-                        className="inline-flex items-center gap-1 hover:text-primary text-xs"
-                        onClick={() => {
-                          navigator.clipboard.writeText(r.staff?.pix_key ?? "");
-                          toast.success("PIX copiado");
-                        }}
-                      >
-                        <Copy className="size-3" /> {r.staff?.pix_key}
-                      </button>
-                    </td>
-                    <td className="py-2 pr-3 text-right font-semibold">{brl(r.amount_cents)}</td>
-                    <td className="py-2 pr-3">
-                      <Badge variant={r.status === "paid" ? "default" : "secondary"}>
-                        {r.status === "paid" ? "Pago" : "Pendente"}
-                      </Badge>
-                    </td>
-                    <td className="py-2 pr-3">
-                      <div className="flex gap-1 justify-end flex-wrap">
-                        {r.receipt_path && (
-                          <Button size="sm" variant="ghost" onClick={() => openFeeReceipt(r.id)} title="Ver anexo">
-                            <FileText className="size-4" />
-                          </Button>
-                        )}
-                        {r.status === "pending" && isMaster && (
-                          <Button size="sm" variant="hero" onClick={() => payFeeAsaas(r.id, r.staff?.name, r.amount_cents, r.staff?.pix_key, r.staff?.pix_key_type)} title="Enviar PIX via Asaas">
-                            💸 PIX
-                          </Button>
-                        )}
-                        {r.status === "paid" && r.asaas_transfer_id && (
-                          <Button size="sm" variant="ghost" onClick={() => downloadTransferReceipt(r.asaas_transfer_id, r.staff?.name ?? r.id)} title="Baixar comprovante Asaas">
-                            <Download className="size-4" />
-                          </Button>
-                        )}
-                        <Button
-                          size="sm"
-                          variant={r.status === "paid" ? "outline" : "secondary"}
-                          onClick={() => toggleFee(r.id, r.status)}
-                        >
-                          {r.status === "paid" ? "Desfazer" : "Marcar pago"}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => deleteFee(r.id)}
-                          title="Excluir cachê"
-                        >
-                          <Trash2 className="size-3" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
       </Card>
 
       {/* Reimbursements by Category */}
@@ -880,94 +667,22 @@ function AdminStaffs() {
           <Stat label="Pago" value={brl(totals.paid)} tone="success" />
           <Stat label="Pendente" value={brl(totals.pending)} tone="warn" />
         </div>
-        {reimbs.isLoading ? (
-          <p className="text-sm text-muted-foreground">Carregando…</p>
-        ) : (reimbs.data?.reimbursements ?? []).length === 0 ? (
-          <p className="text-sm text-muted-foreground">Nenhum reembolso encontrado.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-left text-xs uppercase tracking-wider text-muted-foreground">
-                <tr>
-                  <th className="py-2 pr-3">Staff</th>
-                  <th className="py-2 pr-3">Campeonato</th>
-                  <th className="py-2 pr-3">Categoria</th>
-                  <th className="py-2 pr-3">Descrição</th>
-                  <th className="py-2 pr-3">Data</th>
-                  <th className="py-2 pr-3">PIX</th>
-                  <th className="py-2 pr-3 text-right">Valor</th>
-                  <th className="py-2 pr-3">Status</th>
-                  <th className="py-2 pr-3"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {(reimbs.data!.reimbursements as any[]).map((r) => (
-                  <tr key={r.id} className="border-t border-border/40">
-                    <td className="py-2 pr-3 font-medium">{r.staff?.name}</td>
-                    <td className="py-2 pr-3 text-muted-foreground">{r.championship?.name}</td>
-                    <td className="py-2 pr-3">
-                      <Badge variant="outline">{CATEGORY_LABEL[r.category] ?? r.category}</Badge>
-                    </td>
-                    <td className="py-2 pr-3 max-w-xs truncate" title={r.description}>{r.description}</td>
-                    <td className="py-2 pr-3">{new Date(r.expense_date).toLocaleDateString("pt-BR")}</td>
-                    <td className="py-2 pr-3">
-                      <button
-                        className="inline-flex items-center gap-1 hover:text-primary text-xs"
-                        onClick={() => {
-                          navigator.clipboard.writeText(r.staff?.pix_key ?? "");
-                          toast.success("PIX copiado");
-                        }}
-                      >
-                        <Copy className="size-3" /> {r.staff?.pix_key}
-                      </button>
-                    </td>
-                    <td className="py-2 pr-3 text-right font-semibold">{brl(r.amount_cents)}</td>
-                    <td className="py-2 pr-3">
-                      <Badge variant={r.status === "paid" ? "default" : "secondary"}>
-                        {r.status === "paid" ? "Pago" : "Pendente"}
-                      </Badge>
-                    </td>
-                    <td className="py-2 pr-3">
-                      <div className="flex gap-1 justify-end flex-wrap">
-                        {r.receipt_path && (
-                          <Button size="sm" variant="ghost" onClick={() => openReceipt(r.id)} title="Ver comprovante">
-                            <FileText className="size-4" />
-                          </Button>
-                        )}
-                        {r.status === "pending" && isMaster && (
-                          <Button size="sm" variant="hero" onClick={() => payReimbAsaas(r.id, r.staff?.name, r.amount_cents, r.staff?.pix_key, r.staff?.pix_key_type)} title="Enviar PIX via Asaas">
-                            💸 PIX
-                          </Button>
-                        )}
-                        {r.status === "paid" && r.asaas_transfer_id && (
-                          <Button size="sm" variant="ghost" onClick={() => downloadTransferReceipt(r.asaas_transfer_id, r.staff?.name ?? r.id)} title="Baixar comprovante Asaas">
-                            <Download className="size-4" />
-                          </Button>
-                        )}
-                        <Button
-                          size="sm"
-                          variant={r.status === "paid" ? "outline" : "secondary"}
-                          onClick={() => toggleReimb(r.id, r.status)}
-                        >
-                          {r.status === "paid" ? "Desfazer" : "Marcar pago"}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => deleteReimb(r.id)}
-                          title="Excluir reembolso"
-                        >
-                          <Trash2 className="size-3" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+      </Card>
+
+      <Card className="p-6 bg-gradient-card border-border/50">
+        <h2 className="font-semibold mb-4 flex items-center gap-2">
+          <Users className="size-5 text-primary" /> Staff — cachês e reembolsos
+        </h2>
+        <StaffFinanceCards
+          reimbursements={(reimbs.data?.reimbursements ?? []) as any[]}
+          fees={(fees.data?.fees ?? []) as any[]}
+          championshipId={championship_id === "all" ? null : championship_id}
+          isMaster={isMaster}
+          onPaid={() => {
+            qc.invalidateQueries({ queryKey: ["admin-reimbursements"] });
+            qc.invalidateQueries({ queryKey: ["admin-fees"] });
+          }}
+        />
       </Card>
 
       <AdminNewReimbDialog
@@ -978,52 +693,6 @@ function AdminStaffs() {
         onCreated={() => qc.invalidateQueries({ queryKey: ["admin-reimbursements"] })}
         callCreate={callAdminCreateReimb}
         callUpload={callAdminUpload}
-      />
-
-      {/* Dialog: confirmar favorecido PIX */}
-      <Dialog open={!!beneficiaryDialog} onOpenChange={(o) => { if (!o) setBeneficiaryDialog(null); }}>
-        <DialogContent className="sm:max-w-sm" aria-describedby={undefined}>
-          <DialogHeader>
-            <DialogTitle>{beneficiaryDialog?.title}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3 py-1">
-            <p className="text-sm text-muted-foreground">{beneficiaryDialog?.description}</p>
-            <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3">
-              <div>
-                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-0.5">Favorecido</p>
-                <p className="font-semibold text-base">{beneficiaryDialog?.staffName}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Declarado pelo próprio staff ao cadastrar</p>
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-wider text-muted-foreground mb-0.5">Chave PIX ({beneficiaryDialog?.pixType?.toUpperCase()})</p>
-                <p className="font-mono text-sm break-all">{beneficiaryDialog?.pixKey}</p>
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground">O staff declarou que esses dados estão corretos no momento do cadastro. Esta operação não pode ser desfeita.</p>
-          </div>
-          <div className="flex gap-2 justify-end">
-            <Button variant="outline" onClick={() => setBeneficiaryDialog(null)}>Cancelar</Button>
-            <Button variant="hero" onClick={() => { beneficiaryDialog?.action(); setBeneficiaryDialog(null); }}>
-              Confirmar e pagar
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <AdminPinDialog
-        open={!!pinDialog}
-        onOpenChange={(open) => { if (!open) setPinDialog(null); }}
-        title={pinDialog?.title ?? ""}
-        description={pinDialog?.description}
-        onConfirmed={async () => {
-          try {
-            await pinDialog?.action();
-          } catch (e: any) {
-            toast.error(e?.message ?? "Falha ao executar operação");
-          } finally {
-            setPinDialog(null);
-          }
-        }}
       />
     </div>
   );
