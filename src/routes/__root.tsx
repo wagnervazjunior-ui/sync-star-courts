@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
@@ -8,6 +9,7 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import { Toaster } from "@/components/ui/sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 import appCss from "../styles.css?url";
 
@@ -93,6 +95,25 @@ function RootShell({ children }: { children: React.ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+
+  useEffect(() => {
+    function handleAuthRejection(event: PromiseRejectionEvent) {
+      const err: any = event.reason;
+      const isInvalidRefreshToken =
+        err?.name === "AuthApiError" &&
+        typeof err?.message === "string" &&
+        err.message.includes("Refresh Token");
+      if (!isInvalidRefreshToken) return;
+      event.preventDefault();
+      if (window.location.pathname === "/login") return;
+      supabase.auth.signOut().finally(() => {
+        window.location.href = "/login";
+      });
+    }
+    window.addEventListener("unhandledrejection", handleAuthRejection);
+    return () => window.removeEventListener("unhandledrejection", handleAuthRejection);
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <Outlet />
