@@ -56,7 +56,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { AdminPinDialog } from "@/components/AdminPinDialog";
 
-export const Route = createFileRoute("/admin/staffs")({
+export const Route = createFileRoute("/admin/staffs/")({
   head: () => ({ meta: [{ title: "Staffs — Admin Open Sync" }] }),
   component: AdminStaffs,
 });
