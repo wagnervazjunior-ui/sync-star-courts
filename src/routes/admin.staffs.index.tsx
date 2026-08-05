@@ -24,7 +24,6 @@ import {
 } from "@/lib/staff.functions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -42,7 +41,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Copy, Download, FileText, Link as LinkIcon, Link2, Loader2, Plus, RefreshCw, Tag, Trash2, Trophy, Users, Wallet } from "lucide-react";
+import { Copy, FileText, Link as LinkIcon, Link2, Loader2, Plus, RefreshCw, Tag, Trash2, Trophy, Users, Wallet } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { StaffFinanceCards } from "@/components/StaffFinanceCards";
