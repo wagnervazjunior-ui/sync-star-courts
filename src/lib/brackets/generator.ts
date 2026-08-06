@@ -11,9 +11,13 @@
 //   - Empty position (winner advanced past that slot, or bye) = no entry yet
 //
 // WB R2 losers from every branch merge one round later via doMajor, crossing
-// branches (reversed order) — matching Challonge (confirmed against real
-// 13- and 14-team brackets; see
-// docs/superpowers/specs/2026-08-05-lb-round1-cross-pairing-design.md).
+// branches (reversed order) whenever the WB has more than 2 rounds — matching
+// Challonge (confirmed against real 13- and 14-team brackets; see
+// docs/superpowers/specs/2026-08-05-lb-round1-cross-pairing-design.md). For
+// small brackets where the WB has only 2 rounds, this is also the LAST
+// drop-in, so `reversed=false` and same-branch pairing is used instead
+// (intentional, matches Challonge for those sizes too — unchanged by this
+// fix).
 //
 // After LB R1, minor rounds consolidate survivors before each WB drop-in.
 
@@ -185,7 +189,21 @@ export function generateDoubleElim(n: number): GeneratedMatch[] {
       matches.push({ key, phase: "LB", round: lbRoundNum, position: i + 1, source_a: lbPrev[i], source_b: opponent, bye: false });
       majorKeys.push(key);
     }
-    const extraWb = wbLosers.length > lbPrev.length ? wbLosers.slice(0, wbLosers.length - lbPrev.length) : [];
+    // Leftover WB losers that didn't get a match this round carry over to the
+    // next round. Which end of `wbLosers` is "leftover" depends on which end
+    // the matches above consumed from: `reversed` consumes from the END (so
+    // the leftover is the FRONT); non-reversed consumes from the FRONT (so
+    // the leftover is the END). Using the wrong end silently re-uses an
+    // already-consumed WB loser as if it were still waiting, while dropping
+    // the real leftover entirely — confirmed to corrupt n=5 (WB-2's loser
+    // duplicated into an immediate SEMI rematch, the other WB-2 loser
+    // vanishing) before this fix.
+    const extraWb =
+      wbLosers.length > lbPrev.length
+        ? reversed
+          ? wbLosers.slice(0, wbLosers.length - matchCount)
+          : wbLosers.slice(matchCount)
+        : [];
     const extraLb = lbPrev.length > wbLosers.length ? lbPrev.slice(matchCount) : [];
     lbRoundNum++;
     lbPrev = [...majorKeys.map((k) => ({ type: "winner_of", key: k } as SourceRef)), ...extraWb, ...extraLb];
