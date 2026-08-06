@@ -74,16 +74,16 @@ export function StandingsTab({
       });
   }, [teams, matches]);
 
-  const podium = rows.filter((r) => ["campea", "vice", "terceira"].includes(r.status));
+  const podium = rows.filter((r) => ["campea", "vice", "terceira", "quarta"].includes(r.status));
 
   return (
     <div className="space-y-4">
-      {podium.length === 3 && (
+      {podium.length >= 3 && (
         <Card className="p-4">
           <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
             <Trophy className="size-4 text-yellow-500" /> Pódio
           </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
             {podium.map((r) => {
               const s = statusLabel(r.status);
               return (
