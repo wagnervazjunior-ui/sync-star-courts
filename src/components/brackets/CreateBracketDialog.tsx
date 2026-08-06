@@ -136,7 +136,7 @@ export function CreateBracketDialog({
           </Button>
         )}
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Gerar nova chave</DialogTitle>
         </DialogHeader>
