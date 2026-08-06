@@ -2,13 +2,18 @@
 //
 // LB R1 is built from WB R1 slot positions (not just real-match losers):
 //   - Real WB R1 match → loser fills LB R1 at that slot position
-//   - Bye WB R1 slot → position reserved for whoever loses the WB R2 match
-//     that involves the bye winner (same "slot zone")
-//   - Same-origin pairing: pos_(2i-1) vs pos_(2i) — the two losers who fed the
-//     same WB R2 match play each other first (matches reference double-elim
-//     templates). The anti-seed crossing happens one round later instead,
-//     when LB R1 winners meet WB R2 losers.
-//   - Empty position (winner advanced past that slot) = bye in LB R1
+//   - Bye WB R1 slot → position stays empty; that branch's WB R2 loser
+//     waits for the cross-branch merge instead (see wb2Losers below)
+//   - Same-origin pairing: pos_(2i-1) vs pos_(2i) — the two R1 losers who fed
+//     the same WB R2 match play each other first, but ONLY when both slots
+//     are filled (an "orphan" branch — neither R1 match had a bye). Mixed or
+//     double-bye branches produce at most one waiting entry, no LB R1 match.
+//   - Empty position (winner advanced past that slot, or bye) = no entry yet
+//
+// WB R2 losers from every branch merge one round later via doMajor, crossing
+// branches (reversed order) — matching Challonge (confirmed against real
+// 13- and 14-team brackets; see
+// docs/superpowers/specs/2026-08-05-lb-round1-cross-pairing-design.md).
 //
 // After LB R1, minor rounds consolidate survivors before each WB drop-in.
 
@@ -99,30 +104,18 @@ export function generateDoubleElim(n: number): GeneratedMatch[] {
     }
   }
 
-  // Step 2: WB R2 losers fill reserved bye-slot positions
-  // lbR2DirectEntries = WB R2 losers from "real vs real" matches (bypass LB R1)
-  const lbR2DirectEntries: SourceRef[] = [];
-
+  // Step 2: every WB R2 loser, from every branch, waits for the cross-branch
+  // merge round below — never fills a position[] slot directly. Only a branch
+  // where NEITHER R1 match had a bye ("orphan" branch, both positions filled
+  // by Step 1) is ready to play immediately; every other branch's R2 loser
+  // must wait for a teammate from a DIFFERENT branch (matches Challonge,
+  // confirmed against real 13- and 14-team brackets — see
+  // docs/superpowers/specs/2026-08-05-lb-round1-cross-pairing-design.md).
+  const wb2Losers: SourceRef[] = [];
   if (wbRounds.length >= 2) {
     const wbR2Keys = wbRounds[1];
     for (let j = 0; j < wbR2Keys.length; j++) {
-      const slot1 = 2 * j + 1; // 1-indexed
-      const slot2 = 2 * j + 2;
-      const bye1 = r1IsBye[slot1 - 1];
-      const bye2 = r1IsBye[slot2 - 1];
-      const loserRef: SourceRef = { type: "loser_of", key: wbR2Keys[j] };
-
-      if (bye1 && bye2) {
-        // Both byes: loser fills lower slot position; upper stays null (bye in LB R1)
-        positions[slot1] = loserRef;
-      } else if (bye1) {
-        positions[slot1] = loserRef;
-      } else if (bye2) {
-        positions[slot2] = loserRef;
-      } else {
-        // Real vs real: loser bypasses LB R1, enters LB R2 directly
-        lbR2DirectEntries.push(loserRef);
-      }
+      wb2Losers.push({ type: "loser_of", key: wbR2Keys[j] });
     }
   }
 
@@ -198,12 +191,12 @@ export function generateDoubleElim(n: number): GeneratedMatch[] {
     lbPrev = [...majorKeys.map((k) => ({ type: "winner_of", key: k } as SourceRef)), ...extraWb, ...extraLb];
   };
 
-  // Handle WB R2 direct entries (major round) if any
-  if (lbR2DirectEntries.length > 0) {
-    // Consolidate lbPrev first if oversized
-    while (lbPrev.length > lbR2DirectEntries.length && lbPrev.length > 2) doMinor();
+  // Merge every branch's R2 loser against whatever's ready from Step 3 above
+  // (orphan-branch LB R1 winners + waiting single-branch R1 losers), reversed
+  // to cross branches — same doMajor already used for later rounds below.
+  if (wb2Losers.length > 0) {
     // This is the last drop-in when WB only has 2 rounds (no R3+ loop below).
-    doMajor(lbR2DirectEntries, wbRounds.length > 2);
+    doMajor(wb2Losers, wbRounds.length > 2);
   }
 
   // Process WB R3 and beyond
