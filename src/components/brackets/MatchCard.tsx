@@ -88,6 +88,7 @@ export function MatchCard({
   onAssignCourt,
   onStartMatch,
   onSetFormat,
+  onEditTeam,
 }: {
   match: MatchCardData;
   teams: TeamRef[];
@@ -99,8 +100,9 @@ export function MatchCard({
   onAssignCourt?: (m: MatchCardData, court: number | null) => void;
   onStartMatch?: (m: MatchCardData, started: boolean) => void;
   onSetFormat?: (m: MatchCardData, format: "single_set" | "best_of_3_tiebreak" | null) => void;
+  onEditTeam?: (team: TeamRef) => void;
 }) {
-  const isAdmin = !!(onOpenResult || onSwapInside || onMoveSlot || onAssignCourt || onStartMatch || onSetFormat);
+  const isAdmin = !!(onOpenResult || onSwapInside || onMoveSlot || onAssignCourt || onStartMatch || onSetFormat || onEditTeam);
 
   const teamA = teams.find((t) => t.id === match.team_a_id) ?? null;
   const teamB = teams.find((t) => t.id === match.team_b_id) ?? null;
@@ -258,6 +260,17 @@ export function MatchCard({
                 >
                   Trocar dupla B ({nameB || "vaga B"})
                 </DropdownMenuItem>
+                {onEditTeam && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem disabled={!teamA} onClick={() => teamA && onEditTeam(teamA)}>
+                      Editar dupla A ({nameA || "vaga A"})
+                    </DropdownMenuItem>
+                    <DropdownMenuItem disabled={!teamB} onClick={() => teamB && onEditTeam(teamB)}>
+                      Editar dupla B ({nameB || "vaga B"})
+                    </DropdownMenuItem>
+                  </>
+                )}
                 {onSetFormat && (
                   <>
                     <DropdownMenuSeparator />

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { MatchCard, type MatchCardData, type TeamRef } from "./MatchCard";
 import { MatchResultDialog } from "./MatchResultDialog";
 import { MoveTeamDialog } from "./MoveTeamDialog";
+import { EditTeamDialog } from "./EditTeamDialog";
 import { useServerFn } from "@tanstack/react-start";
 import { swapWithinMatch, setMatchFormat } from "@/lib/brackets.functions";
 import { toast } from "sonner";
@@ -43,6 +44,7 @@ export function BracketView({
 }) {
   const [selected, setSelected] = useState<MatchCardData | null>(null);
   const [moveCtx, setMoveCtx] = useState<{ match: MatchCardData; slot: "a" | "b" } | null>(null);
+  const [editingTeam, setEditingTeam] = useState<TeamRef | null>(null);
   const callSwapInside = useServerFn(swapWithinMatch);
   const callSetFormat = useServerFn(setMatchFormat);
 
@@ -78,6 +80,7 @@ export function BracketView({
     onAssignCourt: readonly || !onAssignCourt ? undefined : (m: MatchCardData, court: number | null) => onAssignCourt(m.id, court),
     onStartMatch: readonly || !onStartMatch ? undefined : (m: MatchCardData, started: boolean) => onStartMatch(m.id, started),
     onSetFormat: readonly ? undefined : handleSetFormat,
+    onEditTeam: readonly ? undefined : (t: TeamRef) => setEditingTeam(t),
   };
 
   const byPhaseRound = useMemo(() => {
@@ -107,6 +110,7 @@ export function BracketView({
       {content}
       <MatchResultDialog open={!!selected} onClose={() => setSelected(null)} match={selected} teams={teams} format={selected?.match_format ?? format} onSaved={onRefresh} />
       <MoveTeamDialog open={!!moveCtx} onClose={() => setMoveCtx(null)} sourceMatch={moveCtx?.match ?? null} sourceSlot={moveCtx?.slot ?? "a"} allMatches={matches} teams={teams} onSaved={onRefresh} />
+      <EditTeamDialog open={!!editingTeam} onClose={() => setEditingTeam(null)} team={editingTeam} onSaved={onRefresh} />
     </>
   );
 }
